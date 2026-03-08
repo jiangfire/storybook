@@ -56,6 +56,8 @@ export default function DashboardPage() {
           {user?.role === 'product' && '产品经理'}
           {user?.role === 'developer' && '开发人员'}
           {user?.role === 'tester' && '测试人员'}
+          {user?.role === 'tech_lead' && '技术负责人'}
+          {user?.role === 'admin' && '管理员'}
         </p>
       </div>
 

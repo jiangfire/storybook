@@ -23,8 +23,8 @@ export default function WorkloadPage() {
         techLeadService.getWorkload(selectedProject || undefined),
         techLeadService.getMyProjects(),
       ]);
-      setWorkloads(workloadRes.data.workloads);
-      setProjects(projectsRes.data.projects);
+      setWorkloads(workloadRes.workloads);
+      setProjects(projectsRes.projects);
     } catch (error) {
       console.error('Failed to load workload:', error);
     } finally {

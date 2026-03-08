@@ -99,6 +99,8 @@ func (s *StoryService) Create(input CreateStoryInput) (*model.UserStory, error) 
 		Description:        description,
 		StoryType:          storyType,
 		Status:             model.StoryStatusPending, // 新创建的故事进入待审批状态
+		ReviewStatus:       model.ReviewStatusPending,
+		ReviewComment:      "",
 		Archived:           false,
 		Priority:           input.Priority,
 		Points:             input.StoryPoints,
@@ -430,15 +432,25 @@ func (s *StoryService) Review(story *model.UserStory, userID uint, approved bool
 	if story.Status != model.StoryStatusPending {
 		return NewValidationError(ValidationIssue{Field: "status", Message: "只有待审批状态的故事可以审批"})
 	}
+	reviewComment := strings.TrimSpace(comment)
+	if !approved && reviewComment == "" {
+		return NewValidationError(ValidationIssue{Field: "comment", Message: "拒绝审批必须填写原因"})
+	}
 
 	oldStatus := story.Status
+	oldReviewStatus := story.ReviewStatus
+	oldReviewComment := story.ReviewComment
 	now := time.Now()
 
 	if approved {
 		story.Status = model.StoryStatusBacklog
+		story.ReviewStatus = model.ReviewStatusApproved
+		story.ReviewComment = ""
 	} else {
-		// 拒绝审批可以设置为特殊状态或直接删除，这里选择标记为backlog但记录拒绝
-		story.Status = model.StoryStatusBacklog
+		// 拒绝后回到待审批，并留下拒绝标记与原因
+		story.Status = model.StoryStatusPending
+		story.ReviewStatus = model.ReviewStatusRejected
+		story.ReviewComment = reviewComment
 	}
 
 	story.ReviewedBy = &userID
@@ -449,12 +461,14 @@ func (s *StoryService) Review(story *model.UserStory, userID uint, approved bool
 	}
 
 	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "reviewed", map[string]any{
-		"status":   oldStatus,
-		"approved": false,
+		"status":         oldStatus,
+		"review_status":  oldReviewStatus,
+		"review_comment": oldReviewComment,
 	}, map[string]any{
-		"status":   story.Status,
-		"approved": approved,
-		"comment":  comment,
+		"status":         story.Status,
+		"review_status":  story.ReviewStatus,
+		"review_comment": story.ReviewComment,
+		"approved":       approved,
 	})
 
 	return nil

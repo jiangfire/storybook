@@ -5,6 +5,25 @@
 ✅ **后端服务**: 运行在 http://localhost:8080
 ✅ **前端服务**: 运行在 http://localhost:3000
 
+## 🤖 自动化测试与覆盖率
+
+### 运行单元测试
+
+```bash
+pnpm run test
+```
+
+### 生成覆盖率报告
+
+```bash
+pnpm run test:coverage
+```
+
+覆盖率产物：
+
+- `coverage/index.html`：可视化覆盖率报告
+- `coverage/coverage-summary.json`：机器可读汇总
+
 ---
 
 ## 📝 测试流程

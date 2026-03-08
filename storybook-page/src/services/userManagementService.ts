@@ -1,4 +1,5 @@
 import api from './api';
+import type { ApiResponse } from '../types/api';
 import type { User, UserRole } from '../types/models';
 
 export interface CreateUserRequest {
@@ -50,27 +51,32 @@ export interface UserWorkloadDetail {
 
 export const userManagementService = {
   // 获取用户列表
-  getUsers: (params?: { role?: UserRole; search?: string; page?: number; limit?: number }) => {
-    return api.get<UsersResponse>('/admin/users', { params });
+  getUsers: async (params?: { role?: UserRole; search?: string; page?: number; limit?: number }) => {
+    const response = await api.get<ApiResponse<UsersResponse>>('/api/admin/users', { params });
+    return response.data.data;
   },
 
   // 创建用户
-  createUser: (data: CreateUserRequest) => {
-    return api.post('/admin/users', data);
+  createUser: async (data: CreateUserRequest) => {
+    const response = await api.post<ApiResponse>('/api/admin/users', data);
+    return response.data.data;
   },
 
   // 更新用户
-  updateUser: (id: number, data: UpdateUserRequest) => {
-    return api.put(`/admin/users/${id}`, data);
+  updateUser: async (id: number, data: UpdateUserRequest) => {
+    const response = await api.put<ApiResponse>(`/api/admin/users/${id}`, data);
+    return response.data.data;
   },
 
   // 删除用户
-  deleteUser: (id: number) => {
-    return api.delete(`/admin/users/${id}`);
+  deleteUser: async (id: number) => {
+    const response = await api.delete<ApiResponse>(`/api/admin/users/${id}`);
+    return response.data.data;
   },
 
   // 获取用户工作负载详情
-  getUserWorkload: (id: number) => {
-    return api.get<UserWorkloadDetail>(`/admin/users/${id}/workload`);
+  getUserWorkload: async (id: number) => {
+    const response = await api.get<ApiResponse<UserWorkloadDetail>>(`/api/admin/users/${id}/workload`);
+    return response.data.data;
   },
 };

@@ -36,8 +36,8 @@ export default function ReviewPage() {
         }),
         techLeadService.getMyProjects(),
       ]);
-      setStories(storiesRes.data.stories);
-      setProjects(projectsRes.data.projects);
+      setStories(storiesRes.stories);
+      setProjects(projectsRes.projects);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -62,12 +62,17 @@ export default function ReviewPage() {
 
   const handleReview = async () => {
     if (!selectedStory || !reviewAction) return;
+    const comment = reviewComment.trim();
+    if (reviewAction === 'reject' && !comment) {
+      alert('拒绝审批必须填写原因');
+      return;
+    }
 
     try {
       setProcessing(true);
       await techLeadService.reviewStory(selectedStory.id, {
         approved: reviewAction === 'approve',
-        comment: reviewComment,
+        comment,
       });
       setReviewModalOpen(false);
       loadData();
@@ -171,6 +176,11 @@ export default function ReviewPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm text-text-light">#{story.id}</span>
                       {getStatusBadge(story.status)}
+                      {story.review_status === 'rejected' && (
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                          已拒绝
+                        </span>
+                      )}
                       <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
                         {story.story_type === 'feature'
                           ? '✨ 功能'
@@ -195,6 +205,11 @@ export default function ReviewPage() {
                       <span>创建者: {story.created_by?.email || '-'}</span>
                       <span>创建时间: {new Date(story.created_at).toLocaleDateString()}</span>
                     </div>
+                    {story.review_status === 'rejected' && story.review_comment && (
+                      <div className="mt-2 text-sm text-red-600">
+                        拒绝原因：{story.review_comment}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 ml-4">
                     <Button
@@ -242,11 +257,13 @@ export default function ReviewPage() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-text mb-1">审批意见（可选）</label>
+            <label className="block text-sm font-medium text-text mb-1">
+              {reviewAction === 'reject' ? '拒绝原因（必填）' : '审批意见（可选）'}
+            </label>
             <textarea
               value={reviewComment}
               onChange={(e) => setReviewComment(e.target.value)}
-              placeholder="输入审批意见..."
+              placeholder={reviewAction === 'reject' ? '请输入拒绝原因...' : '输入审批意见...'}
               rows={3}
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
@@ -258,7 +275,7 @@ export default function ReviewPage() {
             <Button
               variant={reviewAction === 'approve' ? 'primary' : 'danger'}
               onClick={handleReview}
-              disabled={processing}
+              disabled={processing || (reviewAction === 'reject' && !reviewComment.trim())}
             >
               {processing ? '处理中...' : reviewAction === 'approve' ? '确认通过' : '确认拒绝'}
             </Button>

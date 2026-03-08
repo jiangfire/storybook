@@ -66,7 +66,9 @@ async function getUsableAccessToken(): Promise<string | null> {
 }
 
 function buildWsUrl(token: string): string {
-  const rawBase = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').trim();
+  const rawBase = (
+    import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080' : window.location.origin)
+  ).trim();
   try {
     const base = new URL(rawBase);
     const basePath = base.pathname.replace(/\/+$/, '');

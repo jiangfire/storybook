@@ -22,6 +22,16 @@ func EnsureProjectAccess(db *gorm.DB, projectID, userID uint) (*model.Project, b
 		return project, true, nil
 	}
 
+	// 技术负责人和管理员可跨项目只读访问
+	var user model.User
+	if err := db.Select("id, role").First(&user, userID).Error; err == nil {
+		if user.Role == model.RoleTechLead || user.Role == model.RoleAdmin {
+			return project, false, nil
+		}
+	} else {
+		return nil, false, err
+	}
+
 	isMember, err := projectRepo.IsMember(projectID, userID)
 	if err != nil {
 		return nil, false, err
@@ -67,18 +77,9 @@ func IsTechLeadOrAdmin(db *gorm.DB, userID uint, userRole string) bool {
 
 // CanReviewStory 检查用户是否有权限审批故事
 func CanReviewStory(db *gorm.DB, story *model.UserStory, userID uint, userRole string) (bool, error) {
-	// 管理员可以审批任何故事
-	if userRole == model.RoleAdmin {
+	// 管理员和技术负责人都可以审批任何故事
+	if userRole == model.RoleAdmin || userRole == model.RoleTechLead {
 		return true, nil
-	}
-
-	// 技术负责人可以审批其负责项目的故事
-	if userRole == model.RoleTechLead {
-		isTechLead, err := EnsureTechLeadAccess(db, story.ProjectID, userID)
-		if err != nil {
-			return false, err
-		}
-		return isTechLead, nil
 	}
 
 	return false, nil

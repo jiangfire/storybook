@@ -62,7 +62,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/72 backdrop-blur-sm animate-fadeIn"
       onClick={handleBackdropClick}
     >
       <div className={cn('bg-white rounded-2xl shadow-xl w-full animate-slideUp', sizes[size])}>

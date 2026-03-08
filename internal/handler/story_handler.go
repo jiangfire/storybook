@@ -81,7 +81,7 @@ type assignStoryRequest struct {
 }
 
 type reviewStoryRequest struct {
-	Approved bool   `json:"approved" binding:"required"`
+	Approved *bool  `json:"approved"`
 	Comment  string `json:"comment"`
 }
 
@@ -251,7 +251,14 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 			"title":      story.Title,
 			"story_type": story.StoryType,
 			"status":     story.Status,
-			"priority":   story.Priority,
+			"review_status": func() string {
+				if strings.TrimSpace(story.ReviewStatus) == "" {
+					return model.ReviewStatusPending
+				}
+				return story.ReviewStatus
+			}(),
+			"review_comment": story.ReviewComment,
+			"priority":       story.Priority,
 			"story_points": func() any {
 				if story.Points == nil {
 					return nil
@@ -346,11 +353,18 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 			"title":      s.Title,
 			"story_type": s.StoryType,
 			"status":     s.Status,
-			"priority":   s.Priority,
-			"position":   s.Position,
-			"created_by": s.CreatedBy,
-			"created_at": s.CreatedAt,
-			"updated_at": s.UpdatedAt,
+			"review_status": func() string {
+				if strings.TrimSpace(s.ReviewStatus) == "" {
+					return model.ReviewStatusPending
+				}
+				return s.ReviewStatus
+			}(),
+			"review_comment": s.ReviewComment,
+			"priority":       s.Priority,
+			"position":       s.Position,
+			"created_by":     s.CreatedBy,
+			"created_at":     s.CreatedAt,
+			"updated_at":     s.UpdatedAt,
 			"acceptance_criteria_summary": gin.H{
 				"total":                 totalAC,
 				"passed":                passedAC,
@@ -451,7 +465,14 @@ func (h *StoryHandler) GetStory(c *gin.Context) {
 		"description": story.Description,
 		"story_type":  story.StoryType,
 		"status":      story.Status,
-		"priority":    story.Priority,
+		"review_status": func() string {
+			if strings.TrimSpace(story.ReviewStatus) == "" {
+				return model.ReviewStatusPending
+			}
+			return story.ReviewStatus
+		}(),
+		"review_comment": story.ReviewComment,
+		"priority":       story.Priority,
 		"story_points": func() any {
 			if story.Points == nil {
 				return nil
@@ -504,6 +525,9 @@ func (h *StoryHandler) UpdateStory(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
 	if role != model.RoleProduct && role != model.RoleAdmin && story.CreatedBy != userID {
 		api.Forbidden(c, "只有产品经理和故事创建者可以编辑")
 		return
@@ -567,6 +591,10 @@ func (h *StoryHandler) UpdateStatus(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
+		return
+	}
+	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
 		return
 	}
 
@@ -675,6 +703,10 @@ func (h *StoryHandler) ReleaseStory(c *gin.Context) {
 		api.Unauthorized(c, "未登录")
 		return
 	}
+	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
 
 	storyID, ok := parseUintParam(c, "id")
 	if !ok {
@@ -696,7 +728,6 @@ func (h *StoryHandler) ReleaseStory(c *gin.Context) {
 		return
 	}
 
-	role, _ := middleware.CurrentRole(c)
 	if err := h.storySvc.Release(story, userID, role); err != nil {
 		if errors.Is(err, service.ErrNotClaimed) {
 			api.BadRequest(c, "故事未被领取")
@@ -726,8 +757,11 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleProduct && role != model.RoleAdmin && role != model.RoleTechLead {
-		api.Forbidden(c, "仅产品经理或技术负责人可分配故事")
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理可分配故事")
 		return
 	}
 
@@ -817,6 +851,10 @@ func (h *StoryHandler) UpdateACStatus(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
+		return
+	}
+	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
 		return
 	}
 
@@ -951,6 +989,9 @@ func (h *StoryHandler) DeleteStory(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
 	if role != model.RoleProduct && role != model.RoleAdmin && story.CreatedBy != userID {
 		api.Forbidden(c, "仅产品经理、管理员或创建者可删除故事")
 		return
@@ -992,6 +1033,9 @@ func (h *StoryHandler) ArchiveStory(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
 	if role != model.RoleProduct && role != model.RoleAdmin && story.CreatedBy != userID {
 		api.Forbidden(c, "仅产品经理、管理员或创建者可归档故事")
 		return
@@ -1037,6 +1081,9 @@ func (h *StoryHandler) RestoreStory(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
 	if role != model.RoleProduct && role != model.RoleAdmin && story.CreatedBy != userID {
 		api.Forbidden(c, "仅产品经理、管理员或创建者可恢复故事")
 		return
@@ -1204,18 +1251,38 @@ func (h *StoryHandler) ReviewStory(c *gin.Context) {
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
+	if req.Approved == nil {
+		api.BadRequest(c, "approved字段必填")
+		return
+	}
+	comment := strings.TrimSpace(req.Comment)
+	if !*req.Approved && comment == "" {
+		api.BadRequest(c, "拒绝审批必须填写原因")
+		return
+	}
 
-	if err := h.storySvc.Review(story, userID, req.Approved, req.Comment); err != nil {
+	if err := h.storySvc.Review(story, userID, *req.Approved, comment); err != nil {
+		if items, ok := serviceValidationItems(err); ok {
+			api.BadRequest(c, "参数验证失败", items...)
+			return
+		}
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	api.Success(c, "审批成功", gin.H{
-		"id":          story.ID,
-		"status":      story.Status,
-		"reviewed_by": story.ReviewedBy,
-		"reviewed_at": story.ReviewedAt,
-		"approved":    req.Approved,
+		"id":     story.ID,
+		"status": story.Status,
+		"review_status": func() string {
+			if strings.TrimSpace(story.ReviewStatus) == "" {
+				return model.ReviewStatusPending
+			}
+			return story.ReviewStatus
+		}(),
+		"review_comment": story.ReviewComment,
+		"reviewed_by":    story.ReviewedBy,
+		"reviewed_at":    story.ReviewedAt,
+		"approved":       *req.Approved,
 	})
 }
 
@@ -1291,6 +1358,14 @@ func actorFromContext(c *gin.Context, userID uint) gin.H {
 		"id":    userID,
 		"email": c.GetString(middleware.CtxEmailKey),
 	}
+}
+
+func denyTechLeadStoryMutation(c *gin.Context, role string) bool {
+	if role == model.RoleTechLead {
+		api.Forbidden(c, "技术负责人仅可审批用户故事")
+		return true
+	}
+	return false
 }
 
 func parseStringArrayJSON(raw []byte) []string {

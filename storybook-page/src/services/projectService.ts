@@ -11,6 +11,8 @@ import {
   CreateSprintRequest,
   UpdateSprintStatusRequest,
   SprintSummary,
+  VelocityReportData,
+  QualityReportData,
 } from '../types/api';
 import { Project } from '../types/models';
 
@@ -126,6 +128,26 @@ export const projectService = {
     const response = await apiClient.get<ApiResponse<BurndownReport>>(
       `/api/projects/${id}/reports/burndown`,
       { params: { sprint_id: sprintId } }
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 获取项目速度报表
+   */
+  async getVelocity(id: number): Promise<VelocityReportData> {
+    const response = await apiClient.get<ApiResponse<VelocityReportData>>(
+      `/api/projects/${id}/reports/velocity`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 获取项目质量报表
+   */
+  async getQuality(id: number): Promise<QualityReportData> {
+    const response = await apiClient.get<ApiResponse<QualityReportData>>(
+      `/api/projects/${id}/reports/quality`
     );
     return response.data.data;
   },

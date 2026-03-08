@@ -36,6 +36,12 @@ const (
 )
 
 const (
+	ReviewStatusPending  = "pending"
+	ReviewStatusApproved = "approved"
+	ReviewStatusRejected = "rejected"
+)
+
+const (
 	ACStatusPending = "pending"
 	ACStatusPassed  = "passed"
 	ACStatusFailed  = "failed"
@@ -142,6 +148,8 @@ type UserStory struct {
 	Description        string         `gorm:"type:text" json:"description,omitempty"`
 	StoryType          string         `gorm:"size:50;not null;default:feature" json:"story_type"`
 	Status             string         `gorm:"size:50;not null;default:backlog;index" json:"status"`
+	ReviewStatus       string         `gorm:"size:20;not null;default:pending;index" json:"review_status"`
+	ReviewComment      string         `gorm:"type:text" json:"review_comment,omitempty"`
 	Archived           bool           `gorm:"not null;default:false;index" json:"archived"`
 	Priority           int            `gorm:"default:0;index" json:"priority"`
 	Points             *int           `json:"story_points,omitempty"`

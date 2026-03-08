@@ -14,7 +14,7 @@ export default function StoryCreatePage() {
   return (
     <StoryForm
       isOpen
-      onClose={() => navigate(`/projects/${resolvedProjectID}/board`)}
+      onClose={() => navigate(`/projects/${resolvedProjectID}/board`, { replace: true })}
       projectId={resolvedProjectID}
       mode="create"
     />

@@ -41,6 +41,17 @@ pnpm run build
 
 构建产物将输出到 `dist/` 目录。
 
+### 构建并同步到后端 embed 目录
+
+在仓库根目录执行：
+
+```bash
+cd storybook-page
+pnpm run build
+cd ..
+go run ./cmd/embedui
+```
+
 ## 📦 技术栈
 
 - **框架**: React 19 + TypeScript

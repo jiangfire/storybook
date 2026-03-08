@@ -5,12 +5,15 @@ import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../../components/ui/Toast';
 import AcceptanceCriteriaList from '../../components/story/AcceptanceCriteriaList';
 import ActivityTimeline from '../../components/story/ActivityTimeline';
+import StoryTasksPanel from '../../components/story/StoryTasksPanel';
+import StoryTestCasesPanel from '../../components/story/StoryTestCasesPanel';
 import StoryForm from '../../components/story/StoryForm';
 import Button from '../../components/ui/Button';
 import { StoryDetailSkeleton } from '../../components/ui/Skeleton';
 import { projectService } from '../../services/projectService';
 import { storyService } from '../../services/storyService';
-import { SprintSummary } from '../../types/api';
+import { aiService } from '../../services/aiService';
+import { AISplitStoryData, INVESTCheckData, SprintSummary } from '../../types/api';
 import { getErrorMessage } from '../../utils/error';
 import {
   formatStoryType,
@@ -57,6 +60,13 @@ export default function StoryDetailPage() {
   const [memberLoadError, setMemberLoadError] = useState('');
   const [selectedAssigneeID, setSelectedAssigneeID] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isInvestLoading, setIsInvestLoading] = useState(false);
+  const [investError, setInvestError] = useState('');
+  const [investResult, setInvestResult] = useState<INVESTCheckData | null>(null);
+  const [splitTargetCount, setSplitTargetCount] = useState(3);
+  const [isSplitLoading, setIsSplitLoading] = useState(false);
+  const [splitError, setSplitError] = useState('');
+  const [splitResult, setSplitResult] = useState<AISplitStoryData | null>(null);
 
   useEffect(() => {
     clearCurrentStory();
@@ -151,6 +161,7 @@ export default function StoryDetailPage() {
   };
 
   const canPlanSprint = user?.role === 'product' || user?.role === 'admin';
+  const canUseAI = user?.role === 'product' || user?.role === 'admin';
   const canClaimStory = user?.role === 'developer';
   const canEditStory =
     user?.role === 'product' || user?.role === 'admin' || user?.id === currentStory.created_by.id;
@@ -200,6 +211,38 @@ export default function StoryDetailPage() {
       showError(getErrorMessage(error, '分配失败'));
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const handleInvestCheck = async () => {
+    try {
+      setIsInvestLoading(true);
+      setInvestError('');
+      const data = await aiService.checkInvest(currentStory.id);
+      setInvestResult(data);
+      showSuccess('INVEST 检查完成');
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error, 'INVEST 检查失败');
+      setInvestError(msg);
+      showError(msg);
+    } finally {
+      setIsInvestLoading(false);
+    }
+  };
+
+  const handleSplitStory = async () => {
+    try {
+      setIsSplitLoading(true);
+      setSplitError('');
+      const data = await aiService.splitStory(currentStory.id, { target_count: splitTargetCount });
+      setSplitResult(data);
+      showSuccess('AI 拆分建议已生成');
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error, 'AI 拆分失败');
+      setSplitError(msg);
+      showError(msg);
+    } finally {
+      setIsSplitLoading(false);
     }
   };
 
@@ -253,6 +296,11 @@ export default function StoryDetailPage() {
                 </span>
               </div>
             </div>
+            {currentStory.review_status === 'rejected' && currentStory.review_comment && (
+              <div className="mt-3 inline-flex items-center rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                拒绝原因：{currentStory.review_comment}
+              </div>
+            )}
           </div>
 
           {/* 操作按钮 */}
@@ -344,6 +392,10 @@ export default function StoryDetailPage() {
             <h2 className="text-lg font-semibold text-text mb-4">活动历史</h2>
             <ActivityTimeline activities={activities} />
           </div>
+
+          <StoryTasksPanel storyId={currentStory.id} />
+
+          <StoryTestCasesPanel storyId={currentStory.id} />
         </div>
 
         {/* 右侧：侧边栏 */}
@@ -397,6 +449,73 @@ export default function StoryDetailPage() {
                 <div className="text-text-light">
                   说明：产品经理可分配负责人；开发人员可在未分配时自行领取。
                 </div>
+              </div>
+            </div>
+          )}
+
+          {canUseAI && (
+            <div className="bg-white rounded-xl border border-border p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-text">AI 辅助</h2>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-light">INVEST 质量检查</span>
+                  <Button size="sm" variant="secondary" onClick={handleInvestCheck} isLoading={isInvestLoading}>
+                    执行检查
+                  </Button>
+                </div>
+                {investError && <div className="text-xs text-danger">{investError}</div>}
+                {investResult && (
+                  <div className="bg-gray-50 border border-border rounded-lg p-3 text-sm space-y-2">
+                    <div>
+                      总分：<span className="font-semibold">{investResult.invest_score.toFixed(1)}</span>
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      {Object.entries(investResult.checks).map(([key, val]) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span>{val.title}</span>
+                          <span>
+                            {val.score.toFixed(2)} · {val.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {investResult.suggestions.length > 0 && (
+                      <div className="text-xs text-text-light">
+                        建议：{investResult.suggestions.join('；')}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-sm text-text-light">AI 拆分大故事</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={8}
+                    value={splitTargetCount}
+                    onChange={(e) => setSplitTargetCount(Number(e.target.value) || 3)}
+                    className="w-24 px-2 py-1 border border-border rounded text-sm"
+                  />
+                  <Button size="sm" variant="secondary" onClick={handleSplitStory} isLoading={isSplitLoading}>
+                    生成拆分建议
+                  </Button>
+                </div>
+                {splitError && <div className="text-xs text-danger">{splitError}</div>}
+                {splitResult && splitResult.sub_stories.length > 0 && (
+                  <div className="space-y-2">
+                    {splitResult.sub_stories.map((item, idx) => (
+                      <div key={`${item.title}-${idx}`} className="border border-border rounded-lg p-2">
+                        <div className="text-sm font-medium text-text">{item.title}</div>
+                        <div className="text-xs text-text-light mt-1">
+                          点数 {item.story_points} · AC {item.acceptance_criteria.length} 条
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { RegisterRequest } from '../../types/api';
+import type { RegisterRequest } from '../../types/api';
 import { isValidEmail, isValidPassword } from '../../utils/validators';
 
 const roleOptions: Array<{

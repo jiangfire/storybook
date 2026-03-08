@@ -4,6 +4,7 @@ import { storyService } from '../../services/storyService';
 import { projectService } from '../../services/projectService';
 import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../ui/Toast';
+import { aiService } from '../../services/aiService';
 import { isValidStoryTitle, isValidStoryDescription } from '../../utils/validators';
 import { CreateStoryRequest, UpdateStoryRequest, SprintSummary } from '../../types/api';
 import { StoryType } from '../../types/models';
@@ -78,6 +79,9 @@ export default function StoryForm({
   const [selectedSprintID, setSelectedSprintID] = useState('');
   const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
   const [sprintError, setSprintError] = useState('');
+  const [aiRequirement, setAIRequirement] = useState('');
+  const [isAIGenerating, setIsAIGenerating] = useState(false);
+  const [aiError, setAIError] = useState('');
 
   const loadStoryData = useCallback(async () => {
     if (!storyId) return;
@@ -164,7 +168,7 @@ export default function StoryForm({
       if (mode === 'create') {
         const story = await storyService.createStory(projectId, request);
         showSuccess('故事创建成功');
-        navigate(`/stories/${story.id}`);
+        navigate(`/stories/${story.id}`, { replace: true });
         onClose();
       } else {
         await storyService.updateStory(storyId!, request);
@@ -256,6 +260,35 @@ export default function StoryForm({
     });
   };
 
+  const handleAIGenerate = async () => {
+    const requirement = aiRequirement.trim();
+    if (!requirement) {
+      setAIError('请输入需求描述');
+      return;
+    }
+    try {
+      setIsAIGenerating(true);
+      setAIError('');
+      const data = await aiService.generateStory({ requirement });
+      const suggestedTitle = data.action ? data.action.slice(0, 200) : requirement.slice(0, 200);
+      setFormData((prev) => ({
+        ...prev,
+        title: suggestedTitle || prev.title,
+        description: data.user_story || prev.description,
+        story_points: data.story_points || prev.story_points,
+        acceptance_criteria: (data.suggested_ac || []).map((desc, index) => ({
+          description: desc,
+          order: index + 1,
+        })),
+      }));
+      showSuccess('AI草稿已生成并填充表单');
+    } catch (error: unknown) {
+      setAIError(getErrorMessage(error, 'AI生成失败'));
+    } finally {
+      setIsAIGenerating(false);
+    }
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -305,6 +338,25 @@ export default function StoryForm({
             <p className="mt-1 text-sm text-danger">{fieldErrors.description}</p>
           )}
         </div>
+
+        {mode === 'create' && (
+          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-3">
+            <div className="text-sm font-medium text-text">AI 生成故事草稿</div>
+            <textarea
+              value={aiRequirement}
+              onChange={(e) => setAIRequirement(e.target.value)}
+              rows={3}
+              placeholder="输入原始需求，AI会生成用户故事、建议AC与故事点"
+              className="w-full px-3 py-2 border border-blue-200 rounded-lg resize-none"
+            />
+            {aiError && <div className="text-xs text-danger">{aiError}</div>}
+            <div className="flex justify-end">
+              <Button size="sm" variant="secondary" onClick={handleAIGenerate} isLoading={isAIGenerating}>
+                AI 生成草稿
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* 故事类型 */}
         <div>

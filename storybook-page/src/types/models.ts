@@ -1,5 +1,5 @@
 // 用户角色
-export type UserRole = 'product' | 'developer' | 'tester' | 'tech_lead';
+export type UserRole = 'product' | 'developer' | 'tester' | 'tech_lead' | 'admin';
 
 // 用户
 export interface User {
@@ -15,6 +15,7 @@ export type StoryType = 'feature' | 'bug' | 'chore';
 
 // 故事状态
 export type StoryStatus = 'pending' | 'backlog' | 'ready' | 'in_progress' | 'test' | 'done';
+export type StoryReviewStatus = 'pending' | 'approved' | 'rejected';
 
 // 敏捷模式
 export type AgileMode = 'scrum' | 'kanban';
@@ -40,6 +41,8 @@ export interface Story {
   description?: string;
   story_type: StoryType;
   status: StoryStatus;
+  review_status?: StoryReviewStatus;
+  review_comment?: string;
   priority: number;
   story_points?: number;
   position: number;

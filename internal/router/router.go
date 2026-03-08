@@ -6,6 +6,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/realtime"
+	"git.neolidy.top/neo/storybook/internal/webui"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -161,6 +162,8 @@ func New(db *gorm.DB, tokenManager *auth.TokenManager) *gin.Engine {
 		mcp.POST("/v1/stories/:id/analyze-code-ac", mcpHandler.AnalyzeCodeAC)
 		mcp.GET("/v1/stats/ac-completion", mcpHandler.ACCompletionStats)
 	}
+
+	webui.Register(r)
 
 	return r
 }

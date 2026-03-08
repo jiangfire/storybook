@@ -22,7 +22,7 @@ func NewTechLeadHandler(db *gorm.DB) *TechLeadHandler {
 
 // ListPendingStories 获取待审批故事列表（技术负责人）
 func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
+	_, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
 		return
@@ -34,22 +34,7 @@ func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
 		return
 	}
 
-	// 获取技术负责人负责的项目ID列表
-	var projectIDs []uint
-	if err := h.db.Model(&model.ProjectTechLead{}).Where("user_id = ?", userID).Pluck("project_id", &projectIDs).Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	// 管理员可以查看所有待审批故事
 	query := h.db.Model(&model.UserStory{}).Where("status = ?", model.StoryStatusPending)
-	if role != model.RoleAdmin {
-		if len(projectIDs) == 0 {
-			api.Success(c, "success", gin.H{"stories": []gin.H{}, "total": 0})
-			return
-		}
-		query = query.Where("project_id IN ?", projectIDs)
-	}
 
 	// 支持按项目筛选
 	if projectID := c.Query("project_id"); projectID != "" {
@@ -88,7 +73,14 @@ func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
 			"title":      story.Title,
 			"story_type": story.StoryType,
 			"status":     story.Status,
-			"priority":   story.Priority,
+			"review_status": func() string {
+				if strings.TrimSpace(story.ReviewStatus) == "" {
+					return model.ReviewStatusPending
+				}
+				return story.ReviewStatus
+			}(),
+			"review_comment": story.ReviewComment,
+			"priority":       story.Priority,
 			"story_points": func() any {
 				if story.Points == nil {
 					return nil
@@ -242,7 +234,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 
 // ListMyProjects 获取技术负责人负责的项目列表
 func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
+	_, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
 		return
@@ -254,28 +246,10 @@ func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
 		return
 	}
 
-	// 管理员返回所有项目
 	var projects []model.Project
-	if role == model.RoleAdmin {
-		if err := h.db.Find(&projects).Error; err != nil {
-			api.Internal(c, "服务器内部错误")
-			return
-		}
-	} else {
-		// 技术负责人返回负责的项目
-		var projectIDs []uint
-		if err := h.db.Model(&model.ProjectTechLead{}).Where("user_id = ?", userID).Pluck("project_id", &projectIDs).Error; err != nil {
-			api.Internal(c, "服务器内部错误")
-			return
-		}
-		if len(projectIDs) == 0 {
-			api.Success(c, "success", gin.H{"projects": []gin.H{}})
-			return
-		}
-		if err := h.db.Where("id IN ?", projectIDs).Find(&projects).Error; err != nil {
-			api.Internal(c, "服务器内部错误")
-			return
-		}
+	if err := h.db.Find(&projects).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
 	}
 
 	items := make([]gin.H, 0, len(projects))

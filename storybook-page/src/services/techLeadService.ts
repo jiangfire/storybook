@@ -1,4 +1,5 @@
 import api from './api';
+import type { ApiResponse } from '../types/api';
 import type { Story, UserWorkload } from '../types/models';
 
 export interface PendingStoriesResponse {
@@ -23,51 +24,67 @@ export interface AssignStoryRequest {
 
 export const techLeadService = {
   // 获取待审批故事列表
-  getPendingStories: (params?: {
+  getPendingStories: async (params?: {
     project_id?: number;
     search?: string;
     page?: number;
     limit?: number;
   }) => {
-    return api.get<PendingStoriesResponse>('/techlead/pending-stories', { params });
+    const response = await api.get<ApiResponse<PendingStoriesResponse>>('/api/techlead/pending-stories', {
+      params,
+    });
+    return response.data.data;
   },
 
   // 审批故事
-  reviewStory: (storyId: number, data: ReviewStoryRequest) => {
-    return api.post(`/stories/${storyId}/review`, data);
+  reviewStory: async (storyId: number, data: ReviewStoryRequest) => {
+    const response = await api.post<ApiResponse>(`/api/stories/${storyId}/review`, data);
+    return response.data.data;
   },
 
   // 分配故事
-  assignStory: (storyId: number, assigneeId?: number) => {
-    return api.patch(`/stories/${storyId}/assignee`, { assigned_to: assigneeId });
+  assignStory: async (storyId: number, assigneeId?: number) => {
+    const response = await api.patch<ApiResponse>(`/api/stories/${storyId}/assignee`, {
+      assigned_to: assigneeId,
+    });
+    return response.data.data;
   },
 
   // 获取工作负载统计
-  getWorkload: (projectId?: number) => {
-    return api.get<WorkloadResponse>('/techlead/workload', {
+  getWorkload: async (projectId?: number) => {
+    const response = await api.get<ApiResponse<WorkloadResponse>>('/api/techlead/workload', {
       params: projectId ? { project_id: projectId } : undefined,
     });
+    return response.data.data;
   },
 
   // 获取技术负责人负责的项目列表
-  getMyProjects: () => {
-    return api.get<{
-      projects: Array<{ id: number; name: string; agile_mode: string; pending_stories: number }>;
-    }>('/techlead/projects');
+  getMyProjects: async () => {
+    const response = await api.get<
+      ApiResponse<{
+        projects: Array<{ id: number; name: string; agile_mode: string; pending_stories: number }>;
+      }>
+    >('/api/techlead/projects');
+    return response.data.data;
   },
 
   // 获取项目技术负责人列表
-  getProjectTechLeads: (projectId: number) => {
-    return api.get(`/projects/${projectId}/techleads`);
+  getProjectTechLeads: async (projectId: number) => {
+    const response = await api.get<ApiResponse>(`/api/projects/${projectId}/techleads`);
+    return response.data.data;
   },
 
   // 为项目添加技术负责人（仅admin）
-  addTechLead: (projectId: number, userId: number) => {
-    return api.post(`/projects/${projectId}/techleads`, { user_id: userId });
+  addTechLead: async (projectId: number, userId: number) => {
+    const response = await api.post<ApiResponse>(`/api/projects/${projectId}/techleads`, {
+      user_id: userId,
+    });
+    return response.data.data;
   },
 
   // 移除项目技术负责人（仅admin）
-  removeTechLead: (projectId: number, userId: number) => {
-    return api.delete(`/projects/${projectId}/techleads/${userId}`);
+  removeTechLead: async (projectId: number, userId: number) => {
+    const response = await api.delete<ApiResponse>(`/api/projects/${projectId}/techleads/${userId}`);
+    return response.data.data;
   },
 };

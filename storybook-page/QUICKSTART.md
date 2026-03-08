@@ -31,6 +31,20 @@ pnpm run dev
 
 打开浏览器访问 http://localhost:3000
 
+## 📦 单体部署打包（前端嵌入后端）
+
+在仓库根目录执行：
+
+```bash
+cd storybook-page
+pnpm run build
+cd ..
+go run ./cmd/embedui
+go build -o storybook-server ./cmd/server
+```
+
+生成的 `storybook-server` 已内嵌前端静态资源，启动后直接访问后端地址即可（无需分开部署前后端）。
+
 ## 🔑 测试账号
 
 你可以：

@@ -216,6 +216,34 @@ export interface TaskListParams {
   assignee?: number;
 }
 
+export interface TaskItem {
+  id: number;
+  project_id: number;
+  story_id: number;
+  title: string;
+  description?: string;
+  status: 'todo' | 'in_progress' | 'blocked' | 'done';
+  priority: number;
+  progress: number;
+  estimated_hours?: number;
+  code_references?: string[];
+  assigned_to?: { id: number; email?: string } | number;
+  assignee?: { id: number; email: string };
+  created_by?: { id: number; email: string } | number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskListResponse {
+  tasks: TaskItem[];
+}
+
+export interface TaskSplitResponse {
+  story_id: number;
+  created_count: number;
+  tasks: TaskItem[];
+}
+
 // ===== 测试用例相关 =====
 
 // 创建测试用例请求
@@ -224,6 +252,23 @@ export interface CreateTestCaseRequest {
   description?: string;
   steps: string[];
   expected_result?: string;
+}
+
+export interface TestCaseItem {
+  id: number;
+  story_id: number;
+  title: string;
+  description?: string;
+  steps: string[];
+  expected_result?: string;
+  status: 'pending' | 'passed' | 'failed';
+  created_by?: { id: number; email: string };
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface TestCaseListResponse {
+  test_cases: TestCaseItem[];
 }
 
 // ===== 缺陷相关 =====
@@ -252,6 +297,25 @@ export interface UpdateBugStatusRequest {
 // 指派缺陷请求
 export interface AssignBugRequest {
   assigned_to?: number;
+}
+
+export interface BugItem {
+  id: number;
+  project_id: number;
+  story_id?: number;
+  title: string;
+  description?: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  reported_by?: { id: number; email: string };
+  assigned_to?: { id: number; email: string } | number;
+  resolved_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BugListResponse {
+  bugs: BugItem[];
 }
 
 // ===== 冲刺相关 =====
@@ -338,6 +402,38 @@ export interface BurndownReport {
   points: BurndownPoint[];
 }
 
+export interface VelocitySprintItem {
+  sprint_id: number;
+  name: string;
+  status: 'planned' | 'active' | 'completed';
+  start_date: string;
+  end_date: string;
+  story_count: number;
+  planned_points: number;
+  completed_points: number;
+  velocity: number;
+}
+
+export interface VelocityReportData {
+  project_id: number;
+  velocity: VelocitySprintItem[];
+}
+
+export interface QualityReportData {
+  project_id: number;
+  bugs: {
+    total: number;
+    status_breakdown: Record<string, number>;
+    severity_breakdown: Record<string, number>;
+  };
+  acceptance_criteria: {
+    total: number;
+    passed: number;
+    failed: number;
+    completion_percentage: number;
+  };
+}
+
 // ===== 搜索相关 =====
 
 // 搜索查询参数
@@ -357,6 +453,34 @@ export interface SearchResult {
   project_name?: string;
 }
 
+export interface SearchResponseData {
+  projects?: Array<{
+    id: number;
+    name: string;
+    description?: string;
+    agile_mode?: string;
+    created_at: string;
+  }>;
+  stories?: Array<{
+    id: number;
+    project_id: number;
+    title: string;
+    story_type: string;
+    status: string;
+    priority: number;
+    updated_at: string;
+  }>;
+  bugs?: Array<{
+    id: number;
+    project_id: number;
+    story_id?: number;
+    title: string;
+    severity: string;
+    status: string;
+    updated_at: string;
+  }>;
+}
+
 // ===== AI相关 =====
 
 // AI生成故事请求
@@ -374,6 +498,15 @@ export interface AIGenerateStoryResponse {
   suggested_story_points: number;
 }
 
+export interface AIGeneratedStoryResponse {
+  user_story: string;
+  actor: string;
+  action: string;
+  value: string;
+  suggested_ac: string[];
+  story_points: 1 | 2 | 3 | 5 | 8 | 13;
+}
+
 // AI拆分故事请求
 export interface AISplitStoryRequest {
   target_count?: number;
@@ -384,6 +517,24 @@ export interface AISplitStoryResponse {
   sub_stories: Array<{
     title: string;
     description: string;
+    story_points: number;
+  }>;
+}
+
+export interface AISplitStoryData {
+  story_id: number;
+  origin_title: string;
+  sub_stories: Array<{
+    title: string;
+    description: string;
+    acceptance_criteria: Array<{
+      id: string;
+      ref?: string;
+      description: string;
+      status: 'pending' | 'passed' | 'failed';
+      order: number;
+      evidence?: string;
+    }>;
     story_points: number;
   }>;
 }
@@ -400,6 +551,21 @@ export interface INVESTCheckResponse {
     small: CheckResult;
     testable: CheckResult;
   };
+  suggestions: string[];
+}
+
+export interface INVESTCheckData {
+  story_id: number;
+  invest_score: number;
+  checks: Record<
+    'independent' | 'negotiable' | 'valuable' | 'estimable' | 'small' | 'testable',
+    {
+      score: number;
+      status: 'pass' | 'warning' | 'fail';
+      title: string;
+      description: string;
+    }
+  >;
   suggestions: string[];
 }
 

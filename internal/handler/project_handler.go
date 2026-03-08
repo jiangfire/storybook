@@ -2,6 +2,7 @@ package handler
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -153,6 +154,7 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 		api.Unauthorized(c, "未登录")
 		return
 	}
+	role, _ := middleware.CurrentRole(c)
 
 	page := parseIntQuery(c, "page", 1)
 	limit := parseIntQuery(c, "limit", 20)
@@ -162,10 +164,13 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 
 	search := strings.TrimSpace(c.Query("search"))
 
-	query := h.db.Model(&model.Project{}).
-		Joins("LEFT JOIN project_members pm ON pm.project_id = projects.id").
-		Where("projects.owner_id = ? OR pm.user_id = ?", userID, userID).
-		Group("projects.id")
+	query := h.db.Model(&model.Project{})
+	if role != model.RoleTechLead && role != model.RoleAdmin {
+		query = query.
+			Joins("LEFT JOIN project_members pm ON pm.project_id = projects.id").
+			Where("projects.owner_id = ? OR pm.user_id = ?", userID, userID).
+			Group("projects.id")
+	}
 
 	if search != "" {
 		like := fmt.Sprintf("%%%s%%", search)
@@ -242,7 +247,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
-		if err == errForbidden {
+		if errors.Is(err, errForbidden) {
 			api.Forbidden(c, "非项目成员无法访问")
 			return
 		}
@@ -429,7 +434,7 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
-		if err == errForbidden {
+		if errors.Is(err, errForbidden) {
 			api.Forbidden(c, "非项目成员无法访问")
 			return
 		}
@@ -536,7 +541,7 @@ func (h *ProjectHandler) ListMembers(c *gin.Context) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
-		if err == errForbidden {
+		if errors.Is(err, errForbidden) {
 			api.Forbidden(c, "非项目成员无法访问")
 			return
 		}
@@ -595,7 +600,7 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
-		if err == errForbidden {
+		if errors.Is(err, errForbidden) {
 			api.Forbidden(c, "非项目成员无法访问")
 			return
 		}
@@ -676,7 +681,7 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
-		if err == errForbidden {
+		if errors.Is(err, errForbidden) {
 			api.Forbidden(c, "非项目成员无法访问")
 			return
 		}
@@ -720,6 +725,15 @@ func (h *ProjectHandler) getProjectWithAccess(projectID, userID uint) (*model.Pr
 
 	if project.OwnerID == userID {
 		return &project, true, nil
+	}
+
+	var user model.User
+	if err := h.db.Select("id, role").First(&user, userID).Error; err == nil {
+		if user.Role == model.RoleTechLead || user.Role == model.RoleAdmin {
+			return &project, false, nil
+		}
+	} else {
+		return nil, false, err
 	}
 
 	var exists int64

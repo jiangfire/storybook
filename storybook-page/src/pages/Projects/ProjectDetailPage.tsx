@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/projectStore';
+import { useAuthStore } from '../../stores/authStore';
 import { projectService } from '../../services/projectService';
+import { techLeadService } from '../../services/techLeadService';
+import { userManagementService } from '../../services/userManagementService';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
 import { formatStoryStatus, formatSprintStatus } from '../../utils/formatters';
 import { getErrorMessage } from '../../utils/error';
-import { BurndownReport, CreateSprintRequest, SprintSummary } from '../../types/api';
+import {
+  BurndownReport,
+  CreateSprintRequest,
+  QualityReportData,
+  SprintSummary,
+  VelocityReportData,
+} from '../../types/api';
+import { User } from '../../types/models';
 
 interface MemberItem {
   id: number;
@@ -25,6 +35,7 @@ interface MemberItem {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const projectID = Number(id);
+  const { user } = useAuthStore();
   const { showSuccess, showError } = useToast();
   const { currentProject, projectOverview, fetchProject, fetchProjectOverview, isLoading, error } =
     useProjectStore();
@@ -36,6 +47,19 @@ export default function ProjectDetailPage() {
   const [burndown, setBurndown] = useState<BurndownReport | null>(null);
   const [burndownError, setBurndownError] = useState('');
   const [isBurndownLoading, setIsBurndownLoading] = useState(false);
+  const [velocity, setVelocity] = useState<VelocityReportData | null>(null);
+  const [quality, setQuality] = useState<QualityReportData | null>(null);
+  const [isReportLoading, setIsReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [selectedMemberUserID, setSelectedMemberUserID] = useState('');
+  const [selectedMemberRole, setSelectedMemberRole] = useState<'product' | 'developer' | 'tester'>(
+    'developer'
+  );
+  const [isMemberUpdating, setIsMemberUpdating] = useState(false);
+  const [techLeads, setTechLeads] = useState<Array<{ id: number; user?: { id: number; email: string } }>>([]);
+  const [selectedTechLeadUserID, setSelectedTechLeadUserID] = useState('');
+  const [isTechLeadUpdating, setIsTechLeadUpdating] = useState(false);
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
   const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
   const [statusUpdatingSprintID, setStatusUpdatingSprintID] = useState<number | null>(null);
@@ -54,8 +78,13 @@ export default function ProjectDetailPage() {
       fetchProjectOverview(projectID);
       loadMembers(projectID);
       loadSprints(projectID);
+      loadReports(projectID);
+      loadProjectTechLeads(projectID);
+      if (user?.role === 'product' || user?.role === 'admin' || user?.role === 'tech_lead') {
+        loadAllUsers();
+      }
     }
-  }, [projectID, fetchProject, fetchProjectOverview]);
+  }, [projectID, fetchProject, fetchProjectOverview, user?.role]);
 
   useEffect(() => {
     if (!Number.isNaN(projectID) && projectID > 0 && selectedSprintID) {
@@ -71,6 +100,24 @@ export default function ProjectDetailPage() {
     } catch {
       setMemberError('成员列表加载失败');
       setMembers([]);
+    }
+  };
+
+  const loadAllUsers = async () => {
+    try {
+      const data = await userManagementService.getUsers({ page: 1, limit: 100 });
+      setAllUsers(data.users || []);
+    } catch {
+      setAllUsers([]);
+    }
+  };
+
+  const loadProjectTechLeads = async (pid: number) => {
+    try {
+      const data = await techLeadService.getProjectTechLeads(pid);
+      setTechLeads(data.tech_leads || []);
+    } catch {
+      setTechLeads([]);
     }
   };
 
@@ -105,6 +152,102 @@ export default function ProjectDetailPage() {
       setBurndownError('燃尽图数据加载失败');
     } finally {
       setIsBurndownLoading(false);
+    }
+  };
+
+  const loadReports = async (pid: number) => {
+    try {
+      setIsReportLoading(true);
+      setReportError('');
+      const [velocityData, qualityData] = await Promise.all([
+        projectService.getVelocity(pid),
+        projectService.getQuality(pid),
+      ]);
+      setVelocity(velocityData);
+      setQuality(qualityData);
+    } catch (err: unknown) {
+      setVelocity(null);
+      setQuality(null);
+      setReportError(getErrorMessage(err, '报表数据加载失败'));
+    } finally {
+      setIsReportLoading(false);
+    }
+  };
+
+  const handleAddMember = async () => {
+    const userID = Number(selectedMemberUserID);
+    if (!userID) {
+      showError('请选择要添加的成员');
+      return;
+    }
+    try {
+      setIsMemberUpdating(true);
+      await projectService.addProjectMember(projectID, {
+        user_id: userID,
+        role_in_project: selectedMemberRole,
+      });
+      showSuccess('项目成员添加成功');
+      setSelectedMemberUserID('');
+      await loadMembers(projectID);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '成员添加失败'));
+    } finally {
+      setIsMemberUpdating(false);
+    }
+  };
+
+  const handleRemoveMember = async (member: MemberItem) => {
+    if (member.is_owner) {
+      showError('项目 Owner 不能移除');
+      return;
+    }
+    if (!confirm(`确认移除成员 ${member.user?.email || member.user_id} 吗？`)) {
+      return;
+    }
+    try {
+      setIsMemberUpdating(true);
+      await projectService.removeProjectMember(projectID, member.user_id);
+      showSuccess('成员移除成功');
+      await loadMembers(projectID);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '成员移除失败'));
+    } finally {
+      setIsMemberUpdating(false);
+    }
+  };
+
+  const handleAddTechLead = async () => {
+    const userID = Number(selectedTechLeadUserID);
+    if (!userID) {
+      showError('请选择技术负责人');
+      return;
+    }
+    try {
+      setIsTechLeadUpdating(true);
+      await techLeadService.addTechLead(projectID, userID);
+      showSuccess('技术负责人添加成功');
+      setSelectedTechLeadUserID('');
+      await loadProjectTechLeads(projectID);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '技术负责人添加失败'));
+    } finally {
+      setIsTechLeadUpdating(false);
+    }
+  };
+
+  const handleRemoveTechLead = async (userID: number) => {
+    if (!confirm('确认移除该技术负责人吗？')) {
+      return;
+    }
+    try {
+      setIsTechLeadUpdating(true);
+      await techLeadService.removeTechLead(projectID, userID);
+      showSuccess('技术负责人移除成功');
+      await loadProjectTechLeads(projectID);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '技术负责人移除失败'));
+    } finally {
+      setIsTechLeadUpdating(false);
     }
   };
 
@@ -216,6 +359,16 @@ export default function ProjectDetailPage() {
   const completionRate = projectOverview?.statistics?.completion_rate || 0;
   const totalStories = projectOverview?.statistics?.total_stories || 0;
   const activeMembers = projectOverview?.statistics?.active_members || members.length || 0;
+  const canManageMembers = user?.role === 'product' || user?.role === 'admin';
+  const canManageTechLeads = user?.role === 'admin';
+  const availableMemberUsers = allUsers.filter(
+    (candidate) => !members.some((member) => member.user_id === candidate.id)
+  );
+  const availableTechLeadUsers = allUsers.filter(
+    (candidate) =>
+      candidate.role === 'tech_lead' &&
+      !techLeads.some((techLead) => techLead.user && techLead.user.id === candidate.id)
+  );
 
   return (
     <div className="p-8 space-y-6">
@@ -227,6 +380,9 @@ export default function ProjectDetailPage() {
         <div className="flex items-center gap-3">
           <Link to={`/projects/${projectID}/stories/new`}>
             <Button variant="secondary">+ 创建故事</Button>
+          </Link>
+          <Link to={`/projects/${projectID}/bugs`}>
+            <Button variant="secondary">缺陷管理</Button>
           </Link>
           <Link to={`/projects/${projectID}/board`}>
             <Button>进入看板</Button>
@@ -359,6 +515,81 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-border p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-text">速度报表</h2>
+            <Button size="sm" variant="secondary" onClick={() => loadReports(projectID)}>
+              刷新
+            </Button>
+          </div>
+          {isReportLoading && <div className="text-sm text-text-light">报表加载中...</div>}
+          {!isReportLoading && reportError && <div className="text-sm text-danger">{reportError}</div>}
+          {!isReportLoading && !reportError && (!velocity || velocity.velocity.length === 0) && (
+            <div className="text-sm text-text-light">暂无冲刺速度数据</div>
+          )}
+          {!isReportLoading && !reportError && velocity && velocity.velocity.length > 0 && (
+            <div className="space-y-2">
+              {velocity.velocity.map((item) => (
+                <div key={item.sprint_id} className="border border-border rounded-lg p-3">
+                  <div className="font-medium text-text">{item.name}</div>
+                  <div className="text-xs text-text-light mt-1">
+                    状态：{item.status} · 完成点数 {item.completed_points}/{item.planned_points} · 速度{' '}
+                    {item.velocity.toFixed(1)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-border p-6">
+          <h2 className="text-lg font-semibold text-text mb-4">质量报表</h2>
+          {isReportLoading && <div className="text-sm text-text-light">报表加载中...</div>}
+          {!isReportLoading && reportError && <div className="text-sm text-danger">{reportError}</div>}
+          {!isReportLoading && !reportError && quality && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-text-light text-xs">缺陷总数</div>
+                  <div className="text-xl font-semibold text-text mt-1">{quality.bugs.total}</div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-text-light text-xs">AC 完成率</div>
+                  <div className="text-xl font-semibold text-text mt-1">
+                    {quality.acceptance_criteria.completion_percentage.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="text-text-light mb-1">缺陷状态分布</div>
+                <div className="space-y-1">
+                  {Object.entries(quality.bugs.status_breakdown).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span>{key}</span>
+                      <span>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-text-light mb-1">缺陷严重级别分布</div>
+                <div className="space-y-1">
+                  {Object.entries(quality.bugs.severity_breakdown).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span>{key}</span>
+                      <span>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-border p-6">
           <h2 className="text-lg font-semibold text-text mb-4">状态分布</h2>
@@ -374,6 +605,36 @@ export default function ProjectDetailPage() {
 
         <div className="bg-white rounded-xl border border-border p-6">
           <h2 className="text-lg font-semibold text-text mb-4">项目成员</h2>
+          {canManageMembers && (
+            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+              <select
+                value={selectedMemberUserID}
+                onChange={(e) => setSelectedMemberUserID(e.target.value)}
+                className="px-3 py-2 border border-border rounded-lg text-sm"
+              >
+                <option value="">选择用户</option>
+                {availableMemberUsers.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.email}（{candidate.role}）
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedMemberRole}
+                onChange={(e) =>
+                  setSelectedMemberRole(e.target.value as 'product' | 'developer' | 'tester')
+                }
+                className="px-3 py-2 border border-border rounded-lg text-sm"
+              >
+                <option value="product">产品经理</option>
+                <option value="developer">开发</option>
+                <option value="tester">测试</option>
+              </select>
+              <Button size="sm" onClick={handleAddMember} isLoading={isMemberUpdating}>
+                添加成员
+              </Button>
+            </div>
+          )}
           {memberError ? (
             <div className="text-danger text-sm">{memberError}</div>
           ) : members.length === 0 ? (
@@ -383,7 +644,7 @@ export default function ProjectDetailPage() {
               {members.map((member) => (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between border border-border rounded-lg px-3 py-2"
+                  className="flex items-center justify-between border border-border rounded-lg px-3 py-2 gap-2"
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-text truncate">
@@ -394,14 +655,73 @@ export default function ProjectDetailPage() {
                       {member.is_owner ? ' · Owner' : ''}
                     </div>
                   </div>
-                  <div className="text-xs text-text-light">
-                    {new Date(member.joined_at).toLocaleDateString()}
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs text-text-light">
+                      {new Date(member.joined_at).toLocaleDateString()}
+                    </div>
+                    {canManageMembers && !member.is_owner && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => handleRemoveMember(member)}
+                        isLoading={isMemberUpdating}
+                      >
+                        移除
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-border p-6">
+        <h2 className="text-lg font-semibold text-text mb-4">项目技术负责人</h2>
+        {canManageTechLeads && (
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+            <select
+              value={selectedTechLeadUserID}
+              onChange={(e) => setSelectedTechLeadUserID(e.target.value)}
+              className="px-3 py-2 border border-border rounded-lg text-sm"
+            >
+              <option value="">选择技术负责人</option>
+              {availableTechLeadUsers.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.email}
+                </option>
+              ))}
+            </select>
+            <Button size="sm" onClick={handleAddTechLead} isLoading={isTechLeadUpdating}>
+              添加技术负责人
+            </Button>
+          </div>
+        )}
+        {techLeads.length === 0 ? (
+          <div className="text-sm text-text-light">当前项目暂无技术负责人</div>
+        ) : (
+          <div className="space-y-2">
+            {techLeads.map((item) => (
+              <div
+                key={item.id}
+                className="border border-border rounded-lg px-3 py-2 flex items-center justify-between gap-2"
+              >
+                <div className="text-sm text-text">{item.user?.email || '未知用户'}</div>
+                {canManageTechLeads && item.user && (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => handleRemoveTechLead(item.user!.id)}
+                    isLoading={isTechLeadUpdating}
+                  >
+                    移除
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <Modal

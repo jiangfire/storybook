@@ -90,7 +90,7 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -101,7 +101,7 @@ body {
   font-family: var(--font-body);
   color: var(--color-text);
   background-color: var(--color-bg-gray);
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 /* ===== 滚动条样式 ===== */

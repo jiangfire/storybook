@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { userManagementService } from '../../services/userManagementService';
+import {
+  userManagementService,
+  type UserWorkloadDetail,
+} from '../../services/userManagementService';
 import type { User, UserRole } from '../../types/models';
 import { getErrorMessage } from '../../utils/error';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -12,6 +15,7 @@ const roleLabels: Record<UserRole, string> = {
   developer: '开发人员',
   tester: '测试人员',
   tech_lead: '技术负责人',
+  admin: '管理员',
 };
 
 const roleColors: Record<UserRole, string> = {
@@ -19,6 +23,7 @@ const roleColors: Record<UserRole, string> = {
   developer: 'bg-green-100 text-green-800',
   tester: 'bg-purple-100 text-purple-800',
   tech_lead: 'bg-orange-100 text-orange-800',
+  admin: 'bg-red-100 text-red-800',
 };
 
 export default function UserManagementPage() {
@@ -36,6 +41,9 @@ export default function UserManagementPage() {
     role: 'developer' as UserRole,
   });
   const [processing, setProcessing] = useState(false);
+  const [workloadOpen, setWorkloadOpen] = useState(false);
+  const [workloadLoading, setWorkloadLoading] = useState(false);
+  const [workloadDetail, setWorkloadDetail] = useState<UserWorkloadDetail | null>(null);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -44,7 +52,7 @@ export default function UserManagementPage() {
         role: selectedRole || undefined,
         search: searchQuery || undefined,
       });
-      setUsers(res.data.users);
+      setUsers(res.users);
     } catch (error) {
       console.error('Failed to load users:', error);
     } finally {
@@ -132,6 +140,21 @@ export default function UserManagementPage() {
     } catch (error: unknown) {
       console.error('Failed to delete user:', error);
       alert(getErrorMessage(error, '删除失败，请重试'));
+    }
+  };
+
+  const openWorkload = async (user: User) => {
+    try {
+      setWorkloadOpen(true);
+      setWorkloadLoading(true);
+      const data = await userManagementService.getUserWorkload(user.id);
+      setWorkloadDetail(data);
+    } catch (error: unknown) {
+      console.error('Failed to load workload:', error);
+      alert(getErrorMessage(error, '工作负载获取失败'));
+      setWorkloadOpen(false);
+    } finally {
+      setWorkloadLoading(false);
     }
   };
 
@@ -235,6 +258,9 @@ export default function UserManagementPage() {
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="secondary" size="sm" onClick={() => openEditModal(user)}>
                           编辑
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => openWorkload(user)}>
+                          负载
                         </Button>
                         <Button variant="danger" size="sm" onClick={() => handleDelete(user)}>
                           删除
@@ -364,6 +390,70 @@ export default function UserManagementPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal isOpen={workloadOpen} onClose={() => setWorkloadOpen(false)} title="用户工作负载" size="lg">
+        {workloadLoading ? (
+          <div className="text-sm text-text-light">加载中...</div>
+        ) : !workloadDetail ? (
+          <div className="text-sm text-text-light">暂无数据</div>
+        ) : (
+          <div className="space-y-4 text-sm">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="font-medium text-text">{workloadDetail.user.email}</div>
+              <div className="text-text-light">角色：{workloadDetail.user.role}</div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="border border-border rounded-lg p-2">
+                <div className="text-xs text-text-light">总故事点</div>
+                <div className="font-semibold">{workloadDetail.statistics.total_story_points}</div>
+              </div>
+              <div className="border border-border rounded-lg p-2">
+                <div className="text-xs text-text-light">总预估工时</div>
+                <div className="font-semibold">{workloadDetail.statistics.total_estimated_hours}</div>
+              </div>
+              <div className="border border-border rounded-lg p-2">
+                <div className="text-xs text-text-light">故事进行中</div>
+                <div className="font-semibold">{workloadDetail.statistics.stories_in_progress}</div>
+              </div>
+              <div className="border border-border rounded-lg p-2">
+                <div className="text-xs text-text-light">任务进行中</div>
+                <div className="font-semibold">{workloadDetail.statistics.tasks_in_progress}</div>
+              </div>
+            </div>
+
+            <div>
+              <div className="font-medium text-text mb-2">活跃故事</div>
+              {workloadDetail.active_stories.length === 0 ? (
+                <div className="text-text-light">暂无活跃故事</div>
+              ) : (
+                <div className="space-y-1">
+                  {workloadDetail.active_stories.map((story) => (
+                    <div key={story.id} className="border border-border rounded-lg p-2">
+                      #{story.id} {story.title} · {story.status}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="font-medium text-text mb-2">活跃任务</div>
+              {workloadDetail.active_tasks.length === 0 ? (
+                <div className="text-text-light">暂无活跃任务</div>
+              ) : (
+                <div className="space-y-1">
+                  {workloadDetail.active_tasks.map((task) => (
+                    <div key={task.id} className="border border-border rounded-lg p-2">
+                      #{task.id} {task.title} · {task.status}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -10,6 +10,7 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 const ProjectListPage = lazy(() => import('../pages/Projects/ProjectListPage'));
 const ProjectDetailPage = lazy(() => import('../pages/Projects/ProjectDetailPage'));
 const BoardViewPage = lazy(() => import('../pages/Projects/BoardViewPage'));
+const ProjectBugsPage = lazy(() => import('../pages/Projects/ProjectBugsPage'));
 const StoryDetailPage = lazy(() => import('../pages/Stories/StoryDetailPage'));
 const StoryCreatePage = lazy(() => import('../pages/Stories/StoryCreatePage'));
 const DashboardPage = lazy(() => import('../pages/Dashboard/DashboardPage'));
@@ -71,6 +72,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'projects/:id/bugs',
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <ProjectBugsPage />
+          </Suspense>
+        ),
+      },
+      {
         path: 'stories/:id',
         element: (
           <Suspense fallback={<LoadingSpinner />}>
@@ -89,25 +98,31 @@ const router = createBrowserRouter([
       {
         path: 'techlead/review',
         element: (
-          <Suspense fallback={<LoadingSpinner />}>
-            <TechLeadReviewPage />
-          </Suspense>
+          <ProtectedRoute allowedRoles={['tech_lead', 'admin']}>
+            <Suspense fallback={<LoadingSpinner />}>
+              <TechLeadReviewPage />
+            </Suspense>
+          </ProtectedRoute>
         ),
       },
       {
         path: 'techlead/workload',
         element: (
-          <Suspense fallback={<LoadingSpinner />}>
-            <TechLeadWorkloadPage />
-          </Suspense>
+          <ProtectedRoute allowedRoles={['tech_lead', 'admin']}>
+            <Suspense fallback={<LoadingSpinner />}>
+              <TechLeadWorkloadPage />
+            </Suspense>
+          </ProtectedRoute>
         ),
       },
       {
         path: 'admin/users',
         element: (
-          <Suspense fallback={<LoadingSpinner />}>
-            <UserManagementPage />
-          </Suspense>
+          <ProtectedRoute allowedRoles={['tech_lead', 'admin']}>
+            <Suspense fallback={<LoadingSpinner />}>
+              <UserManagementPage />
+            </Suspense>
+          </ProtectedRoute>
         ),
       },
     ],
