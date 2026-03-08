@@ -1,0 +1,622 @@
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { useProjectStore } from '../../stores/projectStore';
+import { projectService } from '../../services/projectService';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
+import { useToast } from '../../components/ui/Toast';
+import { formatStoryStatus, formatSprintStatus } from '../../utils/formatters';
+import { getErrorMessage } from '../../utils/error';
+import { BurndownReport, CreateSprintRequest, SprintSummary } from '../../types/api';
+
+interface MemberItem {
+  id: number;
+  user_id: number;
+  role_in_project: string;
+  joined_at: string;
+  is_owner: boolean;
+  user?: {
+    id: number;
+    email: string;
+    avatar_url?: string;
+  };
+}
+
+export default function ProjectDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const projectID = Number(id);
+  const { showSuccess, showError } = useToast();
+  const { currentProject, projectOverview, fetchProject, fetchProjectOverview, isLoading, error } =
+    useProjectStore();
+  const [members, setMembers] = useState<MemberItem[]>([]);
+  const [memberError, setMemberError] = useState('');
+  const [sprints, setSprints] = useState<SprintSummary[]>([]);
+  const [sprintError, setSprintError] = useState('');
+  const [selectedSprintID, setSelectedSprintID] = useState<number | null>(null);
+  const [burndown, setBurndown] = useState<BurndownReport | null>(null);
+  const [burndownError, setBurndownError] = useState('');
+  const [isBurndownLoading, setIsBurndownLoading] = useState(false);
+  const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
+  const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
+  const [statusUpdatingSprintID, setStatusUpdatingSprintID] = useState<number | null>(null);
+  const [sprintForm, setSprintForm] = useState<CreateSprintRequest>({
+    name: '',
+    goal: '',
+    start_date: '',
+    end_date: '',
+  });
+  const [sprintFormError, setSprintFormError] = useState('');
+  const project = currentProject?.id === projectID ? currentProject : null;
+
+  useEffect(() => {
+    if (!Number.isNaN(projectID) && projectID > 0) {
+      fetchProject(projectID);
+      fetchProjectOverview(projectID);
+      loadMembers(projectID);
+      loadSprints(projectID);
+    }
+  }, [projectID, fetchProject, fetchProjectOverview]);
+
+  useEffect(() => {
+    if (!Number.isNaN(projectID) && projectID > 0 && selectedSprintID) {
+      loadBurndown(projectID, selectedSprintID);
+    }
+  }, [projectID, selectedSprintID]);
+
+  const loadMembers = async (pid: number) => {
+    try {
+      setMemberError('');
+      const data = await projectService.getProjectMembers(pid);
+      setMembers(data.members || []);
+    } catch {
+      setMemberError('成员列表加载失败');
+      setMembers([]);
+    }
+  };
+
+  const loadSprints = async (pid: number) => {
+    try {
+      setSprintError('');
+      const data = await projectService.getSprints(pid);
+      const sprintList = data.sprints || [];
+      setSprints(sprintList);
+      if (sprintList.length > 0) {
+        setSelectedSprintID((prev) => prev || sprintList[0].id);
+      } else {
+        setSelectedSprintID(null);
+        setBurndown(null);
+      }
+    } catch {
+      setSprintError('冲刺列表加载失败');
+      setSprints([]);
+      setSelectedSprintID(null);
+      setBurndown(null);
+    }
+  };
+
+  const loadBurndown = async (pid: number, sprintID: number) => {
+    try {
+      setIsBurndownLoading(true);
+      setBurndownError('');
+      const data = await projectService.getBurndown(pid, sprintID);
+      setBurndown(data);
+    } catch {
+      setBurndown(null);
+      setBurndownError('燃尽图数据加载失败');
+    } finally {
+      setIsBurndownLoading(false);
+    }
+  };
+
+  const getSprintStatusClass = (status: SprintSummary['status']) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-700';
+      case 'completed':
+        return 'bg-gray-200 text-gray-700';
+      default:
+        return 'bg-blue-100 text-blue-700';
+    }
+  };
+
+  const getNextSprintAction = (status: SprintSummary['status']) => {
+    if (status === 'planned') {
+      return { label: '开始冲刺', target: 'active' as const };
+    }
+    if (status === 'active') {
+      return { label: '完成冲刺', target: 'completed' as const };
+    }
+    return { label: '重新激活', target: 'active' as const };
+  };
+
+  const handleCreateSprint = async () => {
+    setSprintFormError('');
+    if (!sprintForm.name.trim()) {
+      setSprintFormError('请输入冲刺名称');
+      return;
+    }
+    if (!sprintForm.start_date || !sprintForm.end_date) {
+      setSprintFormError('请选择开始和结束日期');
+      return;
+    }
+    if (new Date(sprintForm.end_date) < new Date(sprintForm.start_date)) {
+      setSprintFormError('结束日期不能早于开始日期');
+      return;
+    }
+
+    try {
+      setIsSprintSubmitting(true);
+      await projectService.createSprint(projectID, {
+        ...sprintForm,
+        name: sprintForm.name.trim(),
+        goal: sprintForm.goal?.trim(),
+      });
+      showSuccess('冲刺创建成功');
+      setIsCreateSprintOpen(false);
+      setSprintForm({
+        name: '',
+        goal: '',
+        start_date: '',
+        end_date: '',
+      });
+      await loadSprints(projectID);
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error, '创建冲刺失败');
+      setSprintFormError(msg);
+      showError(msg);
+    } finally {
+      setIsSprintSubmitting(false);
+    }
+  };
+
+  const handleUpdateSprintStatus = async (sprint: SprintSummary) => {
+    const action = getNextSprintAction(sprint.status);
+    try {
+      setStatusUpdatingSprintID(sprint.id);
+      await projectService.updateSprintStatus(sprint.id, { status: action.target });
+      showSuccess(`冲刺已更新为${formatSprintStatus(action.target)}`);
+      await loadSprints(projectID);
+      if (selectedSprintID === sprint.id) {
+        await loadBurndown(projectID, sprint.id);
+      }
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '冲刺状态更新失败'));
+    } finally {
+      setStatusUpdatingSprintID(null);
+    }
+  };
+
+  if (Number.isNaN(projectID) || projectID <= 0) {
+    return <div className="p-8 text-danger">项目ID无效</div>;
+  }
+
+  if (isLoading && !project) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center text-text-light">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-3" />
+          <p>加载项目中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !project) {
+    return <div className="p-8 text-danger">{error}</div>;
+  }
+
+  const statusBreakdown = projectOverview?.statistics?.status_breakdown || {
+    backlog: 0,
+    ready: 0,
+    in_progress: 0,
+    test: 0,
+    done: 0,
+  };
+
+  const completionRate = projectOverview?.statistics?.completion_rate || 0;
+  const totalStories = projectOverview?.statistics?.total_stories || 0;
+  const activeMembers = projectOverview?.statistics?.active_members || members.length || 0;
+
+  return (
+    <div className="p-8 space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-text mb-2">{project?.name || '项目详情'}</h1>
+          <p className="text-text-light">{project?.description || '暂无项目描述'}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link to={`/projects/${projectID}/stories/new`}>
+            <Button variant="secondary">+ 创建故事</Button>
+          </Link>
+          <Link to={`/projects/${projectID}/board`}>
+            <Button>进入看板</Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl border border-border p-4">
+          <div className="text-sm text-text-light">总故事数</div>
+          <div className="text-2xl font-bold text-text mt-1">{totalStories}</div>
+        </div>
+        <div className="bg-white rounded-xl border border-border p-4">
+          <div className="text-sm text-text-light">完成率</div>
+          <div className="text-2xl font-bold text-success mt-1">{completionRate.toFixed(1)}%</div>
+        </div>
+        <div className="bg-white rounded-xl border border-border p-4">
+          <div className="text-sm text-text-light">活跃成员</div>
+          <div className="text-2xl font-bold text-text mt-1">{activeMembers}</div>
+        </div>
+        <div className="bg-white rounded-xl border border-border p-4">
+          <div className="text-sm text-text-light">敏捷模式</div>
+          <div className="text-2xl font-bold text-primary mt-1">
+            {project?.agile_mode === 'scrum' ? 'Scrum' : 'Kanban'}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-border p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-text">冲刺管理</h2>
+          <Button size="sm" onClick={() => setIsCreateSprintOpen(true)}>
+            + 新建冲刺
+          </Button>
+        </div>
+
+        {sprintError && <div className="text-danger text-sm mb-3">{sprintError}</div>}
+        {sprints.length === 0 ? (
+          <div className="text-sm text-text-light py-6 text-center">暂无冲刺，先创建一个冲刺</div>
+        ) : (
+          <div className="space-y-3">
+            {sprints.map((sprint) => {
+              const action = getNextSprintAction(sprint.status);
+              return (
+                <div
+                  key={sprint.id}
+                  className="border border-border rounded-lg px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-text truncate">{sprint.name}</span>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full ${getSprintStatusClass(sprint.status)}`}
+                      >
+                        {formatSprintStatus(sprint.status)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-text-light">
+                      {new Date(sprint.start_date).toLocaleDateString()} -{' '}
+                      {new Date(sprint.end_date).toLocaleDateString()} · {sprint.done_stories}/
+                      {sprint.total_stories} 故事完成
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setSelectedSprintID(sprint.id)}
+                    >
+                      查看燃尽图
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => handleUpdateSprintStatus(sprint)}
+                      isLoading={statusUpdatingSprintID === sprint.id}
+                    >
+                      {action.label}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-border p-6">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <h2 className="text-lg font-semibold text-text">燃尽图</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-text-light">冲刺</span>
+            <select
+              value={selectedSprintID || ''}
+              onChange={(e) => setSelectedSprintID(e.target.value ? Number(e.target.value) : null)}
+              className="px-3 py-2 border border-border rounded-lg text-sm"
+              disabled={sprints.length === 0}
+            >
+              {sprints.length === 0 && <option value="">暂无冲刺</option>}
+              {sprints.map((sprint) => (
+                <option key={sprint.id} value={sprint.id}>
+                  {sprint.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!selectedSprintID || isBurndownLoading}
+              onClick={() => {
+                if (selectedSprintID) {
+                  loadBurndown(projectID, selectedSprintID);
+                }
+              }}
+            >
+              刷新
+            </Button>
+          </div>
+        </div>
+
+        {sprintError && <div className="text-danger text-sm mb-3">{sprintError}</div>}
+        {isBurndownLoading && (
+          <div className="text-text-light text-sm py-8 text-center">燃尽图加载中...</div>
+        )}
+        {!isBurndownLoading && burndownError && (
+          <div className="text-danger text-sm py-8 text-center">{burndownError}</div>
+        )}
+        {!isBurndownLoading && !burndownError && burndown && <BurndownChart report={burndown} />}
+        {!isBurndownLoading && !burndown && !burndownError && (
+          <div className="text-text-light text-sm py-8 text-center">请选择冲刺查看燃尽图</div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-border p-6">
+          <h2 className="text-lg font-semibold text-text mb-4">状态分布</h2>
+          <div className="space-y-3">
+            {Object.entries(statusBreakdown).map(([status, count]) => (
+              <div key={status} className="flex items-center justify-between">
+                <span className="text-text-light">{formatStoryStatus(status)}</span>
+                <span className="font-medium text-text">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-border p-6">
+          <h2 className="text-lg font-semibold text-text mb-4">项目成员</h2>
+          {memberError ? (
+            <div className="text-danger text-sm">{memberError}</div>
+          ) : members.length === 0 ? (
+            <div className="text-text-light text-sm">暂无成员</div>
+          ) : (
+            <div className="space-y-3">
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between border border-border rounded-lg px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-text truncate">
+                      {member.user?.email || `用户 #${member.user_id}`}
+                    </div>
+                    <div className="text-xs text-text-light">
+                      {member.role_in_project}
+                      {member.is_owner ? ' · Owner' : ''}
+                    </div>
+                  </div>
+                  <div className="text-xs text-text-light">
+                    {new Date(member.joined_at).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Modal
+        isOpen={isCreateSprintOpen}
+        onClose={() => {
+          if (!isSprintSubmitting) {
+            setIsCreateSprintOpen(false);
+            setSprintFormError('');
+          }
+        }}
+        title="新建冲刺"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">冲刺名称</label>
+            <input
+              type="text"
+              value={sprintForm.name}
+              onChange={(e) => setSprintForm((prev) => ({ ...prev, name: e.target.value }))}
+              className="w-full px-3 py-2 border border-border rounded-lg"
+              placeholder="例如：Sprint 1"
+              maxLength={120}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text mb-2">目标（可选）</label>
+            <textarea
+              value={sprintForm.goal}
+              onChange={(e) => setSprintForm((prev) => ({ ...prev, goal: e.target.value }))}
+              className="w-full px-3 py-2 border border-border rounded-lg resize-none"
+              rows={3}
+              maxLength={500}
+              placeholder="本次冲刺要达成什么"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-text mb-2">开始日期</label>
+              <input
+                type="date"
+                value={sprintForm.start_date}
+                onChange={(e) => setSprintForm((prev) => ({ ...prev, start_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-border rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text mb-2">结束日期</label>
+              <input
+                type="date"
+                value={sprintForm.end_date}
+                onChange={(e) => setSprintForm((prev) => ({ ...prev, end_date: e.target.value }))}
+                className="w-full px-3 py-2 border border-border rounded-lg"
+              />
+            </div>
+          </div>
+          {sprintFormError && (
+            <div className="bg-danger-light text-danger text-sm rounded-lg px-3 py-2">
+              {sprintFormError}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIsCreateSprintOpen(false)}
+              disabled={isSprintSubmitting}
+            >
+              取消
+            </Button>
+            <Button onClick={handleCreateSprint} isLoading={isSprintSubmitting}>
+              创建冲刺
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function BurndownChart({ report }: { report: BurndownReport }) {
+  const points = report.points || [];
+  if (points.length === 0 || report.baseline_points <= 0) {
+    return (
+      <div className="text-sm py-8 text-center space-y-2">
+        <div className="text-text-light">当前冲刺暂无可燃尽的数据</div>
+        <div className="text-text-light">
+          请先把故事规划到该冲刺，并设置故事点；完成故事后实际线才会下降。
+        </div>
+      </div>
+    );
+  }
+
+  const width = 900;
+  const height = 280;
+  const paddingX = 40;
+  const paddingY = 24;
+  const plotWidth = width - paddingX * 2;
+  const plotHeight = height - paddingY * 2;
+  const maxY = Math.max(report.baseline_points, ...points.map((p) => p.remaining_points), 1);
+  const xDivisor = Math.max(points.length - 1, 1);
+  const dayMS = 24 * 60 * 60 * 1000;
+
+  const parseDateOnly = (raw: string) => {
+    const datePart = raw.slice(0, 10);
+    const [year, month, day] = datePart.split('-').map((n) => Number(n));
+    return new Date(year, month - 1, day);
+  };
+
+  const sprintStart = parseDateOnly(report.sprint.start_date);
+  const sprintEnd = parseDateOnly(report.sprint.end_date);
+  const totalSprintDays = Math.max(
+    Math.round((sprintEnd.getTime() - sprintStart.getTime()) / dayMS),
+    1
+  );
+
+  const toX = (index: number) => paddingX + (plotWidth * index) / xDivisor;
+  const toY = (value: number) => paddingY + plotHeight - (plotHeight * value) / maxY;
+  const getIdealValue = (date: string) => {
+    const offsetDays = Math.min(
+      Math.max(Math.round((parseDateOnly(date).getTime() - sprintStart.getTime()) / dayMS), 0),
+      totalSprintDays
+    );
+    return Math.max(report.baseline_points * (1 - offsetDays / totalSprintDays), 0);
+  };
+
+  const actualPath = points
+    .map(
+      (point, index) => `${index === 0 ? 'M' : 'L'} ${toX(index)} ${toY(point.remaining_points)}`
+    )
+    .join(' ');
+
+  const idealPath = points
+    .map((point, index) => {
+      const idealValue = getIdealValue(point.date);
+      return `${index === 0 ? 'M' : 'L'} ${toX(index)} ${toY(idealValue)}`;
+    })
+    .join(' ');
+
+  const firstDate = points[0]?.date || '';
+  const lastDate = points[points.length - 1]?.date || '';
+  const currentRemaining = points[points.length - 1]?.remaining_points || 0;
+  const idealRemaining = Number(getIdealValue(lastDate).toFixed(1));
+  const burnedPoints = Math.max(report.baseline_points - currentRemaining, 0);
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 text-sm">
+        <div className="bg-gray-50 border border-border rounded-lg px-3 py-2">
+          <div className="text-text-light text-xs">基线点数</div>
+          <div className="font-semibold text-text">{report.baseline_points}</div>
+        </div>
+        <div className="bg-gray-50 border border-border rounded-lg px-3 py-2">
+          <div className="text-text-light text-xs">当前剩余（实际）</div>
+          <div className="font-semibold text-text">{currentRemaining}</div>
+        </div>
+        <div className="bg-gray-50 border border-border rounded-lg px-3 py-2">
+          <div className="text-text-light text-xs">今日理想剩余</div>
+          <div className="font-semibold text-text">{idealRemaining}</div>
+        </div>
+      </div>
+
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-64">
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = paddingY + plotHeight * ratio;
+          return (
+            <line
+              key={ratio}
+              x1={paddingX}
+              y1={y}
+              x2={paddingX + plotWidth}
+              y2={y}
+              stroke="#e2e8f0"
+              strokeWidth="1"
+            />
+          );
+        })}
+
+        <path d={idealPath} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="6 4" />
+        <path d={actualPath} fill="none" stroke="#1e3a5f" strokeWidth="3" />
+
+        {points.map((point, index) => (
+          <circle
+            key={`${point.date}-${index}`}
+            cx={toX(index)}
+            cy={toY(point.remaining_points)}
+            r="3.5"
+            fill="#1e3a5f"
+          />
+        ))}
+      </svg>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-3 text-xs text-text-light">
+        <div className="flex items-center gap-4">
+          <span className="inline-flex items-center gap-1">
+            <span className="w-4 h-[2px] bg-slate-400 inline-block" />
+            理想线
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-4 h-[2px] bg-primary inline-block" />
+            实际线
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span>{firstDate}</span>
+          <span>→</span>
+          <span>{lastDate}</span>
+          <span>已燃尽: {burnedPoints} 点</span>
+        </div>
+      </div>
+
+      <div className="mt-3 text-xs text-text-light space-y-1">
+        <div>理想线：基线点数在冲刺总天数内按线性下降计算，不会因为“今天”提前归零。</div>
+        <div>实际线：到每天结束时，状态为“已完成”的故事点从基线中扣减后的剩余点数。</div>
+        <div>统计范围：仅统计已规划到当前冲刺的故事。</div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,1016 @@
+openapi: 3.0.3
+info:
+  title: Storybook API
+  version: 0.1.0
+  description: |
+    Storybook 后端 API（当前实现版本）。
+    统一返回结构：
+    - 成功: { code: 0, message: "success", data: ... }
+    - 失败: { code: 非0, message: "...", errors?: [...] }
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Projects
+  - name: Stories
+  - name: Tasks
+  - name: Sprints
+  - name: Bugs
+  - name: Reports
+  - name: Search
+  - name: AI
+  - name: MCP
+
+paths:
+  /health:
+    get:
+      tags: [Auth]
+      summary: 服务健康检查
+      security: []
+      responses:
+        '200':
+          description: OK
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: 用户注册
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, role]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                role:
+                  type: string
+                  enum: [product, developer, tester]
+      responses:
+        '200':
+          description: 注册成功
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: 用户登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: 登录成功
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新 Access Token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: 刷新成功
+
+  /api/projects:
+    get:
+      tags: [Projects]
+      summary: 项目列表
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [Projects]
+      summary: 创建项目
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, agile_mode]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                description: { type: string, maxLength: 500 }
+                agile_mode: { type: string, enum: [scrum, kanban] }
+      responses:
+        '200':
+          description: 项目创建成功
+
+  /api/projects/{id}:
+    get:
+      tags: [Projects]
+      summary: 项目详情
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Projects]
+      summary: 删除项目（仅Owner）
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: 删除成功 }
+
+  /api/projects/{id}/overview:
+    get:
+      tags: [Projects]
+      summary: 项目概览统计
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/members:
+    get:
+      tags: [Projects]
+      summary: 项目成员列表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Projects]
+      summary: 添加项目成员（仅Owner）
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, role_in_project]
+              properties:
+                user_id: { type: integer }
+                role_in_project: { type: string, enum: [product, developer, tester] }
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/members/{userID}:
+    delete:
+      tags: [Projects]
+      summary: 移除项目成员（仅Owner）
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/stories:
+    get:
+      tags: [Stories]
+      summary: 故事列表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: assignee
+          schema: { type: integer }
+        - in: query
+          name: sort_by
+          schema: { type: string, enum: [priority, assignee, position], default: priority }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: desc }
+        - in: query
+          name: include_archived
+          schema: { type: boolean, default: false }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Stories]
+      summary: 创建故事
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStoryRequest'
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/board:
+    get:
+      tags: [Stories]
+      summary: 看板数据
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}:
+    get:
+      tags: [Stories]
+      summary: 故事详情
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [Stories]
+      summary: 更新故事
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStoryRequest'
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Stories]
+      summary: 删除故事
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/archive:
+    patch:
+      tags: [Stories]
+      summary: 归档故事
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/restore:
+    patch:
+      tags: [Stories]
+      summary: 恢复故事
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/status:
+    patch:
+      tags: [Stories]
+      summary: 更新故事状态
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [backlog, ready, in_progress, test, done] }
+                position: { type: number }
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/claim:
+    post:
+      tags: [Stories]
+      summary: 领取故事
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Stories]
+      summary: 释放故事
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/acceptance-criteria/{acID}:
+    patch:
+      tags: [Stories]
+      summary: 更新AC状态
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+        - in: path
+          name: acID
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/code-refs:
+    post:
+      tags: [Stories]
+      summary: 故事关联代码引用
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reference]
+              properties:
+                reference: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/activities:
+    get:
+      tags: [Stories]
+      summary: 故事活动历史
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+        - in: query
+          name: action
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/sprint:
+    patch:
+      tags: [Sprints]
+      summary: 规划故事到冲刺
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sprint_id:
+                  type: integer
+                  nullable: true
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/tasks:
+    get:
+      tags: [Tasks]
+      summary: 子任务列表
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: assignee
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Tasks]
+      summary: 创建子任务
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/tasks/split-from-ac:
+    post:
+      tags: [Tasks]
+      summary: 基于AC自动拆分子任务
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/test-cases:
+    get:
+      tags: [Tasks]
+      summary: 测试用例列表
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Tasks]
+      summary: 创建测试用例
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, steps]
+              properties:
+                title: { type: string, minLength: 2, maxLength: 255 }
+                description: { type: string }
+                steps:
+                  type: array
+                  items: { type: string }
+                expected_result: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: 任务详情
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [Tasks]
+      summary: 更新任务
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Tasks]
+      summary: 删除任务
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      responses:
+        '200': { description: OK }
+
+  /api/tasks/{id}/status:
+    patch:
+      tags: [Tasks]
+      summary: 更新任务状态
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [todo, in_progress, blocked, done]
+      responses:
+        '200': { description: OK }
+
+  /api/tasks/{id}/progress:
+    patch:
+      tags: [Tasks]
+      summary: 更新任务进度
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [progress]
+              properties:
+                progress: { type: integer, minimum: 0, maximum: 100 }
+      responses:
+        '200': { description: OK }
+
+  /api/tasks/{id}/claim:
+    post:
+      tags: [Tasks]
+      summary: 领取任务
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Tasks]
+      summary: 释放任务
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      responses:
+        '200': { description: OK }
+
+  /api/tasks/{id}/code-refs:
+    post:
+      tags: [Tasks]
+      summary: 任务关联代码引用
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reference]
+              properties:
+                reference: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/test-cases/{id}/status:
+    patch:
+      tags: [Tasks]
+      summary: 更新测试用例状态
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, passed, failed]
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/sprints:
+    get:
+      tags: [Sprints]
+      summary: 冲刺列表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Sprints]
+      summary: 创建冲刺
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, start_date, end_date]
+              properties:
+                name: { type: string }
+                goal: { type: string }
+                start_date: { type: string }
+                end_date: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/sprints/{id}/status:
+    patch:
+      tags: [Sprints]
+      summary: 更新冲刺状态
+      parameters:
+        - $ref: '#/components/parameters/SprintID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [planned, active, completed] }
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/bugs:
+    get:
+      tags: [Bugs]
+      summary: 缺陷列表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: severity
+          schema: { type: string }
+        - in: query
+          name: assignee
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Bugs]
+      summary: 创建缺陷
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, severity]
+              properties:
+                story_id: { type: integer, nullable: true }
+                title: { type: string }
+                description: { type: string }
+                severity: { type: string, enum: [low, medium, high, critical] }
+                assigned_to: { type: integer, nullable: true }
+      responses:
+        '200': { description: OK }
+
+  /api/bugs/{id}:
+    get:
+      tags: [Bugs]
+      summary: 缺陷详情
+      parameters:
+        - $ref: '#/components/parameters/BugID'
+      responses:
+        '200': { description: OK }
+
+  /api/bugs/{id}/status:
+    patch:
+      tags: [Bugs]
+      summary: 更新缺陷状态
+      parameters:
+        - $ref: '#/components/parameters/BugID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [open, in_progress, resolved, closed] }
+      responses:
+        '200': { description: OK }
+
+  /api/bugs/{id}/assign:
+    patch:
+      tags: [Bugs]
+      summary: 指派缺陷
+      parameters:
+        - $ref: '#/components/parameters/BugID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assigned_to: { type: integer, nullable: true }
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/reports/velocity:
+    get:
+      tags: [Reports]
+      summary: 冲刺速率报表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/reports/quality:
+    get:
+      tags: [Reports]
+      summary: 质量报表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/reports/burndown:
+    get:
+      tags: [Reports]
+      summary: 燃尽图数据
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - in: query
+          name: sprint_id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+
+  /api/search:
+    get:
+      tags: [Search]
+      summary: 全局搜索
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+        - in: query
+          name: type
+          schema: { type: string, enum: [all, project, story, bug], default: all }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: OK }
+
+  /api/ai/generate-story:
+    post:
+      tags: [AI]
+      summary: AI生成用户故事
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requirement]
+              properties:
+                requirement: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/ai/stories/{id}/split:
+    post:
+      tags: [AI]
+      summary: AI拆分用户故事
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target_count: { type: integer }
+      responses:
+        '200': { description: OK }
+
+  /api/ai/stories/{id}/invest-check:
+    get:
+      tags: [AI]
+      summary: INVEST质量检查
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /api/me/dashboard:
+    get:
+      tags: [Projects]
+      summary: 个人工作台
+      responses:
+        '200': { description: OK }
+
+  /ws:
+    get:
+      tags: [Auth]
+      summary: WebSocket连接
+      description: 使用 query `token` 携带 Access Token
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema: { type: string }
+      responses:
+        '101':
+          description: Switching Protocols
+
+  /mcp/health:
+    get:
+      tags: [MCP]
+      summary: MCP健康检查
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /mcp/stories/{id}/acceptance-criteria:
+    get:
+      tags: [MCP]
+      summary: 获取故事AC
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /mcp/stories/{id}/ac-coverage:
+    get:
+      tags: [MCP]
+      summary: AC覆盖度
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /mcp/stories/{id}/acceptance-criteria/{acID}/status:
+    post:
+      tags: [MCP]
+      summary: 兼容路径-更新单条AC状态
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+        - in: path
+          name: acID
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /mcp/v1/stories/{id}/validate:
+    post:
+      tags: [MCP]
+      summary: 更新单条AC状态
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /mcp/v1/stories/{id}/update-ac-status:
+    post:
+      tags: [MCP]
+      summary: 批量更新AC状态
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /mcp/v1/stories/{id}/generate-ac-tests:
+    post:
+      tags: [MCP]
+      summary: 生成AC测试模板
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /mcp/v1/stories/{id}/analyze-code-ac:
+    post:
+      tags: [MCP]
+      summary: 代码与AC映射分析
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /mcp/v1/stories/{id}:
+    get:
+      tags: [MCP]
+      summary: 获取故事详情
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /mcp/v1/projects/{id}/stories:
+    get:
+      tags: [MCP]
+      summary: MCP故事列表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /mcp/v1/stats/ac-completion:
+    get:
+      tags: [MCP]
+      summary: AC完成度统计
+      responses:
+        '200': { description: OK }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProjectID:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer }
+    StoryID:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer }
+    TaskID:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer }
+    SprintID:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer }
+    BugID:
+      in: path
+      name: id
+      required: true
+      schema: { type: integer }
+    UserID:
+      in: path
+      name: userID
+      required: true
+      schema: { type: integer }
+
+  schemas:
+    CreateStoryRequest:
+      type: object
+      required: [title, story_type]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+        story_type: { type: string, enum: [feature, bug, chore] }
+        priority: { type: integer, minimum: 0, maximum: 4 }
+        story_points: { type: integer, enum: [1, 2, 3, 5, 8, 13] }
+        acceptance_criteria:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              ref: { type: string }
+              description: { type: string }
+              order: { type: integer }
+        tags:
+          type: array
+          items: { type: string }
+    UpdateStoryRequest:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        story_type: { type: string, enum: [feature, bug, chore] }
+        priority: { type: integer }
+        story_points: { type: integer, enum: [1, 2, 3, 5, 8, 13] }
+        acceptance_criteria:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              ref: { type: string }
+              description: { type: string }
+              order: { type: integer }
+        tags:
+          type: array
+          items: { type: string }
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 2, maxLength: 255 }
+        description: { type: string, maxLength: 2000 }
+        priority: { type: integer, minimum: 0, maximum: 4 }
+        estimated_hours: { type: number, minimum: 0 }
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title: { type: string, minLength: 2, maxLength: 255 }
+        description: { type: string, maxLength: 2000 }
+        priority: { type: integer, minimum: 0, maximum: 4 }
+        estimated_hours: { type: number, minimum: 0 }
