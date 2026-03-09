@@ -19,7 +19,7 @@ const actionConfig: Record<
     iconColor: 'text-purple-600',
   },
   assigned: { label: '分配给', icon: '👤', bgColor: 'bg-green-50', iconColor: 'text-green-600' },
-  commented: { label: '评论了', icon: '💬', bgColor: 'bg-gray-50', iconColor: 'text-gray-600' },
+  commented: { label: '评论了', icon: '💬', bgColor: 'bg-secondary-50', iconColor: 'text-text-light' },
 };
 
 export default function ActivityTimeline({ activities }: ActivityTimelineProps) {
@@ -52,7 +52,7 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
               </div>
               {/* 连接线 */}
               {index < activities.length - 1 && (
-                <div className="w-0.5 flex-1 bg-gray-200 my-1 min-h-[2rem]" />
+                <div className="w-0.5 flex-1 bg-secondary-200 my-1 min-h-[2rem]" />
               )}
             </div>
 

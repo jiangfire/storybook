@@ -13,7 +13,7 @@ const statusConfig: Record<
   ACStatus,
   { label: string; color: string; bgColor: string; icon: string }
 > = {
-  pending: { label: '待验收', color: 'text-gray-700', bgColor: 'bg-gray-100', icon: '○' },
+  pending: { label: '待验收', color: 'text-text', bgColor: 'bg-secondary-100', icon: '○' },
   passed: { label: '已通过', color: 'text-green-700', bgColor: 'bg-green-100', icon: '✓' },
   failed: { label: '未通过', color: 'text-red-700', bgColor: 'bg-red-100', icon: '✕' },
 };
@@ -58,7 +58,7 @@ export default function AcceptanceCriteriaList({
               'p-4 rounded-lg border transition-all',
               ac.status === 'passed' && 'border-green-200 bg-green-50',
               ac.status === 'failed' && 'border-red-200 bg-red-50',
-              ac.status === 'pending' && 'border-gray-200'
+              ac.status === 'pending' && 'border-border'
             )}
           >
             <div className="flex items-start space-x-3">
@@ -74,7 +74,7 @@ export default function AcceptanceCriteriaList({
                         'px-2 py-0.5 rounded text-xs border transition-colors',
                         status === 'pending' &&
                           ac.status === 'pending' &&
-                          'bg-gray-200 border-gray-300 text-gray-800',
+                          'bg-secondary-200 border-secondary-300 text-text',
                         status === 'passed' &&
                           ac.status === 'passed' &&
                           'bg-green-200 border-green-300 text-green-800',
@@ -82,7 +82,7 @@ export default function AcceptanceCriteriaList({
                           ac.status === 'failed' &&
                           'bg-red-200 border-red-300 text-red-800',
                         ac.status !== status &&
-                          'bg-white border-gray-200 text-text-light hover:border-primary'
+                          'bg-white border-border text-text-light hover:border-primary'
                       )}
                     >
                       {status === 'pending' ? '待' : status === 'passed' ? '过' : '未'}
@@ -142,7 +142,7 @@ export default function AcceptanceCriteriaList({
                           setEditingAC(null);
                           setEvidence('');
                         }}
-                        className="px-3 py-1 bg-gray-200 text-text rounded text-sm hover:bg-gray-300 transition-colors"
+                        className="px-3 py-1 bg-secondary-200 text-text rounded text-sm hover:bg-secondary-300 transition-colors"
                       >
                         取消
                       </button>
@@ -173,7 +173,7 @@ export default function AcceptanceCriteriaList({
             {criteria.filter((ac) => ac.status === 'passed').length} / {criteria.length}
           </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+        <div className="w-full bg-secondary-200 rounded-full h-2 mt-2">
           <div
             className="bg-success h-2 rounded-full transition-all duration-300"
             style={{

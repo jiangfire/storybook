@@ -13,19 +13,19 @@ interface BoardColumnProps {
 }
 
 const columnColors: Record<string, string> = {
-  backlog: 'bg-gray-50 border-gray-200',
-  ready: 'bg-blue-50 border-blue-200',
-  in_progress: 'bg-yellow-50 border-yellow-200',
-  test: 'bg-purple-50 border-purple-200',
-  done: 'bg-green-50 border-green-200',
+  backlog: 'bg-secondary-50 border-border',
+  ready: 'bg-primary-50 border-primary-200',
+  in_progress: 'bg-warning-light border-warning',
+  test: 'bg-info-light border-info',
+  done: 'bg-success-light border-success',
 };
 
 const iconColors: Record<string, string> = {
-  backlog: 'bg-gray-200 text-gray-700',
-  ready: 'bg-blue-200 text-blue-700',
-  in_progress: 'bg-yellow-200 text-yellow-700',
-  test: 'bg-purple-200 text-purple-700',
-  done: 'bg-green-200 text-green-700',
+  backlog: 'bg-secondary-200 text-text-light',
+  ready: 'bg-primary-200 text-primary-700',
+  in_progress: 'bg-warning text-text',
+  test: 'bg-info text-text-white',
+  done: 'bg-success text-text-white',
 };
 
 export default function BoardColumn({ id, stories, title, icon, count }: BoardColumnProps) {
@@ -37,8 +37,8 @@ export default function BoardColumn({ id, stories, title, icon, count }: BoardCo
     <div
       ref={setNodeRef}
       className={cn(
-        'flex-1 min-w-[280px] max-w-[320px] rounded-xl border-2 p-4 transition-colors',
-        columnColors[id] || 'bg-gray-50 border-gray-200'
+        'flex-1 min-w-[280px] max-w-[320px] rounded-xl border-2 p-4 transition-colors snap-start',
+        columnColors[id] || 'bg-secondary-50 border-border'
       )}
     >
       {/* 列标题 */}
@@ -47,14 +47,14 @@ export default function BoardColumn({ id, stories, title, icon, count }: BoardCo
           <div
             className={cn(
               'w-8 h-8 rounded-lg flex items-center justify-center',
-              iconColors[id] || 'bg-gray-200 text-gray-700'
+              iconColors[id] || 'bg-secondary-200 text-text-light'
             )}
           >
             <span className="text-lg">{icon}</span>
           </div>
           <h3 className="font-semibold text-text">{title}</h3>
         </div>
-        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-sm font-medium text-text">
+        <div className="w-8 h-8 rounded-full bg-white border border-border flex items-center justify-center text-sm font-medium text-text">
           {count}
         </div>
       </div>

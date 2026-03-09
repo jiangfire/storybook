@@ -32,6 +32,101 @@ interface MemberItem {
   };
 }
 
+// 缺陷状态分布组件
+function BugStatusDistribution({ data, total }: { data: Record<string, number>; total: number }) {
+  const statusConfig: Record<string, { label: string; icon: string; color: string; bgColor: string }> = {
+    open: { label: '待处理', icon: '📥', color: 'text-info', bgColor: 'bg-info-light' },
+    in_progress: { label: '处理中', icon: '🔧', color: 'text-warning', bgColor: 'bg-warning-light' },
+    resolved: { label: '已解决', icon: '✅', color: 'text-success', bgColor: 'bg-success-light' },
+    closed: { label: '已关闭', icon: '📪', color: 'text-text-light', bgColor: 'bg-secondary-100' },
+  };
+
+  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const maxValue = Math.max(...entries.map(([, v]) => v), 1);
+
+  return (
+    <div>
+      <div className="text-text-light text-xs mb-3 flex items-center justify-between">
+        <span>缺陷状态分布</span>
+        <span className="text-text-light">{total} 个</span>
+      </div>
+      <div className="space-y-2">
+        {entries.map(([key, value]) => {
+          const config = statusConfig[key] || { label: key, icon: '📋', color: 'text-text', bgColor: 'bg-secondary-100' };
+          const percentage = total > 0 ? (value / total) * 100 : 0;
+          const barWidth = maxValue > 0 ? (value / maxValue) * 100 : 0;
+
+          return (
+            <div key={key} className="group">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-6 h-6 rounded-md ${config.bgColor} flex items-center justify-center text-sm`}>
+                    {config.icon}
+                  </span>
+                  <span className="text-sm text-text">{config.label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-semibold ${config.color}`}>{value}</span>
+                  {total > 0 && <span className="text-xs text-text-light w-10 text-right">{percentage.toFixed(0)}%</span>}
+                </div>
+              </div>
+              <div className="h-1.5 bg-secondary-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${config.bgColor.replace('-light', '')}`}
+                  style={{ width: `${barWidth}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// 缺陷严重级别分布组件
+function BugSeverityDistribution({ data, total }: { data: Record<string, number>; total: number }) {
+  const severityConfig: Record<string, { label: string; icon: string; color: string; bgColor: string; borderColor: string }> = {
+    critical: { label: '严重', icon: '🔴', color: 'text-danger', bgColor: 'bg-danger-light', borderColor: 'border-danger' },
+    high: { label: '高', icon: '🟠', color: 'text-warning', bgColor: 'bg-warning-light', borderColor: 'border-warning' },
+    medium: { label: '中', icon: '🟡', color: 'text-info', bgColor: 'bg-info-light', borderColor: 'border-info' },
+    low: { label: '低', icon: '🟢', color: 'text-success', bgColor: 'bg-success-light', borderColor: 'border-success' },
+  };
+
+  const entries = Object.entries(data).sort((a, b) => {
+    const order = ['critical', 'high', 'medium', 'low'];
+    return order.indexOf(a[0]) - order.indexOf(b[0]);
+  });
+
+  return (
+    <div>
+      <div className="text-text-light text-xs mb-3">缺陷严重级别分布</div>
+      <div className="grid grid-cols-2 gap-2">
+        {entries.map(([key, value]) => {
+          const config = severityConfig[key] || { label: key, icon: '⚪', color: 'text-text', bgColor: 'bg-secondary-100', borderColor: 'border-border' };
+          const percentage = total > 0 ? (value / total) * 100 : 0;
+
+          return (
+            <div
+              key={key}
+              className={`relative p-3 rounded-lg border-2 ${config.borderColor} ${config.bgColor} transition-all hover:shadow-md`}
+            >
+              <div className="flex items-start justify-between">
+                <span className="text-lg">{config.icon}</span>
+                <span className={`text-2xl font-bold ${config.color}`}>{value}</span>
+              </div>
+              <div className="mt-2 text-sm text-text font-medium">{config.label}</div>
+              {total > 0 && (
+                <div className="mt-1 text-xs text-text-light">{percentage.toFixed(1)}%</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const projectID = Number(id);
@@ -256,7 +351,7 @@ export default function ProjectDetailPage() {
       case 'active':
         return 'bg-green-100 text-green-700';
       case 'completed':
-        return 'bg-gray-200 text-gray-700';
+        return 'bg-secondary-200 text-text-light';
       default:
         return 'bg-blue-100 text-blue-700';
     }
@@ -550,11 +645,11 @@ export default function ProjectDetailPage() {
           {!isReportLoading && !reportError && quality && (
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-secondary-50 rounded-lg p-3">
                   <div className="text-text-light text-xs">缺陷总数</div>
                   <div className="text-xl font-semibold text-text mt-1">{quality.bugs.total}</div>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3">
+                <div className="bg-secondary-50 rounded-lg p-3">
                   <div className="text-text-light text-xs">AC 完成率</div>
                   <div className="text-xl font-semibold text-text mt-1">
                     {quality.acceptance_criteria.completion_percentage.toFixed(1)}%
@@ -562,29 +657,11 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
-              <div>
-                <div className="text-text-light mb-1">缺陷状态分布</div>
-                <div className="space-y-1">
-                  {Object.entries(quality.bugs.status_breakdown).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span>{key}</span>
-                      <span>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* 缺陷状态分布 */}
+              <BugStatusDistribution data={quality.bugs.status_breakdown} total={quality.bugs.total} />
 
-              <div>
-                <div className="text-text-light mb-1">缺陷严重级别分布</div>
-                <div className="space-y-1">
-                  {Object.entries(quality.bugs.severity_breakdown).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span>{key}</span>
-                      <span>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* 缺陷严重级别分布 */}
+              <BugSeverityDistribution data={quality.bugs.severity_breakdown} total={quality.bugs.total} />
             </div>
           )}
         </div>
@@ -869,15 +946,15 @@ function BurndownChart({ report }: { report: BurndownReport }) {
   return (
     <div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 text-sm">
-        <div className="bg-gray-50 border border-border rounded-lg px-3 py-2">
+        <div className="bg-secondary-50 border border-border rounded-lg px-3 py-2">
           <div className="text-text-light text-xs">基线点数</div>
           <div className="font-semibold text-text">{report.baseline_points}</div>
         </div>
-        <div className="bg-gray-50 border border-border rounded-lg px-3 py-2">
+        <div className="bg-secondary-50 border border-border rounded-lg px-3 py-2">
           <div className="text-text-light text-xs">当前剩余（实际）</div>
           <div className="font-semibold text-text">{currentRemaining}</div>
         </div>
-        <div className="bg-gray-50 border border-border rounded-lg px-3 py-2">
+        <div className="bg-secondary-50 border border-border rounded-lg px-3 py-2">
           <div className="text-text-light text-xs">今日理想剩余</div>
           <div className="font-semibold text-text">{idealRemaining}</div>
         </div>

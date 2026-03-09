@@ -1,4 +1,0 @@
-# 构建产物由前端构建生成，仅保留占位 index.html 以保证 go:embed 可编译。
-*
-!index.html
-!.gitignore

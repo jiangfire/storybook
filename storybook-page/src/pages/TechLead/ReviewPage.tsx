@@ -87,7 +87,7 @@ export default function ReviewPage() {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       pending: 'bg-yellow-100 text-yellow-800',
-      backlog: 'bg-gray-100 text-gray-800',
+      backlog: 'bg-secondary-100 text-text',
       ready: 'bg-blue-100 text-blue-800',
       in_progress: 'bg-indigo-100 text-indigo-800',
       test: 'bg-purple-100 text-purple-800',
@@ -103,7 +103,7 @@ export default function ReviewPage() {
     };
     return (
       <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-gray-100'}`}
+        className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || 'bg-secondary-100'}`}
       >
         {labels[status] || status}
       </span>
@@ -170,7 +170,7 @@ export default function ReviewPage() {
         ) : (
           <div className="divide-y divide-border">
             {stories.map((story) => (
-              <div key={story.id} className="p-4 hover:bg-gray-50">
+              <div key={story.id} className="p-4 hover:bg-primary-50">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -181,7 +181,7 @@ export default function ReviewPage() {
                           已拒绝
                         </span>
                       )}
-                      <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                      <span className="text-xs px-2 py-0.5 rounded bg-secondary-100 text-text-light">
                         {story.story_type === 'feature'
                           ? '✨ 功能'
                           : story.story_type === 'bug'
@@ -249,7 +249,7 @@ export default function ReviewPage() {
       >
         <div className="space-y-4">
           {selectedStory && (
-            <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="bg-secondary-50 p-3 rounded-lg">
               <p className="font-medium text-text">{selectedStory.title}</p>
               <p className="text-sm text-text-light mt-1">
                 项目: {selectedStory.project?.name || '-'}

@@ -43,7 +43,7 @@ const storyTypeOptions: Array<{
     value: 'chore',
     label: '杂项',
     emoji: '📦',
-    activeClass: 'border-gray-500 bg-gray-50 text-gray-700',
+    activeClass: 'border-primary-500 bg-secondary-50 text-text',
   },
 ];
 
@@ -311,7 +311,7 @@ export default function StoryForm({
                 setFieldErrors({ ...fieldErrors, title: undefined });
               }
             }}
-            className={`w-full px-3 py-2 border ${fieldErrors.title ? 'border-danger' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary`}
+            className={`w-full px-3 py-2 border ${fieldErrors.title ? 'border-danger' : 'border-border'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary`}
             placeholder="例如：用户登录功能"
             maxLength={200}
           />
@@ -329,7 +329,7 @@ export default function StoryForm({
                 setFieldErrors({ ...fieldErrors, description: undefined });
               }
             }}
-            className={`w-full px-3 py-2 border ${fieldErrors.description ? 'border-danger' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none`}
+            className={`w-full px-3 py-2 border ${fieldErrors.description ? 'border-danger' : 'border-border'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none`}
             placeholder="作为已注册用户，我想要通过邮箱和密码登录..."
             rows={4}
             maxLength={2000}
@@ -370,7 +370,7 @@ export default function StoryForm({
                 className={`p-3 rounded-lg border-2 transition-all ${
                   formData.story_type === type.value
                     ? type.activeClass
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-border hover:border-primary-300'
                 }`}
               >
                 <span className="text-2xl">{type.emoji}</span>
@@ -392,7 +392,7 @@ export default function StoryForm({
                   type="button"
                   onClick={() => setFormData({ ...formData, priority: i })}
                   className={`w-8 h-8 rounded-full transition-all ${
-                    formData.priority >= i ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-400'
+                    formData.priority >= i ? 'bg-red-500 text-white' : 'bg-secondary-200 text-text-light'
                   }`}
                 >
                   <span className="text-xs">🔴</span>
@@ -425,7 +425,7 @@ export default function StoryForm({
                   className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                     formData.story_points === points
                       ? 'border-primary bg-primary text-white'
-                      : 'border-gray-200 hover:border-gray-300 text-text'
+                      : 'border-border hover:border-primary-300 text-text'
                   }`}
                 >
                   {points}
@@ -443,7 +443,7 @@ export default function StoryForm({
                 value={selectedSprintID}
                 onChange={(e) => setSelectedSprintID(e.target.value)}
                 disabled={isSprintsLoading || !canPlanSprint}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-50"
+                className="flex-1 px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-secondary-50"
               >
                 <option value="">不加入冲刺</option>
                 {sprints.map((sprint) => (
@@ -473,7 +473,7 @@ export default function StoryForm({
           <label className="block text-sm font-medium text-text mb-2">验收标准 (AC)</label>
           <div className="space-y-2 mb-3">
             {formData.acceptance_criteria.map((ac, index) => (
-              <div key={index} className="flex items-start space-x-2 p-3 bg-gray-50 rounded-lg">
+              <div key={index} className="flex items-start space-x-2 p-3 bg-secondary-50 rounded-lg">
                 <span className="text-text-light mt-1">{index + 1}.</span>
                 <span className="flex-1 text-sm">{ac.description}</span>
                 <button
@@ -497,7 +497,7 @@ export default function StoryForm({
                   addAC();
                 }
               }}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              className="flex-1 px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
               placeholder="添加验收标准...（按 Enter 快速添加）"
             />
             <button
@@ -541,7 +541,7 @@ export default function StoryForm({
                   addTag();
                 }
               }}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+              className="flex-1 px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
               placeholder="添加标签...（按 Enter 快速添加）"
             />
             <button

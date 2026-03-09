@@ -40,7 +40,7 @@ export default function StoryCard({ story }: StoryCardProps) {
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200"
+      className="bg-white rounded-lg shadow-sm border border-border p-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200"
       onDoubleClick={() => navigate(`/stories/${story.id}`)}
     >
       {/* 类型标签 */}
@@ -73,7 +73,7 @@ export default function StoryCard({ story }: StoryCardProps) {
               {acPassed}/{acTotal}
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-secondary-200 rounded-full h-2">
             <div
               className="bg-success h-2 rounded-full transition-all duration-300"
               style={{ width: `${acPercentage}%` }}
@@ -83,7 +83,7 @@ export default function StoryCard({ story }: StoryCardProps) {
       )}
 
       {/* 底部信息 */}
-      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-3 border-t border-border-light">
         {/* 故事点 */}
         {story.story_points && (
           <div className="flex items-center space-x-1">
@@ -102,7 +102,7 @@ export default function StoryCard({ story }: StoryCardProps) {
           </div>
         ) : (
           <div
-            className="w-8 h-8 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-xs"
+            className="w-8 h-8 rounded-full bg-secondary-100 text-text-light flex items-center justify-center text-xs"
             title="未分配"
           >
             ?

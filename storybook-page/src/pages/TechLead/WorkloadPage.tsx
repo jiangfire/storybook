@@ -116,7 +116,7 @@ export default function WorkloadPage() {
       <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-border">
+            <thead className="bg-secondary-50 border-b border-border">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text">成员</th>
                 <th className="px-4 py-3 text-center text-sm font-medium text-text">负载状态</th>
@@ -138,7 +138,7 @@ export default function WorkloadPage() {
                 workloads.map((workload) => {
                   const workloadInfo = getWorkloadLevel(workload);
                   return (
-                    <tr key={workload.user.id} className="hover:bg-gray-50">
+                    <tr key={workload.user.id} className="hover:bg-primary-50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary font-medium">

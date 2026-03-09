@@ -160,7 +160,7 @@ export default function Header() {
                         <button
                           type="button"
                           key={`project-${item.id}`}
-                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-gray-50"
+                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-primary-50"
                           onClick={() => {
                             setShowResult(false);
                             navigate(`/projects/${item.id}`);
@@ -183,7 +183,7 @@ export default function Header() {
                         <button
                           type="button"
                           key={`story-${item.id}`}
-                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-gray-50"
+                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-primary-50"
                           onClick={() => {
                             setShowResult(false);
                             navigate(`/stories/${item.id}`);
@@ -206,7 +206,7 @@ export default function Header() {
                         <button
                           type="button"
                           key={`bug-${item.id}`}
-                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-gray-50"
+                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-primary-50"
                           onClick={() => {
                             setShowResult(false);
                             navigate(renderBugLink(item.project_id, item.id));
@@ -232,7 +232,7 @@ export default function Header() {
           type="button"
           aria-label="返回上一页"
           onClick={handleGoBack}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border text-xs text-text hover:bg-gray-50 transition-colors"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border text-xs text-text hover:bg-primary-50 transition-colors"
         >
           <span aria-hidden>←</span>
           返回
@@ -262,7 +262,7 @@ export default function Header() {
               <div className="py-2">
                 <Link
                   to="/dashboard"
-                  className="block px-4 py-2 text-sm text-text hover:bg-gray-50 transition-colors"
+                  className="block px-4 py-2 text-sm text-text hover:bg-primary-50 transition-colors"
                 >
                   个人工作台
                 </Link>

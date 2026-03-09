@@ -131,7 +131,7 @@ export default function RegisterPage() {
                     className={`p-3 rounded-lg border-2 transition-all text-left ${
                       role === item.value
                         ? 'border-primary bg-primary-50 text-primary'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-border hover:border-primary-300'
                     }`}
                     disabled={isLoading}
                   >

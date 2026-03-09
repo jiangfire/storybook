@@ -54,11 +54,11 @@ export function formatPriority(priority: number): string {
  */
 export function getPriorityColor(priority: number): string {
   const colors: Record<number, string> = {
-    0: 'bg-gray-200 text-gray-700',
-    1: 'bg-blue-100 text-blue-700',
-    2: 'bg-yellow-100 text-yellow-700',
-    3: 'bg-orange-100 text-orange-700',
-    4: 'bg-red-100 text-red-700',
+    0: 'bg-secondary-200 text-text-light',
+    1: 'bg-info-light text-info',
+    2: 'bg-warning-light text-warning',
+    3: 'bg-warning text-text',
+    4: 'bg-danger-light text-danger',
   };
   return colors[priority] || colors[0];
 }
@@ -80,11 +80,11 @@ export function formatStoryType(type: string): string {
  */
 export function getStoryTypeColor(type: string): string {
   const colors: Record<string, string> = {
-    feature: 'bg-blue-100 text-blue-700',
-    bug: 'bg-red-100 text-red-700',
-    chore: 'bg-gray-100 text-gray-700',
+    feature: 'bg-info-light text-info',
+    bug: 'bg-danger-light text-danger',
+    chore: 'bg-secondary-100 text-text-light',
   };
-  return colors[type] || 'bg-gray-100 text-gray-700';
+  return colors[type] || 'bg-secondary-100 text-text-light';
 }
 
 /**

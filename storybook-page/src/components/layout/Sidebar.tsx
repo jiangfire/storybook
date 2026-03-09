@@ -106,7 +106,7 @@ export default function Sidebar({ currentProject }: SidebarProps) {
                 'flex items-center space-x-2.5 px-3 py-2.5 rounded-lg transition-colors',
                 isActivePath(item.path)
                   ? 'bg-primary-50 text-primary'
-                  : 'text-text-light hover:bg-gray-50'
+                  : 'text-text-light hover:bg-primary-50'
               )}
             >
               <span className="text-lg">{item.icon}</span>
@@ -123,7 +123,7 @@ export default function Sidebar({ currentProject }: SidebarProps) {
             </div>
             <Link
               to={`/projects/${currentProject.id}`}
-              className="block p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+              className="block p-3 rounded-lg bg-secondary-50 hover:bg-secondary-100 transition-colors"
             >
               <div className="font-medium text-text text-sm mb-1 truncate">{currentProject.name}</div>
               <div className="text-xs text-text-light flex items-center justify-between">
@@ -142,7 +142,7 @@ export default function Sidebar({ currentProject }: SidebarProps) {
                       'flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-colors',
                       isActivePath(item.path)
                         ? 'bg-primary-50 text-primary'
-                        : 'text-text-light hover:bg-gray-50'
+                        : 'text-text-light hover:bg-primary-50'
                     )}
                   >
                     <span className="inline-flex items-center gap-1.5">

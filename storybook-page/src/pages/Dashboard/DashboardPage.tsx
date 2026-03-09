@@ -88,7 +88,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl border border-border p-6 card-hover">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-text">进行中</h3>
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <div className="w-12 h-12 bg-warning-light rounded-lg flex items-center justify-center">
                   <span className="text-2xl">🔨</span>
                 </div>
               </div>
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                           <p className="text-sm text-text-light">{story.project}</p>
                         </div>
                         <div className="ml-4">
-                          <span className="px-3 py-1 bg-gray-100 text-text rounded-lg text-sm">
+                          <span className="px-3 py-1 bg-secondary-100 text-text rounded-lg text-sm">
                             {formatStoryStatus(story.status)}
                           </span>
                         </div>
@@ -211,7 +211,7 @@ export default function DashboardPage() {
                           <p className="text-sm text-text-light">{story.project}</p>
                         </div>
                         <div className="ml-4">
-                          <span className="px-3 py-1 bg-gray-100 text-text rounded-lg text-sm">
+                          <span className="px-3 py-1 bg-secondary-100 text-text rounded-lg text-sm">
                             {formatStoryStatus(story.status)}
                           </span>
                         </div>

@@ -215,7 +215,7 @@ export default function UserManagementPage() {
       <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-border">
+            <thead className="bg-secondary-50 border-b border-border">
               <tr>
                 <th className="px-4 py-3 text-left text-sm font-medium text-text">用户</th>
                 <th className="px-4 py-3 text-center text-sm font-medium text-text">角色</th>
@@ -232,7 +232,7 @@ export default function UserManagementPage() {
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className="hover:bg-primary-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary font-medium">
@@ -341,7 +341,7 @@ export default function UserManagementPage() {
       <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="编辑用户">
         <div className="space-y-4">
           {selectedUser && (
-            <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="bg-secondary-50 p-3 rounded-lg">
               <p className="text-sm text-text-light">
                 编辑用户: <span className="font-medium text-text">{selectedUser.email}</span>
               </p>
@@ -399,7 +399,7 @@ export default function UserManagementPage() {
           <div className="text-sm text-text-light">暂无数据</div>
         ) : (
           <div className="space-y-4 text-sm">
-            <div className="bg-gray-50 rounded-lg p-3">
+            <div className="bg-secondary-50 rounded-lg p-3">
               <div className="font-medium text-text">{workloadDetail.user.email}</div>
               <div className="text-text-light">角色：{workloadDetail.user.role}</div>
             </div>

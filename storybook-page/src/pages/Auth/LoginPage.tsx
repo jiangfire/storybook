@@ -51,13 +51,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-accent-50 px-4">
       <div className="max-w-md w-full">
         {/* Logo 和标题 */}
-        <div className="text-center mb-8 animate-slideUp">
+        <div className="text-center mb-8 animate-slideUp" style={{ animationDelay: '0ms' }}>
           <h1 className="font-display text-4xl font-bold text-primary mb-2">Storybook</h1>
           <p className="text-text-light">故事之书，记录每一个用户故事的完整生命周期</p>
         </div>
 
         {/* 登录表单 */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 animate-slideUp">
+        <div className="bg-white rounded-2xl shadow-lg p-8 animate-slideUp" style={{ animationDelay: '100ms' }}>
           <h2 className="text-2xl font-semibold text-text mb-6">登录</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">

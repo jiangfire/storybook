@@ -218,7 +218,7 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
         onDragEnd={handleDragEnd}
       >
         {/* 看板列 */}
-        <div className="flex gap-4 h-full overflow-x-auto pb-4">
+        <div className="flex gap-4 h-full overflow-x-auto pb-4 snap-x snap-mandatory">
           {COLUMNS.map((column) => (
             <BoardColumn
               key={column.id}

@@ -793,7 +793,7 @@ func (h *ProjectHandler) lastUpdatedAt(projectID uint, fallback time.Time) time.
 
 func (h *ProjectHandler) queryProjectMaxTime(target any, column string, projectID uint) (time.Time, bool) {
 	var row struct {
-		T any `gorm:"column:t"`
+		T *time.Time `gorm:"column:t"`
 	}
 	if err := h.db.Model(target).
 		Select(fmt.Sprintf("MAX(%s) AS t", column)).
@@ -802,7 +802,10 @@ func (h *ProjectHandler) queryProjectMaxTime(target any, column string, projectI
 		return time.Time{}, false
 	}
 
-	return normalizeAnyTime(row.T)
+	if row.T == nil || row.T.IsZero() {
+		return time.Time{}, false
+	}
+	return *row.T, true
 }
 
 func normalizeAnyTime(raw any) (time.Time, bool) {

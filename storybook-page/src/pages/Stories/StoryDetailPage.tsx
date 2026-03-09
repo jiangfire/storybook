@@ -409,7 +409,7 @@ export default function StoryDetailPage() {
                   value={selectedSprintID}
                   onChange={(e) => handleSprintChange(e.target.value)}
                   disabled={isSprintsLoading || isSprintPlanning || !canPlanSprint}
-                  className="w-full px-3 py-2 border border-border rounded-lg text-text bg-white disabled:bg-gray-50"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-text bg-white disabled:bg-secondary-50"
                 >
                   <option value="">不加入冲刺</option>
                   {sprints.map((sprint) => (
@@ -465,7 +465,7 @@ export default function StoryDetailPage() {
                 </div>
                 {investError && <div className="text-xs text-danger">{investError}</div>}
                 {investResult && (
-                  <div className="bg-gray-50 border border-border rounded-lg p-3 text-sm space-y-2">
+                  <div className="bg-secondary-50 border border-border rounded-lg p-3 text-sm space-y-2">
                     <div>
                       总分：<span className="font-semibold">{investResult.invest_score.toFixed(1)}</span>
                     </div>

@@ -160,7 +160,7 @@ export default function ProjectListPage() {
                   className={`p-4 rounded-lg border-2 transition-all ${
                     newProject.agile_mode === mode.value
                       ? 'border-primary bg-primary-50 text-primary'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : 'border-border hover:border-primary-300'
                   }`}
                 >
                   <div className="text-3xl mb-2">{mode.emoji}</div>
