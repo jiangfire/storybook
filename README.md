@@ -42,6 +42,22 @@ pnpm install
 pnpm run dev
 ```
 
+## 初始化管理员
+
+首次启动没有 `admin` 账号时，可直接执行：
+
+```bash
+go run ./cmd/bootstrap-admin --email admin@example.com --password Admin1234
+```
+
+可选指定用户名：
+
+```bash
+go run ./cmd/bootstrap-admin --email admin@example.com --username admin --password Admin1234
+```
+
+如果该邮箱已存在，命令会把该用户提升为 `admin`；如果同时传入 `--password`，还会重置密码。
+
 ## 单体部署（前端嵌入后端）
 
 推荐直接使用前端脚本同步构建产物：
