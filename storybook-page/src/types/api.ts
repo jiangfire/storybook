@@ -1,4 +1,4 @@
-import { User, Project, Story, StoryBoardItem, Activity } from './models';
+import type { User, Project, Story, StoryBoardItem, Activity } from './models';
 
 // API 统一响应格式
 export interface ApiResponse<T = unknown> {
@@ -344,6 +344,21 @@ export interface SprintSummary {
 
 export interface SprintListResponse {
   sprints: SprintSummary[];
+}
+
+export interface ProjectMembersResponse {
+  members: Array<{
+    id: number;
+    user_id: number;
+    role_in_project: string;
+    joined_at: string;
+    is_owner: boolean;
+    user: User;
+  }>;
+}
+
+export interface TechLeadsResponse {
+  tech_leads: User[];
 }
 
 // 更新冲刺状态请求

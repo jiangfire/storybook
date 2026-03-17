@@ -6,8 +6,8 @@ import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../ui/Toast';
 import { aiService } from '../../services/aiService';
 import { isValidStoryTitle, isValidStoryDescription } from '../../utils/validators';
-import { CreateStoryRequest, UpdateStoryRequest, SprintSummary } from '../../types/api';
-import { StoryType } from '../../types/models';
+import type { CreateStoryRequest, UpdateStoryRequest, SprintSummary } from '../../types/api';
+import type { StoryType } from '../../types/models';
 import { getErrorMessage } from '../../utils/error';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -70,7 +70,7 @@ export default function StoryForm({
     tags: [] as string[],
   });
 
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [newACText, setNewACText] = useState('');
   const [newTag, setNewTag] = useState('');
@@ -151,27 +151,39 @@ export default function StoryForm({
 
     setIsSubmitting(true);
     try {
-      const request: CreateStoryRequest | UpdateStoryRequest = {
-        title: formData.title,
-        description: formData.description || undefined,
-        story_type: formData.story_type,
-        priority: formData.priority,
-        story_points: formData.story_points,
-        acceptance_criteria: formData.acceptance_criteria.map((ac, index) => ({
-          id: `ac-${index + 1}`,
-          description: ac.description,
-          order: ac.order || index + 1,
-        })),
-        tags: formData.tags,
-      };
-
       if (mode === 'create') {
-        const story = await storyService.createStory(projectId, request);
+        const createRequest: CreateStoryRequest = {
+          title: formData.title,
+          description: formData.description || undefined,
+          story_type: formData.story_type,
+          priority: formData.priority,
+          story_points: formData.story_points as 1 | 2 | 3 | 5 | 8 | 13 | undefined,
+          acceptance_criteria: formData.acceptance_criteria.map((ac, index) => ({
+            id: `ac-${index + 1}`,
+            description: ac.description,
+            order: ac.order || index + 1,
+          })),
+          tags: formData.tags,
+        };
+        const story = await storyService.createStory(projectId, createRequest);
         showSuccess('故事创建成功');
         navigate(`/stories/${story.id}`, { replace: true });
         onClose();
       } else {
-        await storyService.updateStory(storyId!, request);
+        const updateRequest: UpdateStoryRequest = {
+          title: formData.title,
+          description: formData.description || undefined,
+          story_type: formData.story_type,
+          priority: formData.priority,
+          story_points: formData.story_points as 1 | 2 | 3 | 5 | 8 | 13 | undefined,
+          acceptance_criteria: formData.acceptance_criteria.map((ac, index) => ({
+            id: `ac-${index + 1}`,
+            description: ac.description,
+            order: ac.order || index + 1,
+          })),
+          tags: formData.tags,
+        };
+        await storyService.updateStory(storyId!, updateRequest);
         showSuccess('故事更新成功');
         onSaved?.();
         onClose();
@@ -296,7 +308,7 @@ export default function StoryForm({
       title={mode === 'create' ? '创建用户故事' : '编辑用户故事'}
       size="lg"
     >
-      <div className="space-y-6 max-h-[60vh] overflow-auto">
+      <div className="space-y-6">
         {/* 标题 */}
         <div>
           <label className="block text-sm font-medium text-text mb-2">

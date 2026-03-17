@@ -10,14 +10,14 @@ import Modal from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
 import { formatStoryStatus, formatSprintStatus } from '../../utils/formatters';
 import { getErrorMessage } from '../../utils/error';
-import {
+import type {
   BurndownReport,
   CreateSprintRequest,
   QualityReportData,
   SprintSummary,
   VelocityReportData,
 } from '../../types/api';
-import { User } from '../../types/models';
+import type { User } from '../../types/models';
 
 interface MemberItem {
   id: number;

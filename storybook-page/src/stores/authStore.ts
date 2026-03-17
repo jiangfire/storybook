@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '../types/models';
+import type { User } from '../types/models';
 import { authService } from '../services/authService';
-import { LoginRequest, RegisterRequest } from '../types/api';
+import type { LoginRequest, RegisterRequest } from '../types/api';
 import { getErrorMessage } from '../utils/error';
 
 interface AuthState {

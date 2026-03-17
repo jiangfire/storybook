@@ -348,7 +348,8 @@ Content-Type: application/json
     "title": "用户登录功能",
     "description": "作为已注册用户，我想要通过邮箱和密码登录...",
     "story_type": "feature",
-    "status": "backlog",
+    "status": "pending",
+    "review_status": "pending",
     "priority": 3,
     "story_points": 5,
     "acceptance_criteria": [
@@ -375,7 +376,11 @@ Content-Type: application/json
 - AC-3.1.4: 优先级
 - AC-3.1.5: 故事点
 - AC-3.1.6: 验收标准
-- AC-3.1.7: 默认待办状态
+- AC-3.1.7: 默认待审批状态
+
+**当前实现补充**：
+- 新创建的故事进入 `pending`，需通过 `POST /api/stories/:id/review` 由 `tech_lead` 或 `admin` 审批后进入 `backlog`
+- `PATCH /api/stories/:id/assignee` 当前支持 `product`、`tech_lead`、`admin` 分配故事负责人
 
 ---
 

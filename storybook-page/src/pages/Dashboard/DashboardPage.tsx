@@ -10,7 +10,7 @@ import {
   formatPriority,
   getPriorityColor,
 } from '../../utils/formatters';
-import { ApiResponse, DashboardData } from '../../types/api';
+import type { ApiResponse, DashboardData } from '../../types/api';
 
 export default function DashboardPage() {
   const { user } = useAuthStore();

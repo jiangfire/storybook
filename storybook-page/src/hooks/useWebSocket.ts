@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { WSMessage, StoryACUpdatedMessage, StoryStatusChangedMessage } from '../types/api';
+import type { WSMessage, StoryACUpdatedMessage, StoryStatusChangedMessage } from '../types/api';
 import { authService } from '../services/authService';
 
 interface UseWebSocketOptions {
@@ -89,7 +89,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reconnectAttemptsRef = useRef(0);
   const isManualDisconnectRef = useRef(false);
   const isUnmountedRef = useRef(false);

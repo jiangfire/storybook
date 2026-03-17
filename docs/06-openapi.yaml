@@ -23,6 +23,8 @@ tags:
   - name: Search
   - name: AI
   - name: MCP
+  - name: TechLead
+  - name: Admin
 
 paths:
   /health:
@@ -136,6 +138,23 @@ paths:
         - $ref: '#/components/parameters/ProjectID'
       responses:
         '200': { description: OK }
+    put:
+      tags: [Projects]
+      summary: 更新项目（仅Owner）
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 2, maxLength: 100 }
+                description: { type: string, maxLength: 500 }
+                agile_mode: { type: string, enum: [scrum, kanban] }
+      responses:
+        '200': { description: 更新成功 }
     delete:
       tags: [Projects]
       summary: 删除项目（仅Owner）
@@ -314,6 +333,46 @@ paths:
       summary: 释放故事
       parameters:
         - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/assignee:
+    patch:
+      tags: [Stories]
+      summary: 分配或取消分配故事
+      description: 允许 `product`、`tech_lead`、`admin` 操作；仅可分配给项目内开发成员。
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assigned_to:
+                  type: integer
+                  nullable: true
+      responses:
+        '200': { description: OK }
+
+  /api/stories/{id}/review:
+    post:
+      tags: [Stories]
+      summary: 审批故事
+      description: 技术负责人或管理员审批故事；驳回时 `comment` 必填。
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean }
+                comment: { type: string }
       responses:
         '200': { description: OK }
 
@@ -798,6 +857,164 @@ paths:
     get:
       tags: [Projects]
       summary: 个人工作台
+      responses:
+        '200': { description: OK }
+
+  /api/techlead/pending-stories:
+    get:
+      tags: [TechLead]
+      summary: 待审批故事列表
+      parameters:
+        - in: query
+          name: project_id
+          schema: { type: integer }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: OK }
+
+  /api/techlead/workload:
+    get:
+      tags: [TechLead]
+      summary: 开发人员工作负载
+      parameters:
+        - in: query
+          name: project_id
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+
+  /api/techlead/projects:
+    get:
+      tags: [TechLead]
+      summary: 技术负责人可见项目列表
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/techleads:
+    get:
+      tags: [TechLead]
+      summary: 项目技术负责人列表
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [TechLead]
+      summary: 添加项目技术负责人（仅Admin）
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id: { type: integer }
+      responses:
+        '200': { description: OK }
+
+  /api/projects/{id}/techleads/{userID}:
+    delete:
+      tags: [TechLead]
+      summary: 移除项目技术负责人（仅Admin）
+      parameters:
+        - $ref: '#/components/parameters/ProjectID'
+        - $ref: '#/components/parameters/UserID'
+      responses:
+        '200': { description: OK }
+
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: 用户列表
+      description: `tech_lead` 与 `admin` 可访问。
+      parameters:
+        - in: query
+          name: role
+          schema: { type: string, enum: [product, developer, tester, tech_lead, admin] }
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20 }
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Admin]
+      summary: 创建用户
+      description: `tech_lead` 与 `admin` 可访问，但只有 `admin` 可创建 `tech_lead`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password, role]
+              properties:
+                email: { type: string, format: email }
+                username: { type: string, minLength: 2, maxLength: 100 }
+                password: { type: string, minLength: 6 }
+                role: { type: string, enum: [product, developer, tester, tech_lead] }
+      responses:
+        '200': { description: OK }
+
+  /api/admin/users/{id}:
+    put:
+      tags: [Admin]
+      summary: 更新用户
+      description: `tech_lead` 与 `admin` 可访问；只有 `admin` 可设置 `tech_lead` 或 `admin` 角色。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string, minLength: 2, maxLength: 100 }
+                role: { type: string, enum: [product, developer, tester, tech_lead, admin] }
+                password: { type: string, minLength: 6 }
+      responses:
+        '200': { description: OK }
+    delete:
+      tags: [Admin]
+      summary: 删除用户（仅Admin）
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+
+  /api/admin/users/{id}/workload:
+    get:
+      tags: [Admin]
+      summary: 用户工作负载详情
+      description: `tech_lead` 与 `admin` 可访问。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
       responses:
         '200': { description: OK }
 

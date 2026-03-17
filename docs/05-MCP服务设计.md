@@ -813,6 +813,8 @@ func TestLoginWithWrongCredentials(t *testing.T) {
 
 ## 六、MCP服务配置
 
+> 当前仓库已实现 `cmd/mcp` 启动入口以及文中列出的核心工具；`config/mcp.yaml` 在本文中是示例配置，仓库默认未提交该文件，需要按环境自行创建。
+
 ### 6.1 配置文件
 
 ```yaml

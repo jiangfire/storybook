@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestTechLeadGlobalReadAndOnlyReviewE2E(t *testing.T) {
+func TestTechLeadGlobalReadAssignAndReviewE2E(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: "file:e2e_techlead_global_read?mode=memory&cache=shared"})
@@ -28,6 +28,7 @@ func TestTechLeadGlobalReadAndOnlyReviewE2E(t *testing.T) {
 	pm1ID := seedUserOnly(t, db, "pm1-techlead-e2e@example.com", model.RoleProduct)
 	pm2ID := seedUserOnly(t, db, "pm2-techlead-e2e@example.com", model.RoleProduct)
 	techLeadID := seedUserOnly(t, db, "techlead-global-e2e@example.com", model.RoleTechLead)
+	devID := seedUserOnly(t, db, "dev-techlead-e2e@example.com", model.RoleDeveloper)
 
 	pm1Token, _, _ := tm.GenerateAccessToken(pm1ID, "pm1-techlead-e2e@example.com", model.RoleProduct)
 	pm2Token, _, _ := tm.GenerateAccessToken(pm2ID, "pm2-techlead-e2e@example.com", model.RoleProduct)
@@ -50,6 +51,14 @@ func TestTechLeadGlobalReadAndOnlyReviewE2E(t *testing.T) {
 		t.Fatalf("create project2 failed: %d %s", project2Resp.Code, project2Resp.Body)
 	}
 	project2ID := uint(nestedFloat(t, project2Resp.JSON, "data", "id"))
+
+	if err := db.Create(&model.ProjectMember{
+		ProjectID:     project2ID,
+		UserID:        devID,
+		RoleInProject: model.RoleDeveloper,
+	}).Error; err != nil {
+		t.Fatalf("add developer to project2 failed: %v", err)
+	}
 
 	story2Resp := doJSON(t, r, http.MethodPost, "/api/projects/"+strconv.Itoa(int(project2ID))+"/stories", pm2Token, map[string]any{
 		"title":      "Story-Need-Review",
@@ -87,10 +96,13 @@ func TestTechLeadGlobalReadAndOnlyReviewE2E(t *testing.T) {
 	}
 
 	assignResp := doJSON(t, r, http.MethodPatch, "/api/stories/"+strconv.Itoa(int(story2ID))+"/assignee", techLeadToken, map[string]any{
-		"assigned_to": nil,
+		"assigned_to": devID,
 	})
-	if assignResp.Code != http.StatusForbidden {
-		t.Fatalf("tech_lead assign story should be forbidden, got: %d %s", assignResp.Code, assignResp.Body)
+	if assignResp.Code != http.StatusOK {
+		t.Fatalf("tech_lead assign story failed: %d %s", assignResp.Code, assignResp.Body)
+	}
+	if uint(nestedFloat(t, assignResp.JSON, "data", "assigned_to", "id")) != devID {
+		t.Fatalf("tech_lead assign story should set assignee to developer, got: %s", assignResp.Body)
 	}
 
 	updateStoryResp := doJSON(t, r, http.MethodPut, "/api/stories/"+strconv.Itoa(int(story2ID)), techLeadToken, map[string]any{

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AcceptanceCriteria, ACStatus } from '../../types/models';
+import type { AcceptanceCriteria, ACStatus } from '../../types/models';
 import { useStoryStore } from '../../stores/storyStore';
 import { cn } from '../../utils/cn';
 

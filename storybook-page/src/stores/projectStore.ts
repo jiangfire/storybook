@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Project, ProjectOverview } from '../types/models';
-import { ProjectListParams, CreateProjectRequest } from '../types/api';
+import type { Project, ProjectOverview } from '../types/models';
+import type { ProjectListParams, CreateProjectRequest } from '../types/api';
 import { projectService } from '../services/projectService';
 import { getErrorMessage } from '../utils/error';
 

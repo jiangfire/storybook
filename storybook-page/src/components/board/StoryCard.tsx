@@ -1,4 +1,4 @@
-import { StoryBoardItem } from '../../types/models';
+import type { StoryBoardItem } from '../../types/models';
 import {
   formatStoryType,
   getStoryTypeColor,

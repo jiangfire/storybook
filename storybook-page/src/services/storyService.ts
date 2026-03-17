@@ -1,5 +1,5 @@
 import apiClient from './api';
-import {
+import type {
   ApiResponse,
   CreateStoryRequest,
   UpdateStoryRequest,
@@ -15,7 +15,7 @@ import {
   StorySprintPlanResponse,
   AssignStoryRequest,
 } from '../types/api';
-import { Story } from '../types/models';
+import type { Story } from '../types/models';
 
 export const storyService = {
   /**

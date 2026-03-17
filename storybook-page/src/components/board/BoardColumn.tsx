@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { StoryBoardItem } from '../../types/models';
+import type { StoryBoardItem } from '../../types/models';
 import StoryCard from './StoryCard';
 import { cn } from '../../utils/cn';
 

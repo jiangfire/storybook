@@ -1,4 +1,4 @@
-import { Activity } from '../../types/models';
+import type { Activity } from '../../types/models';
 import { formatRelativeTime, getUserInitials } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
 

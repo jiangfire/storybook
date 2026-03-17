@@ -757,11 +757,8 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
-	if denyTechLeadStoryMutation(c, role) {
-		return
-	}
-	if role != model.RoleProduct && role != model.RoleAdmin {
-		api.Forbidden(c, "仅产品经理可分配故事")
+	if role != model.RoleProduct && role != model.RoleTechLead && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理、技术负责人或管理员可分配故事")
 		return
 	}
 

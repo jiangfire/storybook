@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
-  DragEndEvent,
   DragOverlay,
-  DragStartEvent,
+  type DragEndEvent,
+  type DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -13,8 +13,8 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { useStoryStore } from '../../stores/storyStore';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import BoardColumn from './BoardColumn';
-import { StoryBoardItem } from '../../types/models';
-import { StoryStatusChangedMessage } from '../../types/api';
+import type { StoryBoardItem } from '../../types/models';
+import type { StoryStatusChangedMessage } from '../../types/api';
 import { useToast } from '../ui/Toast';
 
 const COLUMNS = [
@@ -67,7 +67,7 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
         .flat()
         .find((s) => s.id === message.story_id);
       if (story) {
-        const updatedStory = { ...story, status: message.new_status };
+        const updatedStory = { ...story, status: message.new_status as StoryBoardItem['status'] };
         // 添加到新状态列
         if (newBoardData[message.new_status]) {
           newBoardData[message.new_status].push(updatedStory);

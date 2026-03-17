@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Project } from '../types/models';
+import type { Project } from '../types/models';
 import { cn } from '../utils/cn';
 
 interface ProjectCardProps {

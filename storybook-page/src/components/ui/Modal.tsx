@@ -1,4 +1,4 @@
-import { useEffect, ReactNode, MouseEvent } from 'react';
+import { useEffect, type ReactNode, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
 

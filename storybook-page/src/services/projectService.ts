@@ -1,10 +1,9 @@
 import apiClient from './api';
-import {
+import type {
   ApiResponse,
   CreateProjectRequest,
   ProjectListParams,
   ProjectListResponse,
-  ProjectOverview,
   AddProjectMemberRequest,
   SprintListResponse,
   BurndownReport,
@@ -13,8 +12,9 @@ import {
   SprintSummary,
   VelocityReportData,
   QualityReportData,
+  ProjectMembersResponse,
 } from '../types/api';
-import { Project } from '../types/models';
+import type { Project, ProjectOverview } from '../types/models';
 
 export const projectService = {
   /**
@@ -72,7 +72,7 @@ export const projectService = {
    * 获取项目成员列表
    */
   async getProjectMembers(id: number) {
-    const response = await apiClient.get<ApiResponse>(`/api/projects/${id}/members`);
+    const response = await apiClient.get<ApiResponse<ProjectMembersResponse>>(`/api/projects/${id}/members`);
     return response.data.data;
   },
 

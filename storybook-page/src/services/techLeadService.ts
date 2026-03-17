@@ -1,5 +1,5 @@
 import api from './api';
-import type { ApiResponse } from '../types/api';
+import type { ApiResponse, TechLeadsResponse } from '../types/api';
 import type { Story, UserWorkload } from '../types/models';
 
 export interface PendingStoriesResponse {
@@ -70,7 +70,7 @@ export const techLeadService = {
 
   // 获取项目技术负责人列表
   getProjectTechLeads: async (projectId: number) => {
-    const response = await api.get<ApiResponse>(`/api/projects/${projectId}/techleads`);
+    const response = await api.get<ApiResponse<TechLeadsResponse>>(`/api/projects/${projectId}/techleads`);
     return response.data.data;
   },
 

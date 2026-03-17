@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { Story, StoryBoardItem, Activity, ACStatus } from '../types/models';
-import { ActivityListParams, BoardData, UpdateStoryStatusRequest } from '../types/api';
+import type { Story, StoryBoardItem, Activity, ACStatus } from '../types/models';
+import type { ActivityListParams, BoardData, UpdateStoryStatusRequest } from '../types/api';
 import { storyService } from '../services/storyService';
 import { getErrorMessage } from '../utils/error';
 

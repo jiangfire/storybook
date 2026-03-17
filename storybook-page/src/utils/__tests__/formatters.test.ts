@@ -29,15 +29,15 @@ describe('formatters', () => {
     expect(formatStoryPoints(5)).toBe('5');
     expect(formatPriority(4)).toBe('紧急');
     expect(formatPriority(999)).toBe('-');
-    expect(getPriorityColor(3)).toContain('orange');
-    expect(getPriorityColor(999)).toContain('gray');
+    expect(getPriorityColor(3)).toContain('warning');
+    expect(getPriorityColor(999)).toContain('secondary');
   });
 
   it('格式化类型与状态', () => {
     expect(formatStoryType('feature')).toBe('功能');
     expect(formatStoryType('custom')).toBe('custom');
-    expect(getStoryTypeColor('bug')).toContain('red');
-    expect(getStoryTypeColor('unknown')).toContain('gray');
+    expect(getStoryTypeColor('bug')).toContain('danger');
+    expect(getStoryTypeColor('unknown')).toContain('secondary');
     expect(formatStoryStatus('ready')).toBe('就绪');
     expect(formatStoryStatus('custom')).toBe('custom');
     expect(formatSprintStatus('planned')).toBe('未开始');

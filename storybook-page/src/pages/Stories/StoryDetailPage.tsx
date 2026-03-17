@@ -112,7 +112,8 @@ export default function StoryDetailPage() {
     setSelectedAssigneeID(currentStory?.assigned_to?.id ? String(currentStory.assigned_to.id) : '');
   }, [currentStory?.assigned_to?.id]);
 
-  const canManageAssignee = user?.role === 'product' || user?.role === 'admin';
+  const canManageAssignee =
+    user?.role === 'product' || user?.role === 'tech_lead' || user?.role === 'admin';
 
   useEffect(() => {
     if (!currentStory?.project_id || !canManageAssignee) {
@@ -197,7 +198,7 @@ export default function StoryDetailPage() {
 
   const handleAssignStory = async () => {
     if (!canManageAssignee) {
-      showError('仅产品经理可分配故事');
+      showError('仅产品经理、技术负责人或管理员可分配故事');
       return;
     }
     try {
@@ -447,7 +448,7 @@ export default function StoryDetailPage() {
                   <div className="text-text-light">项目中暂无开发成员可分配</div>
                 )}
                 <div className="text-text-light">
-                  说明：产品经理可分配负责人；开发人员可在未分配时自行领取。
+                  说明：产品经理、技术负责人和管理员可分配负责人；开发人员可在未分配时自行领取。
                 </div>
               </div>
             </div>
