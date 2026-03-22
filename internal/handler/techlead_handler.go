@@ -22,7 +22,7 @@ func NewTechLeadHandler(db *gorm.DB) *TechLeadHandler {
 
 // ListPendingStories 获取待审批故事列表（技术负责人）
 func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
-	_, ok := middleware.CurrentUserID(c)
+	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
 		return
@@ -35,6 +35,18 @@ func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
 	}
 
 	query := h.db.Model(&model.UserStory{}).Where("status = ?", model.StoryStatusPending)
+	if role == model.RoleTechLead {
+		projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
+		if err != nil {
+			api.Internal(c, "服务器内部错误")
+			return
+		}
+		if len(projectIDs) == 0 {
+			api.Success(c, "success", gin.H{"stories": []gin.H{}, "total": 0, "page": 1, "limit": 20})
+			return
+		}
+		query = query.Where("project_id IN ?", projectIDs)
+	}
 
 	// 支持按项目筛选
 	if projectID := c.Query("project_id"); projectID != "" {
@@ -117,7 +129,7 @@ func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
 
 // ListWorkload 获取开发人员工作负载
 func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
-	_, ok := middleware.CurrentUserID(c)
+	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
 		return
@@ -137,6 +149,29 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 		}
 	}
 
+	visibleProjectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+	if role == model.RoleTechLead && len(visibleProjectIDs) == 0 {
+		api.Success(c, "success", gin.H{"workloads": []gin.H{}})
+		return
+	}
+	if projectID > 0 && role == model.RoleTechLead {
+		allowed := false
+		for _, id := range visibleProjectIDs {
+			if id == projectID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			api.Forbidden(c, "无权查看该项目负载")
+			return
+		}
+	}
+
 	// 获取开发人员列表
 	var developerIDs []uint
 	if projectID > 0 {
@@ -145,8 +180,14 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 			Where("project_id = ? AND role_in_project = ?", projectID, model.RoleDeveloper).
 			Pluck("user_id", &developerIDs)
 	} else {
-		// 获取所有开发人员
-		h.db.Model(&model.User{}).Where("role = ?", model.RoleDeveloper).Pluck("id", &developerIDs)
+		if role == model.RoleAdmin {
+			h.db.Model(&model.User{}).Where("role = ?", model.RoleDeveloper).Pluck("id", &developerIDs)
+		} else {
+			h.db.Model(&model.ProjectMember{}).
+				Where("project_id IN ? AND role_in_project = ?", visibleProjectIDs, model.RoleDeveloper).
+				Distinct().
+				Pluck("user_id", &developerIDs)
+		}
 	}
 
 	if len(developerIDs) == 0 {
@@ -171,6 +212,8 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 			})
 		if projectID > 0 {
 			storyQuery = storyQuery.Where("project_id = ?", projectID)
+		} else if role == model.RoleTechLead {
+			storyQuery = storyQuery.Where("project_id IN ?", visibleProjectIDs)
 		}
 		storyQuery.Count(&activeStories)
 
@@ -183,31 +226,47 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 			})
 		if projectID > 0 {
 			taskQuery = taskQuery.Where("project_id = ?", projectID)
+		} else if role == model.RoleTechLead {
+			taskQuery = taskQuery.Where("project_id IN ?", visibleProjectIDs)
 		}
 		taskQuery.Count(&activeTasks)
 
 		// 统计故事点
 		var totalPoints float64
-		h.db.Model(&model.UserStory{}).
-			Where("assigned_to = ? AND points IS NOT NULL AND status != ?", devID, model.StoryStatusDone).
-			Select("COALESCE(SUM(points), 0)").
-			Scan(&totalPoints)
+		pointsQuery := h.db.Model(&model.UserStory{}).
+			Where("assigned_to = ? AND points IS NOT NULL AND status != ?", devID, model.StoryStatusDone)
+		if projectID > 0 {
+			pointsQuery = pointsQuery.Where("project_id = ?", projectID)
+		} else if role == model.RoleTechLead {
+			pointsQuery = pointsQuery.Where("project_id IN ?", visibleProjectIDs)
+		}
+		pointsQuery.Select("COALESCE(SUM(points), 0)").Scan(&totalPoints)
 
 		// 统计预估工时
 		var estimatedHours float64
-		h.db.Model(&model.Task{}).
-			Where("assigned_to = ? AND status != ?", devID, model.TaskStatusDone).
-			Select("COALESCE(SUM(estimated_hours), 0)").
-			Scan(&estimatedHours)
+		taskHoursQuery := h.db.Model(&model.Task{}).
+			Where("assigned_to = ? AND status != ?", devID, model.TaskStatusDone)
+		if projectID > 0 {
+			taskHoursQuery = taskHoursQuery.Where("project_id = ?", projectID)
+		} else if role == model.RoleTechLead {
+			taskHoursQuery = taskHoursQuery.Where("project_id IN ?", visibleProjectIDs)
+		}
+		taskHoursQuery.Select("COALESCE(SUM(estimated_hours), 0)").Scan(&estimatedHours)
 
 		// 计算完成率（最近30天）
 		var completedStories, totalAssigned int64
-		h.db.Model(&model.UserStory{}).
-			Where("assigned_to = ? AND status = ?", devID, model.StoryStatusDone).
-			Count(&completedStories)
-		h.db.Model(&model.UserStory{}).
-			Where("assigned_to = ?", devID).
-			Count(&totalAssigned)
+		completedQuery := h.db.Model(&model.UserStory{}).
+			Where("assigned_to = ? AND status = ?", devID, model.StoryStatusDone)
+		totalAssignedQuery := h.db.Model(&model.UserStory{}).Where("assigned_to = ?", devID)
+		if projectID > 0 {
+			completedQuery = completedQuery.Where("project_id = ?", projectID)
+			totalAssignedQuery = totalAssignedQuery.Where("project_id = ?", projectID)
+		} else if role == model.RoleTechLead {
+			completedQuery = completedQuery.Where("project_id IN ?", visibleProjectIDs)
+			totalAssignedQuery = totalAssignedQuery.Where("project_id IN ?", visibleProjectIDs)
+		}
+		completedQuery.Count(&completedStories)
+		totalAssignedQuery.Count(&totalAssigned)
 
 		completionRate := 0.0
 		if totalAssigned > 0 {
@@ -234,7 +293,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 
 // ListMyProjects 获取技术负责人负责的项目列表
 func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
-	_, ok := middleware.CurrentUserID(c)
+	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
 		return
@@ -246,8 +305,22 @@ func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
 		return
 	}
 
+	projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
 	var projects []model.Project
-	if err := h.db.Find(&projects).Error; err != nil {
+	query := h.db.Model(&model.Project{})
+	if role != model.RoleAdmin {
+		if len(projectIDs) == 0 {
+			api.Success(c, "success", gin.H{"projects": []gin.H{}})
+			return
+		}
+		query = query.Where("id IN ?", projectIDs)
+	}
+	if err := query.Find(&projects).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

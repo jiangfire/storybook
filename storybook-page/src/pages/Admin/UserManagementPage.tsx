@@ -392,7 +392,12 @@ export default function UserManagementPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={workloadOpen} onClose={() => setWorkloadOpen(false)} title="用户工作负载" size="lg">
+      <Modal
+        isOpen={workloadOpen}
+        onClose={() => setWorkloadOpen(false)}
+        title="用户工作负载"
+        size="lg"
+      >
         {workloadLoading ? (
           <div className="text-sm text-text-light">加载中...</div>
         ) : !workloadDetail ? (
@@ -411,7 +416,9 @@ export default function UserManagementPage() {
               </div>
               <div className="border border-border rounded-lg p-2">
                 <div className="text-xs text-text-light">总预估工时</div>
-                <div className="font-semibold">{workloadDetail.statistics.total_estimated_hours}</div>
+                <div className="font-semibold">
+                  {workloadDetail.statistics.total_estimated_hours}
+                </div>
               </div>
               <div className="border border-border rounded-lg p-2">
                 <div className="text-xs text-text-light">故事进行中</div>

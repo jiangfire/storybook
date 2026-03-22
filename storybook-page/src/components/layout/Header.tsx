@@ -110,7 +110,8 @@ export default function Header() {
     }
   };
 
-  const renderBugLink = (projectID: number, bugID: number) => `/projects/${projectID}/bugs?bug=${bugID}`;
+  const renderBugLink = (projectID: number, bugID: number) =>
+    `/projects/${projectID}/bugs?bug=${bugID}`;
 
   return (
     <header className="h-14 bg-white border-b border-border flex items-center justify-between px-4 sticky top-0 z-50 glass">

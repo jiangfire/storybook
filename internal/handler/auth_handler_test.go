@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"git.neolidy.top/neo/storybook/internal/auth"
 	"git.neolidy.top/neo/storybook/internal/model"
@@ -71,6 +72,57 @@ func TestLoginLockoutAfterFiveFailures(t *testing.T) {
 	r.ServeHTTP(w, c.Request)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected locked user login to fail, got %d", w.Code)
+	}
+}
+
+func TestRefreshRejectedAfterUserStateChanges(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open("file:auth_refresh_state_test?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	hashed, _ := bcrypt.GenerateFromPassword([]byte("Pass1234"), 10)
+	user := model.User{
+		Username:       "refresh-user",
+		Email:          "refresh@example.com",
+		HashedPassword: string(hashed),
+		Role:           model.RoleDeveloper,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+
+	tokenManager := auth.NewTokenManager("test-secret", 24, 24*7)
+	refreshToken, _, err := tokenManager.GenerateRefreshToken(user.ID, user.Email, user.Role)
+	if err != nil {
+		t.Fatalf("generate refresh token: %v", err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	forcedUpdatedAt := time.Now().Add(2 * time.Second)
+	if err := db.Model(&model.User{}).Where("id = ?", user.ID).Updates(map[string]any{
+		"role":       model.RoleProduct,
+		"updated_at": forcedUpdatedAt,
+	}).Error; err != nil {
+		t.Fatalf("update user: %v", err)
+	}
+
+	h := NewAuthHandler(db, tokenManager)
+	w := httptest.NewRecorder()
+	c, r := gin.CreateTestContext(w)
+	r.POST("/api/auth/refresh", h.Refresh)
+	c.Request = newJSONRequest(t, http.MethodPost, "/api/auth/refresh", gin.H{
+		"refresh_token": refreshToken,
+	})
+	r.ServeHTTP(w, c.Request)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected refresh to be rejected after user update, got %d body=%s", w.Code, w.Body.String())
 	}
 }
 

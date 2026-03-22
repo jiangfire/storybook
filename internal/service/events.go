@@ -1,5 +1,5 @@
 package service
 
 type EventPublisher interface {
-	Broadcast(eventType string, data any)
+	BroadcastProject(projectID uint, eventType string, data any)
 }

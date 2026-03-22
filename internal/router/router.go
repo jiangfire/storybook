@@ -23,7 +23,7 @@ func New(db *gorm.DB, tokenManager *auth.TokenManager) *gin.Engine {
 
 	authHandler := handler.NewAuthHandler(db, tokenManager)
 	projectHandler := handler.NewProjectHandler(db)
-	hub := realtime.NewHub()
+	hub := realtime.NewHub(db)
 	storyHandler := handler.NewStoryHandler(db, hub)
 	meHandler := handler.NewMeHandler(db)
 	aiHandler := handler.NewAIHandler(db)
@@ -128,15 +128,23 @@ func New(db *gorm.DB, tokenManager *auth.TokenManager) *gin.Engine {
 		protected.DELETE("/projects/:id/techleads/:userID", techLeadHandler.RemoveTechLead)
 		protected.GET("/projects/:id/techleads", techLeadHandler.ListProjectTechLeads)
 
-		// 用户管理（admin和tech_lead）
+		// 管理员配置
 		admin := protected.Group("/admin")
 		admin.Use(middleware.RequireRoles(model.RoleTechLead, model.RoleAdmin))
 		{
-			admin.GET("/users", userManagementHandler.ListUsers)
-			admin.POST("/users", userManagementHandler.CreateUser)
-			admin.PUT("/users/:id", userManagementHandler.UpdateUser)
-			admin.GET("/users/:id/workload", userManagementHandler.GetUserWorkload)
-			admin.DELETE("/users/:id", userManagementHandler.DeleteUser)
+			admin.GET("/ai/config", aiHandler.GetConfig)
+			admin.PUT("/ai/config", aiHandler.UpsertConfig)
+			admin.POST("/ai/config/test", aiHandler.TestConfig)
+		}
+
+		userAdmin := protected.Group("/admin/users")
+		userAdmin.Use(middleware.RequireRoles(model.RoleAdmin))
+		{
+			userAdmin.GET("", userManagementHandler.ListUsers)
+			userAdmin.POST("", userManagementHandler.CreateUser)
+			userAdmin.PUT("/:id", userManagementHandler.UpdateUser)
+			userAdmin.GET("/:id/workload", userManagementHandler.GetUserWorkload)
+			userAdmin.DELETE("/:id", userManagementHandler.DeleteUser)
 		}
 	}
 

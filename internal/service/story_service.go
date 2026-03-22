@@ -249,7 +249,7 @@ func (s *StoryService) UpdateStatus(story *model.UserStory, userID uint, newStat
 	})
 
 	if s.events != nil {
-		s.events.Broadcast("story.status_changed", map[string]any{
+		s.events.BroadcastProject(story.ProjectID, "story.status_changed", map[string]any{
 			"story_id":   story.ID,
 			"project_id": story.ProjectID,
 			"old_status": oldStatus,
@@ -303,7 +303,7 @@ func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID,
 	})
 
 	if s.events != nil {
-		s.events.Broadcast("story.ac_updated", map[string]any{
+		s.events.BroadcastProject(story.ProjectID, "story.ac_updated", map[string]any{
 			"story_id":  story.ID,
 			"ac_id":     acID,
 			"ac_status": status,

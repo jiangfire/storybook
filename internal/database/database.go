@@ -41,6 +41,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		&model.Task{},
 		&model.ActivityLog{},
 		&model.TestCase{},
+		&model.AIConfig{},
 	); err != nil {
 		return nil, err
 	}

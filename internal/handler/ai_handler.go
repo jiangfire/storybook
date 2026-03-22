@@ -1,13 +1,17 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"math"
+	"net/http"
 	"strings"
+	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -36,28 +40,220 @@ func (h *AIHandler) GenerateStory(c *gin.Context) {
 		return
 	}
 
-	reqText := strings.TrimSpace(req.Requirement)
-	actor := inferActor(reqText)
-	action := inferAction(reqText)
-	value := inferValue(reqText)
-
-	story := fmt.Sprintf("作为 %s，\n我想要 %s，\n以便 %s", actor, action, value)
-	ac := []string{
-		"支持核心输入与校验流程",
-		"操作成功后返回明确反馈",
-		"异常场景有清晰错误提示",
-		"关键操作记录活动日志",
+	requirement := service.SanitizeRequirement(req.Requirement)
+	if len([]rune(requirement)) < 5 {
+		api.BadRequest(c, "需求描述过短")
+		return
 	}
 
-	estimatedPoints := estimatePoints(reqText, len(ac))
+	ctx, cancel := contextWithTimeout(c, 45*time.Second)
+	defer cancel()
+
+	aiService := service.NewAIService(h.db)
+	result, resolvedService, err := generateStoryWithFallback(ctx, requirement, aiService)
+	if err != nil {
+		api.Error(c, http.StatusBadGateway, api.CodeInternal, fmt.Sprintf("AI生成失败: %v", err))
+		return
+	}
+
+	acList := make([]gin.H, 0, len(result.SuggestedAC))
+	for index, description := range result.SuggestedAC {
+		acList = append(acList, gin.H{
+			"description": description,
+			"order":       index + 1,
+		})
+	}
 
 	api.Success(c, "success", gin.H{
-		"user_story":   story,
-		"actor":        actor,
-		"action":       action,
-		"value":        value,
-		"suggested_ac": ac,
-		"story_points": estimatedPoints,
+		"title":         result.Title,
+		"user_story":    result.UserStory,
+		"actor":         result.Actor,
+		"action":        result.Action,
+		"value":         result.Value,
+		"story_type":    result.StoryType,
+		"priority":      result.Priority,
+		"suggested_ac":  result.SuggestedAC,
+		"story_points":  result.StoryPoints,
+		"tags":          result.Tags,
+		"warnings":      result.Warnings,
+		"source":        service.ResolveAIResponseSource(resolvedService),
+		"is_configured": aiService.IsConfigured(),
+		"form_draft": gin.H{
+			"title":               result.Title,
+			"description":         result.UserStory,
+			"story_type":          result.StoryType,
+			"priority":            result.Priority,
+			"story_points":        result.StoryPoints,
+			"acceptance_criteria": acList,
+			"tags":                result.Tags,
+		},
+	})
+}
+
+func generateStoryWithFallback(ctx context.Context, requirement string, primary service.AIService) (*service.StoryResult, service.AIService, error) {
+	if primary == nil {
+		primary = service.NewAIServiceFromConfig(service.RuntimeAIConfig{})
+	}
+
+	result, err := primary.GenerateStory(ctx, requirement)
+	if err == nil {
+		return result, primary, nil
+	}
+	if !primary.IsConfigured() {
+		return nil, primary, err
+	}
+
+	fallback := service.NewAIServiceFromConfig(service.RuntimeAIConfig{})
+	fallbackResult, fallbackErr := fallback.GenerateStory(ctx, requirement)
+	if fallbackErr != nil {
+		return nil, primary, fmt.Errorf("openai 调用失败: %w; 规则降级也失败: %v", err, fallbackErr)
+	}
+	fallbackResult.Warnings = prependAIWarning(
+		fallbackResult.Warnings,
+		"OpenAI 调用失败，已自动回退到规则草稿，请检查 AI 配置或稍后重试",
+	)
+	return fallbackResult, fallback, nil
+}
+
+func prependAIWarning(warnings []string, warning string) []string {
+	warning = strings.TrimSpace(warning)
+	if warning == "" {
+		return warnings
+	}
+	for _, item := range warnings {
+		if item == warning {
+			return warnings
+		}
+	}
+	return append([]string{warning}, warnings...)
+}
+
+type aiConfigRequest struct {
+	APIKey      string   `json:"api_key"`
+	Model       string   `json:"model"`
+	Temperature *float64 `json:"temperature"`
+	MaxTokens   *int     `json:"max_tokens"`
+	Enabled     *bool    `json:"enabled"`
+}
+
+func (h *AIHandler) GetConfig(c *gin.Context) {
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleAdmin {
+		api.Forbidden(c, "仅管理员可查看AI配置")
+		return
+	}
+
+	config, err := h.loadLatestConfig()
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			api.Success(c, "success", gin.H{
+				"config": gin.H{
+					"provider":       "openai",
+					"model":          "gpt-4o-mini",
+					"temperature":    0.2,
+					"max_tokens":     1200,
+					"enabled":        false,
+					"api_key_masked": "",
+					"is_configured":  false,
+				},
+			})
+			return
+		}
+		api.Internal(c, "读取AI配置失败")
+		return
+	}
+
+	api.Success(c, "success", gin.H{
+		"config": h.serializeConfig(config),
+	})
+}
+
+func (h *AIHandler) UpsertConfig(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleAdmin {
+		api.Forbidden(c, "仅管理员可修改AI配置")
+		return
+	}
+
+	var req aiConfigRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+
+	existing, err := h.loadLatestConfig()
+	if err != nil && err != gorm.ErrRecordNotFound {
+		api.Internal(c, "读取AI配置失败")
+		return
+	}
+
+	config, err := h.mergeConfig(existing, req, userID)
+	if err != nil {
+		api.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.db.Save(config).Error; err != nil {
+		api.Internal(c, "保存AI配置失败")
+		return
+	}
+
+	api.Success(c, "success", gin.H{
+		"config": h.serializeConfig(*config),
+	})
+}
+
+func (h *AIHandler) TestConfig(c *gin.Context) {
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleAdmin {
+		api.Forbidden(c, "仅管理员可测试AI配置")
+		return
+	}
+
+	var req aiConfigRequest
+	if c.Request.ContentLength > 0 {
+		if !middleware.BindJSON(c, &req) {
+			return
+		}
+	}
+
+	existing, err := h.loadLatestConfig()
+	if err != nil && err != gorm.ErrRecordNotFound {
+		api.Internal(c, "读取AI配置失败")
+		return
+	}
+
+	runtimeConfig, err := h.resolveTestRuntimeConfig(existing, req)
+	if err != nil {
+		api.BadRequest(c, err.Error())
+		return
+	}
+
+	ctx, cancel := contextWithTimeout(c, 30*time.Second)
+	defer cancel()
+
+	aiService := service.NewAIServiceFromConfig(runtimeConfig)
+	result, err := aiService.GenerateStory(ctx, "需求：用户可以通过邮箱和密码登录系统，并在失败时看到明确提示。")
+	if err != nil {
+		api.Error(c, http.StatusBadGateway, api.CodeInternal, fmt.Sprintf("AI测试失败: %v", err))
+		return
+	}
+
+	api.Success(c, "success", gin.H{
+		"provider": "openai",
+		"model":    runtimeConfig.Model,
+		"preview": gin.H{
+			"title":        result.Title,
+			"user_story":   result.UserStory,
+			"story_type":   result.StoryType,
+			"priority":     result.Priority,
+			"story_points": result.StoryPoints,
+		},
 	})
 }
 
@@ -198,35 +394,171 @@ func (h *AIHandler) INVESTCheck(c *gin.Context) {
 	})
 }
 
-func inferActor(text string) string {
-	candidates := []string{"产品经理", "开发人员", "测试人员", "用户", "访客", "买家", "卖家", "管理员"}
-	for _, c := range candidates {
-		if strings.Contains(text, c) {
-			return c
-		}
-	}
-	return "用户"
+func (h *AIHandler) loadLatestConfig() (model.AIConfig, error) {
+	var cfg model.AIConfig
+	err := h.db.Order("id DESC").First(&cfg).Error
+	return cfg, err
 }
 
-func inferAction(text string) string {
-	text = strings.TrimSpace(text)
-	if strings.HasPrefix(text, "用户") || strings.HasPrefix(text, "作为") {
-		return text
-	}
-	if len([]rune(text)) > 40 {
-		return string([]rune(text)[:40]) + "..."
-	}
-	return text
-}
-
-func inferValue(text string) string {
-	if strings.Contains(text, "以便") {
-		parts := strings.SplitN(text, "以便", 2)
-		if len(parts) == 2 {
-			return strings.TrimSpace(parts[1])
+func (h *AIHandler) serializeConfig(cfg model.AIConfig) gin.H {
+	apiKeyMasked := ""
+	if cfg.APIKeyEncrypted != "" {
+		if decrypted, err := service.DecryptAPIKey(cfg.APIKeyEncrypted); err == nil {
+			apiKeyMasked = service.MaskAPIKey(decrypted)
 		}
 	}
-	return "提升任务交付效率"
+
+	return gin.H{
+		"id":             cfg.ID,
+		"provider":       "openai",
+		"model":          cfg.Model,
+		"temperature":    cfg.Temperature,
+		"max_tokens":     cfg.MaxTokens,
+		"enabled":        cfg.Enabled,
+		"api_key_masked": apiKeyMasked,
+		"updated_by":     cfg.UpdatedBy,
+		"created_at":     cfg.CreatedAt,
+		"updated_at":     cfg.UpdatedAt,
+		"is_configured":  cfg.APIKeyEncrypted != "",
+	}
+}
+
+func (h *AIHandler) mergeConfig(existing model.AIConfig, req aiConfigRequest, userID uint) (*model.AIConfig, error) {
+	hasExisting := existing.ID != 0
+	modelName := strings.TrimSpace(req.Model)
+	if modelName == "" {
+		if hasExisting {
+			modelName = existing.Model
+		} else {
+			modelName = "gpt-4o-mini"
+		}
+	}
+
+	temperature := 0.2
+	if hasExisting {
+		temperature = existing.Temperature
+	}
+	if req.Temperature != nil {
+		temperature = *req.Temperature
+	}
+	if temperature < 0 || temperature > 2 {
+		return nil, fmt.Errorf("temperature 必须在 0 到 2 之间")
+	}
+
+	maxTokens := 1200
+	if hasExisting && existing.MaxTokens > 0 {
+		maxTokens = existing.MaxTokens
+	}
+	if req.MaxTokens != nil {
+		maxTokens = *req.MaxTokens
+	}
+	if maxTokens < 256 || maxTokens > 8192 {
+		return nil, fmt.Errorf("max_tokens 必须在 256 到 8192 之间")
+	}
+
+	enabled := hasExisting && existing.Enabled
+	if req.Enabled != nil {
+		enabled = *req.Enabled
+	}
+
+	encryptedKey := existing.APIKeyEncrypted
+	if strings.TrimSpace(req.APIKey) != "" {
+		var err error
+		encryptedKey, err = service.EncryptAPIKey(strings.TrimSpace(req.APIKey))
+		if err != nil {
+			return nil, fmt.Errorf("加密API Key失败: %w", err)
+		}
+	}
+	if strings.TrimSpace(encryptedKey) == "" {
+		return nil, fmt.Errorf("请填写 OpenAI API Key")
+	}
+
+	config := &model.AIConfig{
+		ID:              existing.ID,
+		APIKeyEncrypted: encryptedKey,
+		Model:           modelName,
+		Temperature:     temperature,
+		MaxTokens:       maxTokens,
+		Enabled:         enabled,
+		UpdatedBy:       userID,
+	}
+	if !hasExisting {
+		config.CreatedAt = time.Now()
+	}
+	return config, nil
+}
+
+func (h *AIHandler) resolveRuntimeConfig(existing model.AIConfig, req aiConfigRequest) (service.RuntimeAIConfig, error) {
+	modelName := strings.TrimSpace(req.Model)
+	if modelName == "" {
+		modelName = existing.Model
+	}
+	if modelName == "" {
+		modelName = "gpt-4o-mini"
+	}
+
+	temperature := existing.Temperature
+	if temperature == 0 {
+		temperature = 0.2
+	}
+	if req.Temperature != nil {
+		temperature = *req.Temperature
+	}
+	if temperature < 0 || temperature > 2 {
+		return service.RuntimeAIConfig{}, fmt.Errorf("temperature 必须在 0 到 2 之间")
+	}
+
+	maxTokens := existing.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = 1200
+	}
+	if req.MaxTokens != nil {
+		maxTokens = *req.MaxTokens
+	}
+	if maxTokens < 256 || maxTokens > 8192 {
+		return service.RuntimeAIConfig{}, fmt.Errorf("max_tokens 必须在 256 到 8192 之间")
+	}
+
+	apiKey := strings.TrimSpace(req.APIKey)
+	if apiKey == "" && strings.TrimSpace(existing.APIKeyEncrypted) != "" {
+		decrypted, err := service.DecryptAPIKey(existing.APIKeyEncrypted)
+		if err != nil {
+			return service.RuntimeAIConfig{}, fmt.Errorf("读取现有API Key失败: %w", err)
+		}
+		apiKey = decrypted
+	}
+	if apiKey == "" {
+		return service.RuntimeAIConfig{}, fmt.Errorf("请先保存 OpenAI API Key")
+	}
+
+	enabled := true
+	if req.Enabled != nil {
+		enabled = *req.Enabled
+	} else if existing.ID != 0 {
+		enabled = existing.Enabled
+	}
+
+	return service.RuntimeAIConfig{
+		APIKey:      apiKey,
+		Model:       modelName,
+		Temperature: temperature,
+		MaxTokens:   maxTokens,
+		Enabled:     enabled,
+	}, nil
+}
+
+func (h *AIHandler) resolveTestRuntimeConfig(existing model.AIConfig, req aiConfigRequest) (service.RuntimeAIConfig, error) {
+	runtimeConfig, err := h.resolveRuntimeConfig(existing, req)
+	if err != nil {
+		return service.RuntimeAIConfig{}, err
+	}
+	// “测试连接”应始终验证真实调用能力，而不是受启用开关影响回退到规则草稿。
+	runtimeConfig.Enabled = true
+	return runtimeConfig, nil
+}
+
+func contextWithTimeout(c *gin.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(c.Request.Context(), timeout)
 }
 
 func estimatePoints(text string, acCount int) int {

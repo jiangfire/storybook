@@ -37,6 +37,7 @@ export interface AcceptanceCriteria {
 export interface Story {
   id: number;
   project_id: number;
+  project?: Pick<Project, 'id' | 'name'>;
   title: string;
   description?: string;
   story_type: StoryType;

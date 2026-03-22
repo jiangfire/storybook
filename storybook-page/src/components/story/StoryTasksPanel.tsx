@@ -299,12 +299,15 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-text truncate">{task.title}</div>
                   <div className="text-xs text-text-light">
-                    P{task.priority} · 工时 {task.estimated_hours || 0}h · 进度 {task.progress || 0}%
+                    P{task.priority} · 工时 {task.estimated_hours || 0}h · 进度 {task.progress || 0}
+                    %
                   </div>
                 </div>
                 <select
                   value={task.status}
-                  onChange={(e) => void handleStatusChange(task, e.target.value as TaskItem['status'])}
+                  onChange={(e) =>
+                    void handleStatusChange(task, e.target.value as TaskItem['status'])
+                  }
                   className="px-2 py-1 border border-border rounded text-sm"
                 >
                   {taskStatusOptions.map((option) => (
@@ -358,7 +361,9 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
           <div className="space-y-3">
             <input
               value={selectedTask.title}
-              onChange={(e) => setSelectedTask((prev) => (prev ? { ...prev, title: e.target.value } : prev))}
+              onChange={(e) =>
+                setSelectedTask((prev) => (prev ? { ...prev, title: e.target.value } : prev))
+              }
               className="w-full px-3 py-2 border border-border rounded-lg"
               placeholder="任务标题"
             />
@@ -378,7 +383,9 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                 max={4}
                 value={selectedTask.priority}
                 onChange={(e) =>
-                  setSelectedTask((prev) => (prev ? { ...prev, priority: Number(e.target.value) } : prev))
+                  setSelectedTask((prev) =>
+                    prev ? { ...prev, priority: Number(e.target.value) } : prev
+                  )
                 }
                 className="px-3 py-2 border border-border rounded-lg"
                 placeholder="优先级"
@@ -417,7 +424,11 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="secondary" onClick={() => setDetailOpen(false)} disabled={detailSaving}>
+              <Button
+                variant="secondary"
+                onClick={() => setDetailOpen(false)}
+                disabled={detailSaving}
+              >
                 关闭
               </Button>
               <Button onClick={handleSaveTaskDetail} isLoading={detailSaving}>

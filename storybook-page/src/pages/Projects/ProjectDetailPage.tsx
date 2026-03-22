@@ -34,9 +34,17 @@ interface MemberItem {
 
 // 缺陷状态分布组件
 function BugStatusDistribution({ data, total }: { data: Record<string, number>; total: number }) {
-  const statusConfig: Record<string, { label: string; icon: string; color: string; bgColor: string }> = {
+  const statusConfig: Record<
+    string,
+    { label: string; icon: string; color: string; bgColor: string }
+  > = {
     open: { label: '待处理', icon: '📥', color: 'text-info', bgColor: 'bg-info-light' },
-    in_progress: { label: '处理中', icon: '🔧', color: 'text-warning', bgColor: 'bg-warning-light' },
+    in_progress: {
+      label: '处理中',
+      icon: '🔧',
+      color: 'text-warning',
+      bgColor: 'bg-warning-light',
+    },
     resolved: { label: '已解决', icon: '✅', color: 'text-success', bgColor: 'bg-success-light' },
     closed: { label: '已关闭', icon: '📪', color: 'text-text-light', bgColor: 'bg-secondary-100' },
   };
@@ -52,7 +60,12 @@ function BugStatusDistribution({ data, total }: { data: Record<string, number>; 
       </div>
       <div className="space-y-2">
         {entries.map(([key, value]) => {
-          const config = statusConfig[key] || { label: key, icon: '📋', color: 'text-text', bgColor: 'bg-secondary-100' };
+          const config = statusConfig[key] || {
+            label: key,
+            icon: '📋',
+            color: 'text-text',
+            bgColor: 'bg-secondary-100',
+          };
           const percentage = total > 0 ? (value / total) * 100 : 0;
           const barWidth = maxValue > 0 ? (value / maxValue) * 100 : 0;
 
@@ -60,14 +73,20 @@ function BugStatusDistribution({ data, total }: { data: Record<string, number>; 
             <div key={key} className="group">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <span className={`w-6 h-6 rounded-md ${config.bgColor} flex items-center justify-center text-sm`}>
+                  <span
+                    className={`w-6 h-6 rounded-md ${config.bgColor} flex items-center justify-center text-sm`}
+                  >
                     {config.icon}
                   </span>
                   <span className="text-sm text-text">{config.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-sm font-semibold ${config.color}`}>{value}</span>
-                  {total > 0 && <span className="text-xs text-text-light w-10 text-right">{percentage.toFixed(0)}%</span>}
+                  {total > 0 && (
+                    <span className="text-xs text-text-light w-10 text-right">
+                      {percentage.toFixed(0)}%
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="h-1.5 bg-secondary-100 rounded-full overflow-hidden">
@@ -86,11 +105,38 @@ function BugStatusDistribution({ data, total }: { data: Record<string, number>; 
 
 // 缺陷严重级别分布组件
 function BugSeverityDistribution({ data, total }: { data: Record<string, number>; total: number }) {
-  const severityConfig: Record<string, { label: string; icon: string; color: string; bgColor: string; borderColor: string }> = {
-    critical: { label: '严重', icon: '🔴', color: 'text-danger', bgColor: 'bg-danger-light', borderColor: 'border-danger' },
-    high: { label: '高', icon: '🟠', color: 'text-warning', bgColor: 'bg-warning-light', borderColor: 'border-warning' },
-    medium: { label: '中', icon: '🟡', color: 'text-info', bgColor: 'bg-info-light', borderColor: 'border-info' },
-    low: { label: '低', icon: '🟢', color: 'text-success', bgColor: 'bg-success-light', borderColor: 'border-success' },
+  const severityConfig: Record<
+    string,
+    { label: string; icon: string; color: string; bgColor: string; borderColor: string }
+  > = {
+    critical: {
+      label: '严重',
+      icon: '🔴',
+      color: 'text-danger',
+      bgColor: 'bg-danger-light',
+      borderColor: 'border-danger',
+    },
+    high: {
+      label: '高',
+      icon: '🟠',
+      color: 'text-warning',
+      bgColor: 'bg-warning-light',
+      borderColor: 'border-warning',
+    },
+    medium: {
+      label: '中',
+      icon: '🟡',
+      color: 'text-info',
+      bgColor: 'bg-info-light',
+      borderColor: 'border-info',
+    },
+    low: {
+      label: '低',
+      icon: '🟢',
+      color: 'text-success',
+      bgColor: 'bg-success-light',
+      borderColor: 'border-success',
+    },
   };
 
   const entries = Object.entries(data).sort((a, b) => {
@@ -103,7 +149,13 @@ function BugSeverityDistribution({ data, total }: { data: Record<string, number>
       <div className="text-text-light text-xs mb-3">缺陷严重级别分布</div>
       <div className="grid grid-cols-2 gap-2">
         {entries.map(([key, value]) => {
-          const config = severityConfig[key] || { label: key, icon: '⚪', color: 'text-text', bgColor: 'bg-secondary-100', borderColor: 'border-border' };
+          const config = severityConfig[key] || {
+            label: key,
+            icon: '⚪',
+            color: 'text-text',
+            bgColor: 'bg-secondary-100',
+            borderColor: 'border-border',
+          };
           const percentage = total > 0 ? (value / total) * 100 : 0;
 
           return (
@@ -152,7 +204,9 @@ export default function ProjectDetailPage() {
     'developer'
   );
   const [isMemberUpdating, setIsMemberUpdating] = useState(false);
-  const [techLeads, setTechLeads] = useState<Array<{ id: number; user?: { id: number; email: string } }>>([]);
+  const [techLeads, setTechLeads] = useState<
+    Array<{ id: number; user?: { id: number; email: string } }>
+  >([]);
   const [selectedTechLeadUserID, setSelectedTechLeadUserID] = useState('');
   const [isTechLeadUpdating, setIsTechLeadUpdating] = useState(false);
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
@@ -619,7 +673,9 @@ export default function ProjectDetailPage() {
             </Button>
           </div>
           {isReportLoading && <div className="text-sm text-text-light">报表加载中...</div>}
-          {!isReportLoading && reportError && <div className="text-sm text-danger">{reportError}</div>}
+          {!isReportLoading && reportError && (
+            <div className="text-sm text-danger">{reportError}</div>
+          )}
           {!isReportLoading && !reportError && (!velocity || velocity.velocity.length === 0) && (
             <div className="text-sm text-text-light">暂无冲刺速度数据</div>
           )}
@@ -629,8 +685,8 @@ export default function ProjectDetailPage() {
                 <div key={item.sprint_id} className="border border-border rounded-lg p-3">
                   <div className="font-medium text-text">{item.name}</div>
                   <div className="text-xs text-text-light mt-1">
-                    状态：{item.status} · 完成点数 {item.completed_points}/{item.planned_points} · 速度{' '}
-                    {item.velocity.toFixed(1)}%
+                    状态：{item.status} · 完成点数 {item.completed_points}/{item.planned_points} ·
+                    速度 {item.velocity.toFixed(1)}%
                   </div>
                 </div>
               ))}
@@ -641,7 +697,9 @@ export default function ProjectDetailPage() {
         <div className="bg-white rounded-xl border border-border p-6">
           <h2 className="text-lg font-semibold text-text mb-4">质量报表</h2>
           {isReportLoading && <div className="text-sm text-text-light">报表加载中...</div>}
-          {!isReportLoading && reportError && <div className="text-sm text-danger">{reportError}</div>}
+          {!isReportLoading && reportError && (
+            <div className="text-sm text-danger">{reportError}</div>
+          )}
           {!isReportLoading && !reportError && quality && (
             <div className="space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-3">
@@ -658,10 +716,16 @@ export default function ProjectDetailPage() {
               </div>
 
               {/* 缺陷状态分布 */}
-              <BugStatusDistribution data={quality.bugs.status_breakdown} total={quality.bugs.total} />
+              <BugStatusDistribution
+                data={quality.bugs.status_breakdown}
+                total={quality.bugs.total}
+              />
 
               {/* 缺陷严重级别分布 */}
-              <BugSeverityDistribution data={quality.bugs.severity_breakdown} total={quality.bugs.total} />
+              <BugSeverityDistribution
+                data={quality.bugs.severity_breakdown}
+                total={quality.bugs.total}
+              />
             </div>
           )}
         </div>

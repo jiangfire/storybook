@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
+	"strconv"
 	"strings"
 
 	"git.neolidy.top/neo/storybook/internal/fileutil"
@@ -235,10 +237,19 @@ func getUintArg(args map[string]any, key string) (uint, error) {
 
 	switch typed := value.(type) {
 	case float64:
+		if typed < 0 || math.Trunc(typed) != typed || typed > float64(^uint(0)) {
+			return 0, fmt.Errorf("%s is invalid", key)
+		}
 		return uint(typed), nil
 	case int:
+		if typed < 0 {
+			return 0, fmt.Errorf("%s is invalid", key)
+		}
 		return uint(typed), nil
 	case int64:
+		if typed < 0 {
+			return 0, fmt.Errorf("%s is invalid", key)
+		}
 		return uint(typed), nil
 	case uint:
 		return typed, nil
@@ -294,7 +305,6 @@ func parseUpdates(raw any) ([]service.MCPACUpdateInput, error) {
 }
 
 func strconvParseUint(value string) (uint, error) {
-	var out uint
-	_, err := fmt.Sscanf(value, "%d", &out)
-	return out, err
+	out, err := strconv.ParseUint(value, 10, strconv.IntSize)
+	return uint(out), err
 }

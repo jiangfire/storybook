@@ -13,7 +13,7 @@ import { StoryDetailSkeleton } from '../../components/ui/Skeleton';
 import { projectService } from '../../services/projectService';
 import { storyService } from '../../services/storyService';
 import { aiService } from '../../services/aiService';
-import { AISplitStoryData, INVESTCheckData, SprintSummary } from '../../types/api';
+import type { AISplitStoryData, INVESTCheckData, SprintSummary } from '../../types/api';
 import { getErrorMessage } from '../../utils/error';
 import {
   formatStoryType,
@@ -460,7 +460,12 @@ export default function StoryDetailPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-text-light">INVEST 质量检查</span>
-                  <Button size="sm" variant="secondary" onClick={handleInvestCheck} isLoading={isInvestLoading}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleInvestCheck}
+                    isLoading={isInvestLoading}
+                  >
                     执行检查
                   </Button>
                 </div>
@@ -468,7 +473,8 @@ export default function StoryDetailPage() {
                 {investResult && (
                   <div className="bg-secondary-50 border border-border rounded-lg p-3 text-sm space-y-2">
                     <div>
-                      总分：<span className="font-semibold">{investResult.invest_score.toFixed(1)}</span>
+                      总分：
+                      <span className="font-semibold">{investResult.invest_score.toFixed(1)}</span>
                     </div>
                     <div className="space-y-1 text-xs">
                       {Object.entries(investResult.checks).map(([key, val]) => (
@@ -500,7 +506,12 @@ export default function StoryDetailPage() {
                     onChange={(e) => setSplitTargetCount(Number(e.target.value) || 3)}
                     className="w-24 px-2 py-1 border border-border rounded text-sm"
                   />
-                  <Button size="sm" variant="secondary" onClick={handleSplitStory} isLoading={isSplitLoading}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleSplitStory}
+                    isLoading={isSplitLoading}
+                  >
                     生成拆分建议
                   </Button>
                 </div>
@@ -508,7 +519,10 @@ export default function StoryDetailPage() {
                 {splitResult && splitResult.sub_stories.length > 0 && (
                   <div className="space-y-2">
                     {splitResult.sub_stories.map((item, idx) => (
-                      <div key={`${item.title}-${idx}`} className="border border-border rounded-lg p-2">
+                      <div
+                        key={`${item.title}-${idx}`}
+                        className="border border-border rounded-lg p-2"
+                      >
                         <div className="text-sm font-medium text-text">{item.title}</div>
                         <div className="text-xs text-text-light mt-1">
                           点数 {item.story_points} · AC {item.acceptance_criteria.length} 条

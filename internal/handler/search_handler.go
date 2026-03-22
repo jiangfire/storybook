@@ -7,6 +7,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -36,29 +37,37 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
+	role, _ := middleware.CurrentRole(c)
 
 	like := fmt.Sprintf("%%%s%%", q)
+	projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
 	data := gin.H{}
 
 	if searchType == "all" || searchType == "project" {
-		data["projects"] = h.searchProjects(userID, like, limit)
+		data["projects"] = h.searchProjects(projectIDs, like, limit)
 	}
 	if searchType == "all" || searchType == "story" {
-		data["stories"] = h.searchStories(userID, like, limit)
+		data["stories"] = h.searchStories(projectIDs, like, limit)
 	}
 	if searchType == "all" || searchType == "bug" {
-		data["bugs"] = h.searchBugs(userID, like, limit)
+		data["bugs"] = h.searchBugs(projectIDs, like, limit)
 	}
 
 	api.Success(c, "success", data)
 }
 
-func (h *SearchHandler) searchProjects(userID uint, like string, limit int) []gin.H {
+func (h *SearchHandler) searchProjects(projectIDs []uint, like string, limit int) []gin.H {
+	if len(projectIDs) == 0 {
+		return []gin.H{}
+	}
 	var rows []model.Project
 	err := h.db.Model(&model.Project{}).
-		Joins("LEFT JOIN project_members pm ON pm.project_id = projects.id").
-		Where("(projects.owner_id = ? OR pm.user_id = ?) AND projects.name LIKE ?", userID, userID, like).
-		Group("projects.id").
+		Where("projects.id IN ? AND projects.name LIKE ?", projectIDs, like).
 		Order("projects.updated_at DESC").
 		Limit(limit).
 		Find(&rows).Error
@@ -79,13 +88,13 @@ func (h *SearchHandler) searchProjects(userID uint, like string, limit int) []gi
 	return out
 }
 
-func (h *SearchHandler) searchStories(userID uint, like string, limit int) []gin.H {
+func (h *SearchHandler) searchStories(projectIDs []uint, like string, limit int) []gin.H {
+	if len(projectIDs) == 0 {
+		return []gin.H{}
+	}
 	var rows []model.UserStory
 	err := h.db.Model(&model.UserStory{}).
-		Joins("JOIN projects p ON p.id = user_stories.project_id").
-		Joins("LEFT JOIN project_members pm ON pm.project_id = p.id").
-		Where("(p.owner_id = ? OR pm.user_id = ?) AND user_stories.archived = false AND (user_stories.title LIKE ? OR user_stories.description LIKE ?)", userID, userID, like, like).
-		Group("user_stories.id").
+		Where("project_id IN ? AND archived = false AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like).
 		Order("user_stories.updated_at DESC").
 		Limit(limit).
 		Find(&rows).Error
@@ -108,13 +117,13 @@ func (h *SearchHandler) searchStories(userID uint, like string, limit int) []gin
 	return out
 }
 
-func (h *SearchHandler) searchBugs(userID uint, like string, limit int) []gin.H {
+func (h *SearchHandler) searchBugs(projectIDs []uint, like string, limit int) []gin.H {
+	if len(projectIDs) == 0 {
+		return []gin.H{}
+	}
 	var rows []model.BugReport
 	err := h.db.Model(&model.BugReport{}).
-		Joins("JOIN projects p ON p.id = bug_reports.project_id").
-		Joins("LEFT JOIN project_members pm ON pm.project_id = p.id").
-		Where("(p.owner_id = ? OR pm.user_id = ?) AND (bug_reports.title LIKE ? OR bug_reports.description LIKE ?)", userID, userID, like, like).
-		Group("bug_reports.id").
+		Where("project_id IN ? AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like).
 		Order("bug_reports.updated_at DESC").
 		Limit(limit).
 		Find(&rows).Error

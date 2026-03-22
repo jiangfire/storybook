@@ -19,7 +19,12 @@ const actionConfig: Record<
     iconColor: 'text-purple-600',
   },
   assigned: { label: '分配给', icon: '👤', bgColor: 'bg-green-50', iconColor: 'text-green-600' },
-  commented: { label: '评论了', icon: '💬', bgColor: 'bg-secondary-50', iconColor: 'text-text-light' },
+  commented: {
+    label: '评论了',
+    icon: '💬',
+    bgColor: 'bg-secondary-50',
+    iconColor: 'text-text-light',
+  },
 };
 
 export default function ActivityTimeline({ activities }: ActivityTimelineProps) {

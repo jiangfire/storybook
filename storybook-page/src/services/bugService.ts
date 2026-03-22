@@ -11,14 +11,20 @@ import type {
 
 export const bugService = {
   async getProjectBugs(projectId: number, params?: BugListParams): Promise<BugListResponse> {
-    const response = await apiClient.get<ApiResponse<BugListResponse>>(`/api/projects/${projectId}/bugs`, {
-      params,
-    });
+    const response = await apiClient.get<ApiResponse<BugListResponse>>(
+      `/api/projects/${projectId}/bugs`,
+      {
+        params,
+      }
+    );
     return response.data.data;
   },
 
   async createBug(projectId: number, data: CreateBugRequest): Promise<BugItem> {
-    const response = await apiClient.post<ApiResponse<BugItem>>(`/api/projects/${projectId}/bugs`, data);
+    const response = await apiClient.post<ApiResponse<BugItem>>(
+      `/api/projects/${projectId}/bugs`,
+      data
+    );
     return response.data.data;
   },
 
@@ -37,4 +43,3 @@ export const bugService = {
     return response.data.data;
   },
 };
-

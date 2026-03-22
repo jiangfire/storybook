@@ -1,16 +1,15 @@
 package handler
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -165,11 +164,22 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	search := strings.TrimSpace(c.Query("search"))
 
 	query := h.db.Model(&model.Project{})
-	if role != model.RoleTechLead && role != model.RoleAdmin {
-		query = query.
-			Joins("LEFT JOIN project_members pm ON pm.project_id = projects.id").
-			Where("projects.owner_id = ? OR pm.user_id = ?", userID, userID).
-			Group("projects.id")
+	if role != model.RoleAdmin {
+		projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
+		if err != nil {
+			api.Internal(c, "服务器内部错误")
+			return
+		}
+		if len(projectIDs) == 0 {
+			api.Success(c, "success", gin.H{
+				"projects": []projectItem{},
+				"total":    0,
+				"page":     page,
+				"limit":    limit,
+			})
+			return
+		}
+		query = query.Where("projects.id IN ?", projectIDs)
 	}
 
 	if search != "" {
@@ -718,36 +728,17 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 var errForbidden = fmt.Errorf("forbidden")
 
 func (h *ProjectHandler) getProjectWithAccess(projectID, userID uint) (*model.Project, bool, error) {
-	var project model.Project
-	if err := h.db.Preload("Owner").First(&project, projectID).Error; err != nil {
-		return nil, false, err
-	}
-
-	if project.OwnerID == userID {
-		return &project, true, nil
-	}
-
-	var user model.User
-	if err := h.db.Select("id, role").First(&user, userID).Error; err == nil {
-		if user.Role == model.RoleTechLead || user.Role == model.RoleAdmin {
-			return &project, false, nil
+	project, isOwner, err := service.EnsureProjectAccess(h.db, projectID, userID)
+	if err != nil {
+		if errors.Is(err, service.ErrForbidden) {
+			return nil, false, errForbidden
 		}
-	} else {
 		return nil, false, err
 	}
-
-	var exists int64
-	if err := h.db.Model(&model.ProjectMember{}).
-		Where("project_id = ? AND user_id = ?", project.ID, userID).
-		Count(&exists).Error; err != nil {
+	if err := h.db.Preload("Owner").First(project, project.ID).Error; err != nil {
 		return nil, false, err
 	}
-
-	if exists == 0 {
-		return nil, false, errForbidden
-	}
-
-	return &project, false, nil
+	return project, isOwner, nil
 }
 
 func (h *ProjectHandler) recentActivities(projectID uint, limit int) []gin.H {
@@ -806,77 +797,6 @@ func (h *ProjectHandler) queryProjectMaxTime(target any, column string, projectI
 		return time.Time{}, false
 	}
 	return *row.T, true
-}
-
-func normalizeAnyTime(raw any) (time.Time, bool) {
-	switch v := raw.(type) {
-	case nil:
-		return time.Time{}, false
-	case time.Time:
-		return v, !v.IsZero()
-	case *time.Time:
-		if v == nil || v.IsZero() {
-			return time.Time{}, false
-		}
-		return *v, true
-	case sql.NullTime:
-		if !v.Valid || v.Time.IsZero() {
-			return time.Time{}, false
-		}
-		return v.Time, true
-	case string:
-		return parseFlexibleTime(v)
-	case []byte:
-		return parseFlexibleTime(string(v))
-	case int64:
-		return normalizeUnixTime(v), true
-	case int32:
-		return normalizeUnixTime(int64(v)), true
-	case int:
-		return normalizeUnixTime(int64(v)), true
-	case float64:
-		return normalizeUnixTime(int64(v)), true
-	case float32:
-		return normalizeUnixTime(int64(v)), true
-	default:
-		return parseFlexibleTime(fmt.Sprint(v))
-	}
-}
-
-func parseFlexibleTime(raw string) (time.Time, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" || strings.EqualFold(raw, "<nil>") {
-		return time.Time{}, false
-	}
-
-	layouts := []string{
-		time.RFC3339Nano,
-		time.RFC3339,
-		"2006-01-02 15:04:05.999999999-07:00",
-		"2006-01-02 15:04:05.999999999Z07:00",
-		"2006-01-02 15:04:05.999999999",
-		"2006-01-02 15:04:05",
-		"2006-01-02",
-	}
-	for _, layout := range layouts {
-		if t, err := time.Parse(layout, raw); err == nil {
-			return t, !t.IsZero()
-		}
-	}
-
-	if unix, err := strconv.ParseInt(raw, 10, 64); err == nil {
-		return normalizeUnixTime(unix), true
-	}
-
-	return time.Time{}, false
-}
-
-func normalizeUnixTime(v int64) time.Time {
-	// 13位按毫秒，10位按秒。
-	if v > 9999999999 {
-		return time.UnixMilli(v)
-	}
-	return time.Unix(v, 0)
 }
 
 func actionText(action string) string {

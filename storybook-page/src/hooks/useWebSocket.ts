@@ -65,9 +65,10 @@ async function getUsableAccessToken(): Promise<string | null> {
   }
 }
 
-function buildWsUrl(token: string): string {
+function buildWsUrl(): string {
   const rawBase = (
-    import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080' : window.location.origin)
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.DEV ? 'http://localhost:8080' : window.location.origin)
   ).trim();
   try {
     const base = new URL(rawBase);
@@ -76,10 +77,9 @@ function buildWsUrl(token: string): string {
     const wsPath = `${normalizedPath || ''}/ws`.replace(/\/{2,}/g, '/');
     const ws = new URL(`${base.protocol}//${base.host}${wsPath}`);
     ws.protocol = ws.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws.searchParams.set('token', token);
     return ws.toString();
   } catch {
-    return `${rawBase.replace(/\/+$/, '').replace(/\/api$/, '')}/ws?token=${encodeURIComponent(token)}`
+    return `${rawBase.replace(/\/+$/, '').replace(/\/api$/, '')}/ws`
       .replace('http://', 'ws://')
       .replace('https://', 'wss://');
   }
@@ -115,7 +115,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       return;
     }
 
-    const ws = new WebSocket(buildWsUrl(token));
+    const ws = new WebSocket(buildWsUrl(), ['storybook-token', token]);
     isManualDisconnectRef.current = false;
     wsRef.current = ws;
     isConnectingRef.current = false;
@@ -136,7 +136,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         wsLog('message received:', message.type);
 
         // 根据消息类型分发
-          switch (message.type) {
+        switch (message.type) {
           case 'story.status_changed':
             options.onStoryStatusChanged?.(message.data as StoryStatusChangedMessage);
             break;

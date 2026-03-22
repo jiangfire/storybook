@@ -23,9 +23,14 @@ export const testCaseService = {
     return response.data.data;
   },
 
-  async updateTestCaseStatus(id: number, data: Pick<UpdateACStatusRequest, 'status'>): Promise<TestCaseItem> {
-    const response = await apiClient.patch<ApiResponse<TestCaseItem>>(`/api/test-cases/${id}/status`, data);
+  async updateTestCaseStatus(
+    id: number,
+    data: Pick<UpdateACStatusRequest, 'status'>
+  ): Promise<TestCaseItem> {
+    const response = await apiClient.patch<ApiResponse<TestCaseItem>>(
+      `/api/test-cases/${id}/status`,
+      data
+    );
     return response.data.data;
   },
 };
-

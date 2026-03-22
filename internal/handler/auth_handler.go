@@ -207,7 +207,22 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	accessToken, accessExp, err := h.tokenManager.GenerateAccessToken(claims.UserID, claims.Email, claims.Role)
+	var user model.User
+	if err := h.db.Select("id, email, role, updated_at").First(&user, claims.UserID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.Unauthorized(c, "Refresh Token无效")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if claims.IssuedAt == nil || user.UpdatedAt.After(claims.IssuedAt.Time) {
+		api.Unauthorized(c, "Refresh Token已失效，请重新登录")
+		return
+	}
+
+	accessToken, accessExp, err := h.tokenManager.GenerateAccessToken(user.ID, user.Email, user.Role)
 	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return

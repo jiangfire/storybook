@@ -9,4 +9,3 @@ export const searchService = {
     return response.data.data;
   },
 };
-

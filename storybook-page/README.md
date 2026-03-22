@@ -2,6 +2,12 @@
 
 Storybook 前端是仓库内的 React 单页应用，对应后端的项目、故事、任务、缺陷、报表和技术负责人相关接口。
 
+当前前端额外包含：
+
+- 管理员 AI 配置页：`/admin/ai`
+- 故事表单 AI 自动填表
+- OpenAI 不可用时的规则草稿降级提示
+
 ## 环境要求
 
 - Node.js 18+
@@ -58,6 +64,7 @@ src/
 
 ```bash
 pnpm run lint
+pnpm exec tsc --noEmit
 pnpm run test
 pnpm run test:coverage
 pnpm run format
@@ -68,3 +75,5 @@ pnpm run format
 - 生产静态资源会输出到 `dist/`。
 - 后端嵌入目录是仓库根下的 `internal/webui/dist`。
 - 如需单体部署，请优先使用 `pnpm run build:embed`，避免手工复制文件。
+- 故事表单中的 AI 自动填表支持“仅补空白”和“覆盖填充”两种策略。
+- 当后端未配置 OpenAI 或 OpenAI 调用失败时，前端会显示“规则草稿”来源标识。

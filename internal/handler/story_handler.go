@@ -23,7 +23,7 @@ type StoryHandler struct {
 }
 
 type EventPublisher interface {
-	Broadcast(eventType string, data any)
+	BroadcastProject(projectID uint, eventType string, data any)
 }
 
 func NewStoryHandler(db *gorm.DB, events EventPublisher) *StoryHandler {

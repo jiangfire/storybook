@@ -13,6 +13,7 @@ Storybook 是一个围绕用户故事（User Story）的敏捷协作系统，支
 - 全局搜索（项目/故事/缺陷）
 - WebSocket 实时更新
 - MCP 接口（AC 校验与 AI 辅助能力）
+- AI 用户故事辅助：管理员配置 OpenAI，故事表单支持“仅补空白 / 覆盖填充”，调用失败自动回退规则草稿
 
 ## 技术栈
 
@@ -33,6 +34,18 @@ go run ./cmd/server
 - `DB_DRIVER=sqlite`
 - `DB_DSN=storybook.db`
 - `JWT_SECRET=change-me-in-production`
+
+如果需要启用管理员 AI 配置页中的 OpenAI 持久化配置，还需要额外设置：
+
+- `AI_CONFIG_ENCRYPTION_KEY`
+
+该值需要是一个 Base64 编码后的 32 字节密钥，可用下面的方式生成：
+
+```bash
+powershell -Command "$bytes = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes); [Convert]::ToBase64String($bytes)"
+```
+
+如果本地只想体验故事表单的 AI 自动填表，不配置 OpenAI 也可以正常使用，系统会自动回退到内置规则草稿。
 
 2. 启动前端（新终端）：
 
@@ -85,6 +98,35 @@ go run ./cmd/embedui
 ```
 
 启动后直接访问后端地址（默认 `http://localhost:8080`），无需单独部署前端静态站点。
+
+## AI 配置说明
+
+1. 使用管理员账号登录。
+2. 进入前端管理页 `/admin/ai`。
+3. 配置 OpenAI API Key、模型、temperature、max tokens，并执行“测试连接”。
+4. 故事创建表单会显示 AI 自动填表区域，支持：
+   - 仅补空白：只补尚未填写的字段
+   - 覆盖填充：用 AI 草稿整体覆盖当前表单
+
+补充说明：
+
+- 如果 OpenAI 未配置或被手动禁用，故事表单仍可使用规则草稿。
+- 如果 OpenAI 已配置但调用失败，后端会自动降级到规则草稿，并在前端返回 warning。
+
+## 质量检查与安全扫描
+
+常用检查命令：
+
+```bash
+go test ./...
+golangci-lint run
+powershell -ExecutionPolicy Bypass -File .\scripts\run-gosec.ps1
+```
+
+说明：
+
+- `scripts/run-gosec.ps1` 已固化仓库内确认过的 gosec 路径级排除规则，用于屏蔽当前项目中已确认的误报。
+- 如果直接执行 `gosec ./...`，你仍会看到部分 `G304` / `G117` 规则型告警。
 
 ## 文档
 

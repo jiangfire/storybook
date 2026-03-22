@@ -51,7 +51,12 @@ export interface UserWorkloadDetail {
 
 export const userManagementService = {
   // 获取用户列表
-  getUsers: async (params?: { role?: UserRole; search?: string; page?: number; limit?: number }) => {
+  getUsers: async (params?: {
+    role?: UserRole;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) => {
     const response = await api.get<ApiResponse<UsersResponse>>('/api/admin/users', { params });
     return response.data.data;
   },
@@ -76,7 +81,9 @@ export const userManagementService = {
 
   // 获取用户工作负载详情
   getUserWorkload: async (id: number) => {
-    const response = await api.get<ApiResponse<UserWorkloadDetail>>(`/api/admin/users/${id}/workload`);
+    const response = await api.get<ApiResponse<UserWorkloadDetail>>(
+      `/api/admin/users/${id}/workload`
+    );
     return response.data.data;
   },
 };

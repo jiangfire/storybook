@@ -4,6 +4,9 @@ import type {
   AIGeneratedStoryResponse,
   AISplitStoryRequest,
   AISplitStoryData,
+  AIConfigResponse,
+  AIConfigTestResponse,
+  AIConfigUpdateRequest,
   ApiResponse,
   INVESTCheckData,
 } from '../types/api';
@@ -13,6 +16,27 @@ export const aiService = {
     const response = await apiClient.post<ApiResponse<AIGeneratedStoryResponse>>(
       '/api/ai/generate-story',
       data
+    );
+    return response.data.data;
+  },
+
+  async getConfig(): Promise<AIConfigResponse> {
+    const response = await apiClient.get<ApiResponse<AIConfigResponse>>('/api/admin/ai/config');
+    return response.data.data;
+  },
+
+  async updateConfig(data: AIConfigUpdateRequest): Promise<AIConfigResponse> {
+    const response = await apiClient.put<ApiResponse<AIConfigResponse>>(
+      '/api/admin/ai/config',
+      data
+    );
+    return response.data.data;
+  },
+
+  async testConfig(data?: AIConfigUpdateRequest): Promise<AIConfigTestResponse> {
+    const response = await apiClient.post<ApiResponse<AIConfigTestResponse>>(
+      '/api/admin/ai/config/test',
+      data ?? {}
     );
     return response.data.data;
   },
@@ -32,4 +56,3 @@ export const aiService = {
     return response.data.data;
   },
 };
-

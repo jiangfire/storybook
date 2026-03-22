@@ -30,7 +30,7 @@ func (h *UserManagementHandler) ListUsers(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleTechLead && role != model.RoleAdmin {
+	if role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")
 		return
 	}
@@ -100,7 +100,7 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleTechLead && role != model.RoleAdmin {
+	if role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")
 		return
 	}
@@ -108,10 +108,15 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Username string `json:"username" binding:"required,min=2,max=100"`
-		Password string `json:"password" binding:"required,min=6"`
+		Password string `json:"password" binding:"required,min=8"`
 		Role     string `json:"role" binding:"required"`
 	}
 	if !middleware.BindJSON(c, &req) {
+		return
+	}
+
+	if !isStrongPassword(req.Password) {
+		api.BadRequest(c, "密码至少8位，包含字母和数字")
 		return
 	}
 
@@ -191,7 +196,7 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleTechLead && role != model.RoleAdmin {
+	if role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")
 		return
 	}
@@ -279,8 +284,8 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 	}
 
 	if req.Password != nil {
-		if len(*req.Password) < 6 {
-			api.BadRequest(c, "密码长度至少6位")
+		if !isStrongPassword(*req.Password) {
+			api.BadRequest(c, "密码至少8位，包含字母和数字")
 			return
 		}
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*req.Password), 10)
@@ -325,7 +330,7 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 	}
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleTechLead && role != model.RoleAdmin {
+	if role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")
 		return
 	}

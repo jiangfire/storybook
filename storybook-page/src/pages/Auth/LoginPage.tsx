@@ -57,7 +57,10 @@ export default function LoginPage() {
         </div>
 
         {/* 登录表单 */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 animate-slideUp" style={{ animationDelay: '100ms' }}>
+        <div
+          className="bg-white rounded-2xl shadow-lg p-8 animate-slideUp"
+          style={{ animationDelay: '100ms' }}
+        >
           <h2 className="text-2xl font-semibold text-text mb-6">登录</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">

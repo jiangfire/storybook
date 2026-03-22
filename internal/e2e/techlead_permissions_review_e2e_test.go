@@ -15,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestTechLeadGlobalReadAssignAndReviewE2E(t *testing.T) {
+func TestTechLeadScopedAccessAssignAndReviewE2E(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: "file:e2e_techlead_global_read?mode=memory&cache=shared"})
@@ -70,22 +70,35 @@ func TestTechLeadGlobalReadAssignAndReviewE2E(t *testing.T) {
 	}
 	story2ID := uint(nestedFloat(t, story2Resp.JSON, "data", "id"))
 
+	if err := db.Create(&model.ProjectTechLead{
+		ProjectID:  project2ID,
+		UserID:     techLeadID,
+		AssignedAt: db.NowFunc(),
+	}).Error; err != nil {
+		t.Fatalf("assign tech lead to project2 failed: %v", err)
+	}
+
 	listResp := doJSON(t, r, http.MethodGet, "/api/projects", techLeadToken, nil)
 	if listResp.Code != http.StatusOK {
 		t.Fatalf("tech_lead list projects failed: %d %s", listResp.Code, listResp.Body)
 	}
-	if !projectListContainsID(t, listResp.JSON, project1ID) || !projectListContainsID(t, listResp.JSON, project2ID) {
-		t.Fatalf("tech_lead should see all projects, got: %s", listResp.Body)
+	if projectListContainsID(t, listResp.JSON, project1ID) || !projectListContainsID(t, listResp.JSON, project2ID) {
+		t.Fatalf("tech_lead should only see assigned/participated projects, got: %s", listResp.Body)
 	}
 
 	getProjectResp := doJSON(t, r, http.MethodGet, "/api/projects/"+strconv.Itoa(int(project1ID)), techLeadToken, nil)
-	if getProjectResp.Code != http.StatusOK {
-		t.Fatalf("tech_lead get project1 failed: %d %s", getProjectResp.Code, getProjectResp.Body)
+	if getProjectResp.Code != http.StatusForbidden {
+		t.Fatalf("tech_lead get unassigned project should be forbidden, got: %d %s", getProjectResp.Code, getProjectResp.Body)
 	}
 
 	getStoryResp := doJSON(t, r, http.MethodGet, "/api/stories/"+strconv.Itoa(int(story2ID)), techLeadToken, nil)
 	if getStoryResp.Code != http.StatusOK {
 		t.Fatalf("tech_lead get story2 failed: %d %s", getStoryResp.Code, getStoryResp.Body)
+	}
+
+	userAdminResp := doJSON(t, r, http.MethodGet, "/api/admin/users", techLeadToken, nil)
+	if userAdminResp.Code != http.StatusForbidden {
+		t.Fatalf("tech_lead should not access admin user management, got: %d %s", userAdminResp.Code, userAdminResp.Body)
 	}
 
 	updateStatusResp := doJSON(t, r, http.MethodPatch, "/api/stories/"+strconv.Itoa(int(story2ID))+"/status", techLeadToken, map[string]any{
@@ -148,6 +161,14 @@ func TestTechLeadRejectReviewRulesE2E(t *testing.T) {
 		t.Fatalf("create project failed: %d %s", projectResp.Code, projectResp.Body)
 	}
 	projectID := uint(nestedFloat(t, projectResp.JSON, "data", "id"))
+
+	if err := db.Create(&model.ProjectTechLead{
+		ProjectID:  projectID,
+		UserID:     techLeadID,
+		AssignedAt: db.NowFunc(),
+	}).Error; err != nil {
+		t.Fatalf("assign tech lead failed: %v", err)
+	}
 
 	storyResp := doJSON(t, r, http.MethodPost, "/api/projects/"+strconv.Itoa(int(projectID))+"/stories", pmToken, map[string]any{
 		"title":      "Story-Reject-Required-Reason",

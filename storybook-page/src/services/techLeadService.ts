@@ -30,9 +30,12 @@ export const techLeadService = {
     page?: number;
     limit?: number;
   }) => {
-    const response = await api.get<ApiResponse<PendingStoriesResponse>>('/api/techlead/pending-stories', {
-      params,
-    });
+    const response = await api.get<ApiResponse<PendingStoriesResponse>>(
+      '/api/techlead/pending-stories',
+      {
+        params,
+      }
+    );
     return response.data.data;
   },
 
@@ -70,7 +73,9 @@ export const techLeadService = {
 
   // 获取项目技术负责人列表
   getProjectTechLeads: async (projectId: number) => {
-    const response = await api.get<ApiResponse<TechLeadsResponse>>(`/api/projects/${projectId}/techleads`);
+    const response = await api.get<ApiResponse<TechLeadsResponse>>(
+      `/api/projects/${projectId}/techleads`
+    );
     return response.data.data;
   },
 
@@ -84,7 +89,9 @@ export const techLeadService = {
 
   // 移除项目技术负责人（仅admin）
   removeTechLead: async (projectId: number, userId: number) => {
-    const response = await api.delete<ApiResponse>(`/api/projects/${projectId}/techleads/${userId}`);
+    const response = await api.delete<ApiResponse>(
+      `/api/projects/${projectId}/techleads/${userId}`
+    );
     return response.data.data;
   },
 };

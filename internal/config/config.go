@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Config 应用配置。
@@ -20,13 +21,13 @@ func Load() (*Config, error) {
 		ServerAddr:      getEnv("SERVER_ADDR", ":8080"),
 		DBDriver:        getEnv("DB_DRIVER", "sqlite"),
 		DBDSN:           getEnv("DB_DSN", "storybook.db"),
-		JWTSecret:       getEnv("JWT_SECRET", "change-me-in-production"),
+		JWTSecret:       strings.TrimSpace(os.Getenv("JWT_SECRET")),
 		AccessTokenTTL:  24,
 		RefreshTokenTTL: 24 * 7,
 	}
 
 	if cfg.JWTSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET must not be empty")
+		return nil, fmt.Errorf("JWT_SECRET must be set")
 	}
 
 	return cfg, nil

@@ -503,23 +503,86 @@ export interface AIGenerateStoryRequest {
   requirement: string;
 }
 
-// AI生成故事响应
-export interface AIGenerateStoryResponse {
-  suggested_title: string;
-  suggested_description: string;
-  suggested_ac: Array<{
+export interface AIFormDraft {
+  title: string;
+  description: string;
+  story_type: 'feature' | 'bug' | 'chore';
+  priority: number;
+  story_points: 1 | 2 | 3 | 5 | 8 | 13;
+  acceptance_criteria: Array<{
     description: string;
+    order: number;
   }>;
-  suggested_story_points: number;
+  tags: string[];
 }
 
 export interface AIGeneratedStoryResponse {
+  title: string;
   user_story: string;
   actor: string;
   action: string;
   value: string;
+  story_type: 'feature' | 'bug' | 'chore';
+  priority: number;
   suggested_ac: string[];
   story_points: 1 | 2 | 3 | 5 | 8 | 13;
+  tags: string[];
+  warnings: string[];
+  source: 'openai' | 'heuristic';
+  is_configured: boolean;
+  form_draft: AIFormDraft;
+}
+
+export interface AIConfig {
+  id?: number;
+  provider: 'openai';
+  model: string;
+  temperature: number;
+  max_tokens: number;
+  enabled: boolean;
+  api_key_masked: string;
+  is_configured: boolean;
+  updated_by?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AIConfigUpdateRequest {
+  api_key?: string;
+  model?: string;
+  temperature?: number;
+  max_tokens?: number;
+  enabled?: boolean;
+}
+
+export interface AIConfigResponse {
+  config: AIConfig;
+}
+
+export interface AIConfigTestResponse {
+  provider: 'openai';
+  model: string;
+  preview: {
+    title: string;
+    user_story: string;
+    story_type: 'feature' | 'bug' | 'chore';
+    priority: number;
+    story_points: 1 | 2 | 3 | 5 | 8 | 13;
+  };
+}
+
+export interface AIChatRefineRequest {
+  original_story: AIGeneratedStoryResponse;
+  feedback: string;
+}
+
+export interface AIBatchGenerateRequest {
+  requirement: string;
+  count: number;
+}
+
+export interface AIBatchGenerateResponse {
+  stories: AIGeneratedStoryResponse[];
 }
 
 // AI拆分故事请求

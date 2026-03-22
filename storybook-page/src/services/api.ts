@@ -2,7 +2,8 @@ import axios, { AxiosError, type InternalAxiosRequestConfig, type AxiosResponse 
 import type { ApiResponse } from '../types/api';
 
 // API 基础URL
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '');
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '');
 
 // 创建 Axios 实例
 const apiClient = axios.create({

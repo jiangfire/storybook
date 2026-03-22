@@ -6,7 +6,13 @@ import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../ui/Toast';
 import { aiService } from '../../services/aiService';
 import { isValidStoryTitle, isValidStoryDescription } from '../../utils/validators';
-import type { CreateStoryRequest, UpdateStoryRequest, SprintSummary } from '../../types/api';
+import type {
+  AIGeneratedStoryResponse,
+  AIFormDraft,
+  CreateStoryRequest,
+  SprintSummary,
+  UpdateStoryRequest,
+} from '../../types/api';
 import type { StoryType } from '../../types/models';
 import { getErrorMessage } from '../../utils/error';
 import Modal from '../ui/Modal';
@@ -20,6 +26,26 @@ interface StoryFormProps {
   mode: 'create' | 'edit';
   onSaved?: () => void;
 }
+
+const initialAIFieldState = {
+  title: false,
+  description: false,
+  story_type: false,
+  priority: false,
+  story_points: false,
+  acceptance_criteria: false,
+  tags: false,
+};
+
+const initialStoryFormState = {
+  title: '',
+  description: '',
+  story_type: 'feature' as StoryType,
+  priority: 2,
+  story_points: undefined as number | undefined,
+  acceptance_criteria: [] as Array<{ description: string; order: number }>,
+  tags: [] as string[],
+};
 
 const storyTypeOptions: Array<{
   value: StoryType;
@@ -60,15 +86,7 @@ export default function StoryForm({
   const { user } = useAuthStore();
   const canPlanSprint = user?.role === 'product' || user?.role === 'admin';
 
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    story_type: 'feature' as StoryType,
-    priority: 2,
-    story_points: undefined as number | undefined,
-    acceptance_criteria: [] as Array<{ description: string; order: number }>,
-    tags: [] as string[],
-  });
+  const [formData, setFormData] = useState(initialStoryFormState);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,6 +100,8 @@ export default function StoryForm({
   const [aiRequirement, setAIRequirement] = useState('');
   const [isAIGenerating, setIsAIGenerating] = useState(false);
   const [aiError, setAIError] = useState('');
+  const [lastAIResult, setLastAIResult] = useState<AIGeneratedStoryResponse | null>(null);
+  const [aiFieldState, setAIFieldState] = useState(initialAIFieldState);
 
   const loadStoryData = useCallback(async () => {
     if (!storyId) return;
@@ -99,6 +119,15 @@ export default function StoryForm({
           order: ac.order || index + 1,
         })),
         tags: story.tags || [],
+      });
+      setAIFieldState({
+        title: Boolean(story.title),
+        description: Boolean(story.description),
+        story_type: true,
+        priority: true,
+        story_points: story.story_points !== undefined,
+        acceptance_criteria: story.acceptance_criteria.length > 0,
+        tags: (story.tags || []).length > 0,
       });
       setSelectedSprintID(story.sprint_id ? String(story.sprint_id) : '');
     } catch {
@@ -128,6 +157,22 @@ export default function StoryForm({
       void loadSprints();
     }
   }, [mode, storyId, isOpen, loadStoryData, loadSprints]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'create') {
+      return;
+    }
+
+    setFormData(initialStoryFormState);
+    setFieldErrors({});
+    setNewACText('');
+    setNewTag('');
+    setAIRequirement('');
+    setAIError('');
+    setLastAIResult(null);
+    setAIFieldState(initialAIFieldState);
+    setSelectedSprintID('');
+  }, [isOpen, mode]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -244,6 +289,7 @@ export default function StoryForm({
         },
       ],
     });
+    setAIFieldState((prev) => ({ ...prev, acceptance_criteria: true }));
     setNewACText('');
   };
 
@@ -252,6 +298,7 @@ export default function StoryForm({
       ...formData,
       acceptance_criteria: formData.acceptance_criteria.filter((_, i) => i !== index),
     });
+    setAIFieldState((prev) => ({ ...prev, acceptance_criteria: true }));
   };
 
   const addTag = () => {
@@ -262,6 +309,7 @@ export default function StoryForm({
       ...formData,
       tags: [...formData.tags, newTag.trim()],
     });
+    setAIFieldState((prev) => ({ ...prev, tags: true }));
     setNewTag('');
   };
 
@@ -270,9 +318,46 @@ export default function StoryForm({
       ...formData,
       tags: formData.tags.filter((t) => t !== tag),
     });
+    setAIFieldState((prev) => ({ ...prev, tags: true }));
   };
 
-  const handleAIGenerate = async () => {
+  const applyAIDraft = (draft: AIFormDraft, strategy: 'replace' | 'fill_empty') => {
+    const shouldReplace = strategy === 'replace';
+    setFormData((prev) => ({
+      title: shouldReplace || !prev.title.trim() ? draft.title : prev.title,
+      description: shouldReplace || !prev.description.trim() ? draft.description : prev.description,
+      story_type:
+        shouldReplace ||
+        (!aiFieldState.story_type && prev.story_type === initialStoryFormState.story_type)
+          ? draft.story_type
+          : prev.story_type,
+      priority:
+        shouldReplace ||
+        (!aiFieldState.priority && prev.priority === initialStoryFormState.priority)
+          ? draft.priority
+          : prev.priority,
+      story_points:
+        shouldReplace || prev.story_points === undefined ? draft.story_points : prev.story_points,
+      acceptance_criteria:
+        shouldReplace || prev.acceptance_criteria.length === 0
+          ? draft.acceptance_criteria
+          : prev.acceptance_criteria,
+      tags: shouldReplace || prev.tags.length === 0 ? draft.tags : prev.tags,
+    }));
+    setAIFieldState((prev) => ({
+      title: prev.title || shouldReplace || draft.title.trim().length > 0,
+      description: prev.description || shouldReplace || draft.description.trim().length > 0,
+      story_type:
+        prev.story_type || shouldReplace || draft.story_type !== initialStoryFormState.story_type,
+      priority: prev.priority || shouldReplace || draft.priority !== initialStoryFormState.priority,
+      story_points: prev.story_points || shouldReplace || draft.story_points !== undefined,
+      acceptance_criteria:
+        prev.acceptance_criteria || shouldReplace || draft.acceptance_criteria.length > 0,
+      tags: prev.tags || shouldReplace || draft.tags.length > 0,
+    }));
+  };
+
+  const handleAIGenerate = async (strategy: 'replace' | 'fill_empty') => {
     const requirement = aiRequirement.trim();
     if (!requirement) {
       setAIError('请输入需求描述');
@@ -282,18 +367,13 @@ export default function StoryForm({
       setIsAIGenerating(true);
       setAIError('');
       const data = await aiService.generateStory({ requirement });
-      const suggestedTitle = data.action ? data.action.slice(0, 200) : requirement.slice(0, 200);
-      setFormData((prev) => ({
-        ...prev,
-        title: suggestedTitle || prev.title,
-        description: data.user_story || prev.description,
-        story_points: data.story_points || prev.story_points,
-        acceptance_criteria: (data.suggested_ac || []).map((desc, index) => ({
-          description: desc,
-          order: index + 1,
-        })),
-      }));
-      showSuccess('AI草稿已生成并填充表单');
+      setLastAIResult(data);
+      applyAIDraft(data.form_draft, strategy);
+      if (!data.is_configured) {
+        showSuccess('当前未配置 OpenAI，已使用内置规则草稿填充表单');
+      } else {
+        showSuccess(strategy === 'replace' ? 'AI 已覆盖填充表单' : 'AI 已补充空白字段');
+      }
     } catch (error: unknown) {
       setAIError(getErrorMessage(error, 'AI生成失败'));
     } finally {
@@ -319,6 +399,7 @@ export default function StoryForm({
             value={formData.title}
             onChange={(e) => {
               setFormData({ ...formData, title: e.target.value });
+              setAIFieldState((prev) => ({ ...prev, title: true }));
               if (fieldErrors.title) {
                 setFieldErrors({ ...fieldErrors, title: undefined });
               }
@@ -337,6 +418,7 @@ export default function StoryForm({
             value={formData.description}
             onChange={(e) => {
               setFormData({ ...formData, description: e.target.value });
+              setAIFieldState((prev) => ({ ...prev, description: true }));
               if (fieldErrors.description) {
                 setFieldErrors({ ...fieldErrors, description: undefined });
               }
@@ -351,24 +433,56 @@ export default function StoryForm({
           )}
         </div>
 
-        {mode === 'create' && (
-          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-3">
-            <div className="text-sm font-medium text-text">AI 生成故事草稿</div>
-            <textarea
-              value={aiRequirement}
-              onChange={(e) => setAIRequirement(e.target.value)}
-              rows={3}
-              placeholder="输入原始需求，AI会生成用户故事、建议AC与故事点"
-              className="w-full px-3 py-2 border border-blue-200 rounded-lg resize-none"
-            />
-            {aiError && <div className="text-xs text-danger">{aiError}</div>}
-            <div className="flex justify-end">
-              <Button size="sm" variant="secondary" onClick={handleAIGenerate} isLoading={isAIGenerating}>
-                AI 生成草稿
-              </Button>
-            </div>
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-medium text-text">AI 自动填表</div>
+            {lastAIResult && (
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                  lastAIResult.source === 'openai'
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}
+              >
+                {lastAIResult.source === 'openai' ? 'OpenAI' : '规则草稿'}
+              </span>
+            )}
           </div>
-        )}
+          <textarea
+            value={aiRequirement}
+            onChange={(e) => setAIRequirement(e.target.value)}
+            rows={3}
+            placeholder="输入原始需求，AI 会自动补全标题、描述、类型、优先级、故事点、AC 和标签"
+            className="w-full px-3 py-2 border border-blue-200 rounded-lg resize-none"
+          />
+          {aiError && <div className="text-xs text-danger">{aiError}</div>}
+          {lastAIResult?.warnings && lastAIResult.warnings.length > 0 && (
+            <div className="rounded-lg bg-white/80 border border-blue-100 px-3 py-2 space-y-1">
+              {lastAIResult.warnings.map((warning) => (
+                <div key={warning} className="text-xs text-text-light">
+                  {warning}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void handleAIGenerate('fill_empty')}
+              isLoading={isAIGenerating}
+            >
+              仅补空白
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => void handleAIGenerate('replace')}
+              isLoading={isAIGenerating}
+            >
+              覆盖填充
+            </Button>
+          </div>
+        </div>
 
         {/* 故事类型 */}
         <div>
@@ -378,7 +492,10 @@ export default function StoryForm({
               <button
                 key={type.value}
                 type="button"
-                onClick={() => setFormData({ ...formData, story_type: type.value })}
+                onClick={() => {
+                  setFormData({ ...formData, story_type: type.value });
+                  setAIFieldState((prev) => ({ ...prev, story_type: true }));
+                }}
                 className={`p-3 rounded-lg border-2 transition-all ${
                   formData.story_type === type.value
                     ? type.activeClass
@@ -402,9 +519,14 @@ export default function StoryForm({
                 <button
                   key={i}
                   type="button"
-                  onClick={() => setFormData({ ...formData, priority: i })}
+                  onClick={() => {
+                    setFormData({ ...formData, priority: i });
+                    setAIFieldState((prev) => ({ ...prev, priority: true }));
+                  }}
                   className={`w-8 h-8 rounded-full transition-all ${
-                    formData.priority >= i ? 'bg-red-500 text-white' : 'bg-secondary-200 text-text-light'
+                    formData.priority >= i
+                      ? 'bg-red-500 text-white'
+                      : 'bg-secondary-200 text-text-light'
                   }`}
                 >
                   <span className="text-xs">🔴</span>
@@ -428,12 +550,13 @@ export default function StoryForm({
                 <button
                   key={points}
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
                     setFormData({
                       ...formData,
                       story_points: formData.story_points === points ? undefined : points,
-                    })
-                  }
+                    });
+                    setAIFieldState((prev) => ({ ...prev, story_points: true }));
+                  }}
                   className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
                     formData.story_points === points
                       ? 'border-primary bg-primary text-white'
@@ -485,7 +608,10 @@ export default function StoryForm({
           <label className="block text-sm font-medium text-text mb-2">验收标准 (AC)</label>
           <div className="space-y-2 mb-3">
             {formData.acceptance_criteria.map((ac, index) => (
-              <div key={index} className="flex items-start space-x-2 p-3 bg-secondary-50 rounded-lg">
+              <div
+                key={index}
+                className="flex items-start space-x-2 p-3 bg-secondary-50 rounded-lg"
+              >
                 <span className="text-text-light mt-1">{index + 1}.</span>
                 <span className="flex-1 text-sm">{ac.description}</span>
                 <button

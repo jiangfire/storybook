@@ -191,7 +191,7 @@ func (s *TaskService) UpdateStatus(task *model.Task, projectID, userID uint, rol
 	})
 
 	if s.events != nil {
-		s.events.Broadcast("task.status_changed", map[string]any{
+		s.events.BroadcastProject(task.ProjectID, "task.status_changed", map[string]any{
 			"task_id":    task.ID,
 			"project_id": task.ProjectID,
 			"old_status": oldStatus,
@@ -253,7 +253,7 @@ func (s *TaskService) UpdateProgress(task *model.Task, projectID, userID uint, r
 	})
 
 	if s.events != nil {
-		s.events.Broadcast("task.progress_changed", map[string]any{
+		s.events.BroadcastProject(task.ProjectID, "task.progress_changed", map[string]any{
 			"task_id":      task.ID,
 			"project_id":   task.ProjectID,
 			"old_progress": oldProgress,

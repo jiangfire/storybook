@@ -27,11 +27,16 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       'inline-flex items-center justify-center font-medium rounded-lg transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
-      primary: 'bg-primary text-white hover:bg-primary-700 hover:-translate-y-px focus-visible:ring-primary',
-      secondary: 'bg-secondary text-text hover:bg-primary-50 hover:-translate-y-px focus-visible:ring-primary-200',
-      accent: 'bg-accent text-white hover:bg-accent-500 hover:-translate-y-px focus-visible:ring-accent',
-      danger: 'bg-danger text-white hover:bg-danger-700 hover:-translate-y-px focus-visible:ring-danger',
-      ghost: 'bg-transparent text-text hover:bg-primary-50 hover:-translate-y-px focus-visible:ring-primary-200',
+      primary:
+        'bg-primary text-white hover:bg-primary-700 hover:-translate-y-px focus-visible:ring-primary',
+      secondary:
+        'bg-secondary text-text hover:bg-primary-50 hover:-translate-y-px focus-visible:ring-primary-200',
+      accent:
+        'bg-accent text-white hover:bg-accent-500 hover:-translate-y-px focus-visible:ring-accent',
+      danger:
+        'bg-danger text-white hover:bg-danger-700 hover:-translate-y-px focus-visible:ring-danger',
+      ghost:
+        'bg-transparent text-text hover:bg-primary-50 hover:-translate-y-px focus-visible:ring-primary-200',
     };
 
     const sizes = {

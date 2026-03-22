@@ -44,7 +44,13 @@ const menuItems: MenuItem[] = [
     path: '/admin/users',
     icon: '👥',
     label: '人员',
-    allowedRoles: ['tech_lead', 'admin'],
+    allowedRoles: ['admin'],
+  },
+  {
+    path: '/admin/ai',
+    icon: '🤖',
+    label: 'AI',
+    allowedRoles: ['admin'],
   },
 ];
 
@@ -125,7 +131,9 @@ export default function Sidebar({ currentProject }: SidebarProps) {
               to={`/projects/${currentProject.id}`}
               className="block p-3 rounded-lg bg-secondary-50 hover:bg-secondary-100 transition-colors"
             >
-              <div className="font-medium text-text text-sm mb-1 truncate">{currentProject.name}</div>
+              <div className="font-medium text-text text-sm mb-1 truncate">
+                {currentProject.name}
+              </div>
               <div className="text-xs text-text-light flex items-center justify-between">
                 <span>{currentProject.agile_mode === 'scrum' ? '🏃 Scrum' : '📋 Kanban'}</span>
                 <span>详情 →</span>

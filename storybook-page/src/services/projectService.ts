@@ -72,7 +72,9 @@ export const projectService = {
    * 获取项目成员列表
    */
   async getProjectMembers(id: number) {
-    const response = await apiClient.get<ApiResponse<ProjectMembersResponse>>(`/api/projects/${id}/members`);
+    const response = await apiClient.get<ApiResponse<ProjectMembersResponse>>(
+      `/api/projects/${id}/members`
+    );
     return response.data.data;
   },
 

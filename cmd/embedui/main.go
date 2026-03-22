@@ -21,7 +21,7 @@ func main() {
 		fail("未找到前端构建产物，请先执行 `cd storybook-page && pnpm run build`")
 	}
 
-	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+	if err := os.MkdirAll(dstDir, 0o750); err != nil {
 		fail("创建目标目录失败: %v", err)
 	}
 
@@ -57,7 +57,7 @@ func cleanDestination(dstDir string) error {
 }
 
 func copyDir(srcDir, dstDir string) error {
-	return filepath.WalkDir(srcDir, func(path string, d os.DirEntry, walkErr error) error {
+	return filepath.WalkDir(srcDir, func(path string, d os.DirEntry, walkErr error) (err error) {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -72,16 +72,21 @@ func copyDir(srcDir, dstDir string) error {
 		}
 
 		if d.IsDir() {
-			return os.MkdirAll(targetPath, 0o755)
+			return os.MkdirAll(targetPath, 0o750)
 		}
 
 		srcFile, err := os.Open(path)
 		if err != nil {
 			return err
 		}
-		defer srcFile.Close()
+		defer func() {
+			closeErr := srcFile.Close()
+			if err == nil && closeErr != nil {
+				err = closeErr
+			}
+		}()
 
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o750); err != nil {
 			return err
 		}
 

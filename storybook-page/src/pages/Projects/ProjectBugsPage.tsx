@@ -111,19 +111,22 @@ export default function ProjectBugsPage() {
     void loadBugs();
   }, [loadBugs]);
 
-  const openBugDetail = useCallback(async (bugID: number) => {
-    try {
-      setDetailOpen(true);
-      setLoadingDetail(true);
-      const data = await bugService.getBug(bugID);
-      setDetail(data);
-    } catch (err: unknown) {
-      showError(getErrorMessage(err, '缺陷详情加载失败'));
-      setDetailOpen(false);
-    } finally {
-      setLoadingDetail(false);
-    }
-  }, [showError]);
+  const openBugDetail = useCallback(
+    async (bugID: number) => {
+      try {
+        setDetailOpen(true);
+        setLoadingDetail(true);
+        const data = await bugService.getBug(bugID);
+        setDetail(data);
+      } catch (err: unknown) {
+        showError(getErrorMessage(err, '缺陷详情加载失败'));
+        setDetailOpen(false);
+      } finally {
+        setLoadingDetail(false);
+      }
+    },
+    [showError]
+  );
 
   const bugQueryParam = searchParams.get('bug');
 

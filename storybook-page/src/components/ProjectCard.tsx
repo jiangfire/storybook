@@ -29,7 +29,9 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           <span
             className={cn(
               'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-              agile_mode === 'scrum' ? 'bg-primary-100 text-primary-700' : 'bg-success-light text-success'
+              agile_mode === 'scrum'
+                ? 'bg-primary-100 text-primary-700'
+                : 'bg-success-light text-success'
             )}
           >
             {agile_mode === 'scrum' ? '🏃 Scrum' : '📋 Kanban'}

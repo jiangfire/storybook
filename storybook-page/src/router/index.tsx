@@ -17,6 +17,7 @@ const DashboardPage = lazy(() => import('../pages/Dashboard/DashboardPage'));
 const TechLeadReviewPage = lazy(() => import('../pages/TechLead/ReviewPage'));
 const TechLeadWorkloadPage = lazy(() => import('../pages/TechLead/WorkloadPage'));
 const UserManagementPage = lazy(() => import('../pages/Admin/UserManagementPage'));
+const AIConfigPage = lazy(() => import('../pages/Admin/AIConfigPage'));
 
 const router = createBrowserRouter([
   {
@@ -118,9 +119,19 @@ const router = createBrowserRouter([
       {
         path: 'admin/users',
         element: (
-          <ProtectedRoute allowedRoles={['tech_lead', 'admin']}>
+          <ProtectedRoute allowedRoles={['admin']}>
             <Suspense fallback={<LoadingSpinner />}>
               <UserManagementPage />
+            </Suspense>
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'admin/ai',
+        element: (
+          <ProtectedRoute allowedRoles={['admin']}>
+            <Suspense fallback={<LoadingSpinner />}>
+              <AIConfigPage />
             </Suspense>
           </ProtectedRoute>
         ),

@@ -20,7 +20,7 @@ func NewWSHandler(tokenManager *auth.TokenManager, hub *realtime.Hub) *WSHandler
 }
 
 func (h *WSHandler) Connect(c *gin.Context) {
-	token := strings.TrimSpace(c.Query("token"))
+	token, protocol := parseWebSocketProtocolHeader(c.GetHeader("Sec-WebSocket-Protocol"))
 	if token == "" {
 		header := strings.TrimSpace(c.GetHeader("Authorization"))
 		if strings.HasPrefix(strings.ToLower(header), "bearer ") {
@@ -48,5 +48,22 @@ func (h *WSHandler) Connect(c *gin.Context) {
 		return
 	}
 
-	h.hub.HandleWS(c, claims.UserID)
+	h.hub.HandleWS(c, claims.UserID, protocol)
+}
+
+func parseWebSocketProtocolHeader(header string) (token, protocol string) {
+	parts := strings.Split(header, ",")
+	trimmed := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			trimmed = append(trimmed, part)
+		}
+	}
+
+	if len(trimmed) >= 2 && strings.EqualFold(trimmed[0], "storybook-token") {
+		return trimmed[1], "storybook-token"
+	}
+
+	return "", ""
 }
