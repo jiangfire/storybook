@@ -24,12 +24,12 @@ export default function ProjectCard({ project }: ProjectCardProps) {
     agile_mode === 'scrum'
       ? 'bg-primary-100 text-primary-700'
       : 'bg-success-light text-success';
-  const modeLabel = agile_mode === 'scrum' ? 'Scrum' : 'Kanban';
+  const modeLabel = agile_mode === 'scrum' ? '冲刺' : '看板';
 
   return (
     <Link
       to={`/projects/${id}`}
-      className={`card-hover block rounded-[1.6rem] border border-border bg-gradient-to-br ${accentClass} p-5 shadow-sm transition-all duration-200 hover:border-primary-200 hover:shadow-lg sm:p-6`}
+      className={`card-hover block rounded-[1.6rem] border border-border bg-gradient-to-br ${accentClass} p-5 shadow-sm transition-all duration-200 hover:border-primary-200 sm:p-6`}
     >
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
@@ -38,7 +38,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           </div>
           <div className="min-w-0">
             <h3 className="line-clamp-1 text-lg font-semibold text-text">{name}</h3>
-            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-text-light">Project</p>
+            <p className="mt-1 text-sm text-text-light">进入项目总览、看板与缺陷管理</p>
           </div>
         </div>
 
@@ -48,7 +48,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium',
               badgeClass
             )}
-            title={`${modeLabel} 项目`}
+            title={`${modeLabel}项目`}
           >
             {agile_mode === 'scrum' ? (
               <>
@@ -95,18 +95,18 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         {is_owner && (
           <div
             className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1.5 text-amber-700"
-            title="项目 Owner"
-            aria-label="项目 Owner"
+            title="项目负责人"
+            aria-label="项目负责人"
           >
             <CrownIcon size={14} />
-            <span className="text-xs font-medium">Owner</span>
+            <span className="text-xs font-medium">负责人</span>
           </div>
         )}
       </div>
 
       <div className="flex items-center justify-between border-t border-border/80 pt-4 text-xs text-text-light">
         <span>创建于 {new Date(created_at).toLocaleDateString()}</span>
-        <span className="font-medium text-primary">进入项目 →</span>
+        <span className="font-medium text-primary">查看项目</span>
       </div>
     </Link>
   );

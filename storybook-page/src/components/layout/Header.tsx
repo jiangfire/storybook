@@ -126,18 +126,17 @@ export default function Header() {
     '协作成员';
 
   return (
-    <header className="sticky top-0 z-50 px-3 pt-3 sm:px-4 lg:px-6">
+    <header className="relative z-20 px-3 pt-3 sm:px-4 lg:px-6">
       <div className="mx-auto max-w-[1600px]">
-        <div className="surface-card rounded-[1.4rem] px-3 py-3 sm:px-4">
+        <div className="surface-card rounded-[1rem] px-3 py-2.5 sm:px-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
-            <div className="flex items-center justify-between gap-3 lg:min-w-[330px]">
-              <Link to="/projects" className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary-700 to-accent text-white shadow-md">
-                  <span className="text-base font-bold">S</span>
+            <div className="flex items-center justify-between gap-3 lg:min-w-[280px]">
+              <Link to="/projects" className="flex min-w-0 items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white">
+                  <span className="text-sm font-bold">S</span>
                 </div>
                 <div className="min-w-0">
-                  <h1 className="font-display text-lg font-bold text-primary">Storybook</h1>
-                  <p className="hidden text-xs text-text-light sm:block">敏捷协作工作台</p>
+                  <h1 className="font-display text-base font-bold text-primary sm:text-lg">Storybook</h1>
                 </div>
               </Link>
 
@@ -145,14 +144,14 @@ export default function Header() {
                 type="button"
                 aria-label="返回上一页"
                 onClick={handleGoBack}
-                className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-3 py-2 text-xs text-text transition-colors hover:border-primary-200 hover:bg-primary-50"
+                className="inline-flex items-center gap-1 rounded-full border border-transparent px-2.5 py-2 text-xs text-text-light transition-colors hover:border-border hover:bg-secondary-50 hover:text-text"
               >
                 <span aria-hidden>←</span>
                 <span className="hidden sm:inline">返回</span>
               </button>
             </div>
 
-            <div ref={searchContainerRef} className="relative order-3 w-full lg:order-none lg:flex-1">
+            <div ref={searchContainerRef} className="relative order-3 w-full lg:order-none lg:max-w-xl lg:flex-1">
               <div className="relative">
                 <input
                   value={query}
@@ -165,7 +164,7 @@ export default function Header() {
                   onBlur={handleSearchBlur}
                   onKeyDown={handleSearchKeyDown}
                   placeholder="搜索项目 / 故事 / 缺陷"
-                  className="w-full rounded-2xl border border-border bg-white/90 py-3 pl-4 pr-10 text-sm text-text shadow-sm outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                  className="w-full rounded-xl border border-border bg-secondary-50 py-2.5 pl-4 pr-10 text-sm text-text outline-none transition focus:border-primary-200 focus:bg-white focus:ring-4 focus:ring-primary/10"
                 />
                 <span
                   aria-hidden
@@ -180,7 +179,7 @@ export default function Header() {
               </div>
 
               {showResult && (
-                <div className="surface-card absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-auto rounded-2xl p-3 shadow-xl">
+                <div className="surface-card absolute left-0 right-0 top-full z-50 mt-1.5 max-h-96 overflow-auto rounded-[1.25rem] border border-border bg-white p-2.5 shadow-[0_22px_48px_-36px_rgba(16,42,67,0.45)]">
                   {searchError && <div className="text-sm text-danger">{searchError}</div>}
                   {!searchError && !searching && searchData && (
                     <div className="space-y-3">
@@ -258,28 +257,28 @@ export default function Header() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 sm:gap-3">
+            <div className="flex items-center justify-end gap-2 sm:gap-2.5">
               <div ref={userMenuRef} className="relative">
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={isUserMenuOpen}
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2 rounded-2xl border border-border bg-white/90 px-2 py-1.5 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 sm:px-2.5"
+                  className="flex items-center gap-2 rounded-xl border border-border bg-white px-2 py-1.5 transition-colors hover:border-primary-200 hover:bg-primary-50 sm:px-2.5"
                 >
                   <div className="hidden text-right lg:block">
                     <div className="max-w-[180px] truncate text-sm font-medium text-text">
                       {user?.email}
                     </div>
-                    <div className="text-xs text-text-light">{roleLabel}</div>
+                    <div className="text-[11px] text-text-light">{roleLabel}</div>
                   </div>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary">
                     {user?.email ? getUserInitials(user.email) : '?'}
                   </div>
                 </button>
 
                 {isUserMenuOpen && (
-                  <div className="surface-card absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl shadow-xl">
+                  <div className="surface-card absolute right-0 top-full z-50 mt-1.5 w-56 rounded-[1.25rem] border border-border bg-white shadow-[0_22px_48px_-36px_rgba(16,42,67,0.45)]">
                     <div className="border-b border-border px-4 py-3 lg:hidden">
                       <div className="truncate text-sm font-medium text-text">{user?.email}</div>
                       <div className="mt-1 text-xs text-text-light">{roleLabel}</div>

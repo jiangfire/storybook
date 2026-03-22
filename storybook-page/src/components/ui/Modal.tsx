@@ -63,19 +63,24 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/72 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/18 p-4 animate-fadeIn"
       onClick={handleBackdropClick}
     >
-      <div className={cn('bg-white rounded-2xl shadow-xl w-full animate-slideUp', sizes[size])}>
+      <div
+        className={cn(
+          'surface-card w-full rounded-[1.5rem] border border-border bg-white shadow-[0_28px_60px_-36px_rgba(16,42,67,0.45)] animate-slideUp',
+          sizes[size]
+        )}
+      >
         {/* 头部 */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-6 border-b border-border">
-            {title && <h2 className="text-xl font-semibold text-text">{title}</h2>}
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            {title && <h2 className="text-lg font-semibold text-text">{title}</h2>}
             {showCloseButton && (
               <button
                 onClick={onClose}
                 aria-label="关闭弹窗"
-                className="p-2 rounded-lg hover:bg-primary-50 transition-colors"
+                className="rounded-xl p-2 transition-colors hover:bg-primary-50"
               >
                 <XIcon size={16} />
               </button>
@@ -84,7 +89,7 @@ export default function Modal({
         )}
 
         {/* 内容 */}
-        <div className="p-6 max-h-[70vh] overflow-auto">{children}</div>
+        <div className="max-h-[72vh] overflow-auto px-5 py-5">{children}</div>
       </div>
     </div>,
     document.body

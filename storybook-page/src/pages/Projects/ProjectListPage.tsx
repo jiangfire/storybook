@@ -21,8 +21,8 @@ const agileModeOptions: Array<{
   label: string;
   desc: string;
 }> = [
-  { value: 'kanban', label: 'Kanban', desc: '看板' },
-  { value: 'scrum', label: 'Scrum', desc: '冲刺' },
+  { value: 'kanban', label: '看板模式', desc: '持续流转' },
+  { value: 'scrum', label: '冲刺模式', desc: '按周期推进' },
 ];
 
 export default function ProjectListPage() {
@@ -92,34 +92,34 @@ export default function ProjectListPage() {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-border bg-white/80 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-text-light">全部项目</div>
+                <div className="text-xs font-medium text-text-light">全部项目</div>
                 <div className="mt-2 text-3xl font-semibold text-text">{projects.length}</div>
               </div>
               <div className="rounded-2xl border border-border bg-white/80 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-text-light">Owner</div>
+                <div className="text-xs font-medium text-text-light">负责项目</div>
                 <div className="mt-2 inline-flex items-center gap-2 text-3xl font-semibold text-text">
                   <CrownIcon size={20} />
                   {ownerProjects}
                 </div>
               </div>
               <div className="rounded-2xl border border-border bg-white/80 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-text-light">敏捷模式</div>
+                <div className="text-xs font-medium text-text-light">敏捷模式</div>
                 <div className="mt-2 flex items-center gap-3 text-sm text-text">
                   <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1">
                     <SprintIcon size={13} />
-                    Scrum {scrumProjects}
+                    冲刺 {scrumProjects}
                   </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 px-2.5 py-1">
                     <BoardIcon size={13} />
-                    Kanban {kanbanProjects}
+                    看板 {kanbanProjects}
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-lg">
-            <div className="text-xs uppercase tracking-[0.22em] text-white/70">Quick Action</div>
+          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-md">
+            <div className="text-xs font-medium text-white/70">快速操作</div>
             <h2 className="mt-3 text-2xl font-semibold">创建新项目</h2>
             <p className="mt-2 text-sm leading-6 text-white/80">
               新项目会自动带你进入详情页，后续即可配置成员、故事与工作方式。
@@ -140,7 +140,7 @@ export default function ProjectListPage() {
             </p>
           </div>
           <div className="w-full lg:max-w-md">
-            <label htmlFor="project-search" className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-text-light">
+            <label htmlFor="project-search" className="mb-2 block text-xs font-medium text-text-light">
               搜索
             </label>
             <div className="relative">
@@ -163,7 +163,7 @@ export default function ProjectListPage() {
       {isLoading ? (
         <ProjectListSkeleton />
       ) : error ? (
-        <div className="rounded-2xl bg-danger-light px-4 py-3 text-danger">{error}</div>
+        <div className="state-panel state-panel-error">{error}</div>
       ) : filteredProjects.length === 0 ? (
         <div className="surface-card rounded-[1.8rem] px-5 py-14 text-center">
           <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-secondary-50 text-text-light">
@@ -207,7 +207,7 @@ export default function ProjectListPage() {
               value={newProject.name}
               onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
               placeholder="例如：电商平台"
-              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="field-control"
               maxLength={100}
             />
           </div>
@@ -219,7 +219,7 @@ export default function ProjectListPage() {
               value={newProject.description}
               onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
               placeholder="简要描述项目的目标和范围..."
-              className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              className="field-control"
               rows={3}
               maxLength={500}
             />
@@ -228,16 +228,16 @@ export default function ProjectListPage() {
           {/* 敏捷模式 */}
           <div>
             <label className="block text-sm font-medium text-text mb-2">敏捷模式</label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {agileModeOptions.map((mode) => (
                 <button
                   key={mode.value}
                   type="button"
                   onClick={() => setNewProject({ ...newProject, agile_mode: mode.value })}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`rounded-2xl border p-4 transition-colors ${
                     newProject.agile_mode === mode.value
-                      ? 'border-primary bg-primary-50 text-primary'
-                      : 'border-border hover:border-primary-300'
+                      ? 'border-primary-200 bg-primary-50 text-primary'
+                      : 'border-border bg-white hover:border-primary-200 hover:bg-primary-50'
                   }`}
                 >
                   <div className="mb-2 flex justify-center">
@@ -256,13 +256,11 @@ export default function ProjectListPage() {
 
           {/* 错误提示 */}
           {formError && (
-            <div className="bg-danger-light text-danger px-4 py-3 rounded-lg text-sm">
-              {formError}
-            </div>
+            <div className="state-panel state-panel-error">{formError}</div>
           )}
 
           {/* 按钮 */}
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end">
             <Button
               variant="secondary"
               onClick={() => {

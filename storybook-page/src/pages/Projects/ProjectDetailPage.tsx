@@ -29,6 +29,8 @@ import {
   InboxIcon,
   SearchIcon,
   SprintIcon,
+  StoryIcon,
+  UsersIcon,
   WrenchIcon,
 } from '../../components/ui/AppIcon';
 
@@ -435,7 +437,7 @@ export default function ProjectDetailPage() {
 
   const handleRemoveMember = (member: MemberItem) => {
     if (member.is_owner) {
-      showError('项目 Owner 不能移除');
+      showError('项目负责人不能移除');
       return;
     }
     setConfirmAction({
@@ -613,6 +615,7 @@ export default function ProjectDetailPage() {
   const completionRate = projectOverview?.statistics?.completion_rate || 0;
   const totalStories = projectOverview?.statistics?.total_stories || 0;
   const activeMembers = projectOverview?.statistics?.active_members || members.length || 0;
+  const projectModeLabel = project?.agile_mode === 'scrum' ? '冲刺模式' : '看板模式';
   const canManageMembers = user?.role === 'product' || user?.role === 'admin';
   const canManageTechLeads = user?.role === 'admin';
   const canCreateStory = user?.role === 'product' || user?.role === 'admin';
@@ -627,69 +630,116 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <h1 className="mb-2 text-2xl font-bold text-text sm:text-3xl">
-            {project?.name || '项目详情'}
-          </h1>
-          <p className="text-sm text-text-light sm:text-base">
-            {project?.description || '暂无项目描述'}
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
-          {canCreateStory ? (
-            <Link to={`/projects/${projectID}/stories/new`}>
-              <Button variant="secondary">创建故事</Button>
-            </Link>
-          ) : (
-            <span className="inline-flex items-center rounded-lg bg-secondary-50 px-3 py-2 text-xs text-text-light">
-              仅产品经理和管理员可创建故事
-            </span>
-          )}
-          <Link to={`/projects/${projectID}/bugs`}>
-            <Button variant="secondary">缺陷管理</Button>
-          </Link>
-          <Link to={`/projects/${projectID}/board`}>
-            <Button>进入看板</Button>
-          </Link>
-        </div>
-      </div>
+      <section className="surface-card overflow-hidden rounded-[2rem]">
+        <div className="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:px-8 lg:py-8">
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary">
+                  {project?.agile_mode === 'scrum' ? <SprintIcon size={14} /> : <BoardIcon size={14} />}
+                  {projectModeLabel}
+                </span>
+                {project?.owner && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                    <CrownIcon size={12} />
+                    负责人 {project.owner.email}
+                  </span>
+                )}
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
+                  {project?.name || '项目详情'}
+                </h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-text-light sm:text-base">
+                  {project?.description || '暂无项目描述。这里汇总项目节奏、质量、成员和冲刺进展。'}
+                </p>
+              </div>
+            </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        <div className="bg-white rounded-xl border border-border p-4">
-          <div className="text-sm text-text-light">总故事数</div>
-          <div className="text-2xl font-bold text-text mt-1">{totalStories}</div>
-        </div>
-        <div className="bg-white rounded-xl border border-border p-4">
-          <div className="text-sm text-text-light">完成率</div>
-          <div className="text-2xl font-bold text-success mt-1">{completionRate.toFixed(1)}%</div>
-        </div>
-        <div className="bg-white rounded-xl border border-border p-4">
-          <div className="text-sm text-text-light">活跃成员</div>
-          <div className="text-2xl font-bold text-text mt-1">{activeMembers}</div>
-        </div>
-        <div className="bg-white rounded-xl border border-border p-4">
-          <div className="text-sm text-text-light">敏捷模式</div>
-          <div className="text-2xl font-bold text-primary mt-1">
-            <span className="inline-flex items-center gap-2">
-              {project?.agile_mode === 'scrum' ? <SprintIcon size={20} /> : <BoardIcon size={20} />}
-              {project?.agile_mode === 'scrum' ? 'Scrum' : 'Kanban'}
-            </span>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-white p-4">
+                <div className="text-xs font-medium text-text-light">总故事数</div>
+                <div className="mt-2 inline-flex items-center gap-2 text-2xl font-semibold text-text">
+                  <StoryIcon size={20} />
+                  {totalStories}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-white p-4">
+                <div className="text-xs font-medium text-text-light">完成率</div>
+                <div className="mt-2 inline-flex items-center gap-2 text-2xl font-semibold text-success">
+                  <CheckCircleIcon size={20} />
+                  {completionRate.toFixed(1)}%
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-white p-4">
+                <div className="text-xs font-medium text-text-light">活跃成员</div>
+                <div className="mt-2 inline-flex items-center gap-2 text-2xl font-semibold text-text">
+                  <UsersIcon size={20} />
+                  {activeMembers}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-md">
+            <div className="text-xs font-medium text-white/70">当前重点</div>
+            <div className="mt-3 text-3xl font-semibold">{statusBreakdown.in_progress || 0}</div>
+            <p className="mt-1 text-sm text-white/80">个故事处于推进中</p>
+            <div className="mt-5 space-y-2 text-sm text-white/85">
+              <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
+                <span>待开始</span>
+                <span className="font-semibold">{statusBreakdown.backlog || 0}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
+                <span>待提测 / 测试中</span>
+                <span className="font-semibold">
+                  {(statusBreakdown.ready || 0) + (statusBreakdown.test || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
+                <span>已完成</span>
+                <span className="font-semibold">{statusBreakdown.done || 0}</span>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col gap-2">
+              <Link to={`/projects/${projectID}/board`}>
+                <Button className="w-full bg-white text-primary hover:bg-white/90">进入看板</Button>
+              </Link>
+              <Link to={`/projects/${projectID}/bugs`}>
+                <Button variant="secondary" className="w-full border-white/30 bg-white/10 text-white hover:bg-white/15">
+                  缺陷管理
+                </Button>
+              </Link>
+              {canCreateStory ? (
+                <Link to={`/projects/${projectID}/stories/new`}>
+                  <Button variant="secondary" className="w-full border-white/30 bg-white/10 text-white hover:bg-white/15">
+                    创建故事
+                  </Button>
+                </Link>
+              ) : (
+                <div className="rounded-xl bg-white/10 px-3 py-2 text-xs text-white/75">
+                  仅产品经理和管理员可创建故事
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+      <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-lg font-semibold text-text">冲刺管理</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-text">冲刺管理</h2>
+            <p className="mt-1 text-sm text-text-light">统一查看每个冲刺的周期、完成量和下一步动作。</p>
+          </div>
           <Button size="sm" onClick={() => setIsCreateSprintOpen(true)}>
             + 新建冲刺
           </Button>
         </div>
 
-        {sprintError && <div className="text-danger text-sm mb-3">{sprintError}</div>}
+        {sprintError && <div className="state-panel state-panel-error mb-3">{sprintError}</div>}
         {sprints.length === 0 ? (
-          <div className="text-sm text-text-light py-6 text-center">暂无冲刺，先创建一个冲刺</div>
+          <div className="state-panel state-panel-empty">暂无冲刺，先创建一个冲刺</div>
         ) : (
           <div className="space-y-3">
             {sprints.map((sprint) => {
@@ -737,15 +787,18 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+      <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <h2 className="text-lg font-semibold text-text">燃尽图</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-text">燃尽图</h2>
+            <p className="mt-1 text-sm text-text-light">把理想线和实际线放在一起看，快速判断冲刺节奏是否健康。</p>
+          </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="text-sm text-text-light">冲刺</span>
             <select
               value={selectedSprintID || ''}
               onChange={(e) => setSelectedSprintID(e.target.value ? Number(e.target.value) : null)}
-              className="px-3 py-2 border border-border rounded-lg text-sm"
+              className="field-control"
               disabled={sprints.length === 0}
             >
               {sprints.length === 0 && <option value="">暂无冲刺</option>}
@@ -770,33 +823,36 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {sprintError && <div className="text-danger text-sm mb-3">{sprintError}</div>}
+        {sprintError && <div className="state-panel state-panel-error mb-3">{sprintError}</div>}
         {isBurndownLoading && (
-          <div className="text-text-light text-sm py-8 text-center">燃尽图加载中...</div>
+          <div className="state-panel state-panel-loading">燃尽图加载中...</div>
         )}
         {!isBurndownLoading && burndownError && (
-          <div className="text-danger text-sm py-8 text-center">{burndownError}</div>
+          <div className="state-panel state-panel-error">{burndownError}</div>
         )}
         {!isBurndownLoading && !burndownError && burndown && <BurndownChart report={burndown} />}
         {!isBurndownLoading && !burndown && !burndownError && (
-          <div className="text-text-light text-sm py-8 text-center">请选择冲刺查看燃尽图</div>
+          <div className="state-panel state-panel-empty">请选择冲刺查看燃尽图</div>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+        <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-lg font-semibold text-text">速度报表</h2>
+            <div>
+              <h2 className="text-lg font-semibold text-text">速度报表</h2>
+              <p className="mt-1 text-sm text-text-light">用已完成点数和计划点数判断团队交付节奏。</p>
+            </div>
             <Button size="sm" variant="secondary" onClick={() => loadReports(projectID)}>
               刷新
             </Button>
           </div>
-          {isReportLoading && <div className="text-sm text-text-light">报表加载中...</div>}
+          {isReportLoading && <div className="state-panel state-panel-loading">报表加载中...</div>}
           {!isReportLoading && reportError && (
-            <div className="text-sm text-danger">{reportError}</div>
+            <div className="state-panel state-panel-error">{reportError}</div>
           )}
           {!isReportLoading && !reportError && (!velocity || velocity.velocity.length === 0) && (
-            <div className="text-sm text-text-light">暂无冲刺速度数据</div>
+            <div className="state-panel state-panel-empty">暂无冲刺速度数据</div>
           )}
           {!isReportLoading && !reportError && velocity && velocity.velocity.length > 0 && (
             <div className="space-y-2">
@@ -804,7 +860,7 @@ export default function ProjectDetailPage() {
                 <div key={item.sprint_id} className="border border-border rounded-lg p-3">
                   <div className="font-medium text-text">{item.name}</div>
                   <div className="text-xs text-text-light mt-1">
-                    状态：{item.status} · 完成点数 {item.completed_points}/{item.planned_points} ·
+                    状态：{formatSprintStatus(item.status)} · 完成点数 {item.completed_points}/{item.planned_points} ·
                     速度 {item.velocity.toFixed(1)}%
                   </div>
                 </div>
@@ -813,11 +869,14 @@ export default function ProjectDetailPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-text mb-4">质量报表</h2>
-          {isReportLoading && <div className="text-sm text-text-light">报表加载中...</div>}
+        <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-text">质量报表</h2>
+            <p className="mt-1 text-sm text-text-light">结合缺陷和 AC 完成率看当前质量风险。</p>
+          </div>
+          {isReportLoading && <div className="state-panel state-panel-loading">报表加载中...</div>}
           {!isReportLoading && reportError && (
-            <div className="text-sm text-danger">{reportError}</div>
+            <div className="state-panel state-panel-error">{reportError}</div>
           )}
           {!isReportLoading && !reportError && quality && (
             <div className="space-y-4 text-sm">
@@ -851,8 +910,11 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
-          <h2 className="text-lg font-semibold text-text mb-4">状态分布</h2>
+        <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-text">状态分布</h2>
+            <p className="mt-1 text-sm text-text-light">快速看当前故事主要积压在哪个阶段。</p>
+          </div>
           <div className="space-y-3">
             {Object.entries(statusBreakdown).map(([status, count]) => (
               <div key={status} className="flex items-center justify-between">
@@ -863,7 +925,7 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+        <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
           <div className="mb-4 flex flex-col gap-2">
             <h2 className="text-lg font-semibold text-text">项目成员</h2>
             <div className="flex flex-wrap items-center gap-2 text-xs text-text-light">
@@ -881,7 +943,7 @@ export default function ProjectDetailPage() {
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                 <CrownIcon size={12} />
-                Owner
+                负责人
               </span>
             </div>
           </div>
@@ -890,7 +952,7 @@ export default function ProjectDetailPage() {
               <select
                 value={selectedMemberUserID}
                 onChange={(e) => setSelectedMemberUserID(e.target.value)}
-                className="px-3 py-2 border border-border rounded-lg text-sm"
+                className="field-control"
               >
                 <option value="">选择用户</option>
                 {availableMemberUsers.map((candidate) => (
@@ -904,7 +966,7 @@ export default function ProjectDetailPage() {
                 onChange={(e) =>
                   setSelectedMemberRole(e.target.value as 'product' | 'developer' | 'tester')
                 }
-                className="px-3 py-2 border border-border rounded-lg text-sm"
+                className="field-control"
               >
                 <option value="product">产品经理</option>
                 <option value="developer">开发</option>
@@ -916,9 +978,9 @@ export default function ProjectDetailPage() {
             </div>
           )}
           {memberError ? (
-            <div className="text-danger text-sm">{memberError}</div>
+            <div className="state-panel state-panel-error">{memberError}</div>
           ) : members.length === 0 ? (
-            <div className="text-text-light text-sm">暂无成员</div>
+            <div className="state-panel state-panel-empty">暂无成员</div>
           ) : (
             <div className="space-y-3">
               {members.map((member) => {
@@ -949,8 +1011,8 @@ export default function ProjectDetailPage() {
                             {member.is_owner && (
                               <span
                                 className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-amber-700"
-                                title="项目 Owner"
-                                aria-label="项目 Owner"
+                                title="项目负责人"
+                                aria-label="项目负责人"
                               >
                                 <CrownIcon size={12} />
                               </span>
@@ -980,14 +1042,17 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-text mb-4">项目技术负责人</h2>
+      <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-text">项目技术负责人</h2>
+          <p className="mt-1 text-sm text-text-light">明确技术把关角色，减少决策和审批链路的模糊地带。</p>
+        </div>
         {canManageTechLeads && (
           <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2">
             <select
               value={selectedTechLeadUserID}
               onChange={(e) => setSelectedTechLeadUserID(e.target.value)}
-              className="px-3 py-2 border border-border rounded-lg text-sm"
+              className="field-control"
             >
               <option value="">选择技术负责人</option>
               {availableTechLeadUsers.map((candidate) => (
@@ -1002,7 +1067,7 @@ export default function ProjectDetailPage() {
           </div>
         )}
         {techLeads.length === 0 ? (
-          <div className="text-sm text-text-light">当前项目暂无技术负责人</div>
+          <div className="state-panel state-panel-empty">当前项目暂无技术负责人</div>
         ) : (
           <div className="space-y-2">
             {techLeads.map((item) => (
@@ -1081,7 +1146,7 @@ export default function ProjectDetailPage() {
               type="text"
               value={sprintForm.name}
               onChange={(e) => setSprintForm((prev) => ({ ...prev, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-border rounded-lg"
+              className="field-control"
               placeholder="例如：Sprint 1"
               maxLength={120}
             />
@@ -1091,20 +1156,20 @@ export default function ProjectDetailPage() {
             <textarea
               value={sprintForm.goal}
               onChange={(e) => setSprintForm((prev) => ({ ...prev, goal: e.target.value }))}
-              className="w-full px-3 py-2 border border-border rounded-lg resize-none"
+              className="field-control"
               rows={3}
               maxLength={500}
               placeholder="本次冲刺要达成什么"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-text mb-2">开始日期</label>
               <input
                 type="date"
                 value={sprintForm.start_date}
                 onChange={(e) => setSprintForm((prev) => ({ ...prev, start_date: e.target.value }))}
-                className="w-full px-3 py-2 border border-border rounded-lg"
+                className="field-control"
               />
             </div>
             <div>
@@ -1113,16 +1178,14 @@ export default function ProjectDetailPage() {
                 type="date"
                 value={sprintForm.end_date}
                 onChange={(e) => setSprintForm((prev) => ({ ...prev, end_date: e.target.value }))}
-                className="w-full px-3 py-2 border border-border rounded-lg"
+                className="field-control"
               />
             </div>
           </div>
           {sprintFormError && (
-            <div className="bg-danger-light text-danger text-sm rounded-lg px-3 py-2">
-              {sprintFormError}
-            </div>
+            <div className="state-panel state-panel-error">{sprintFormError}</div>
           )}
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
             <Button
               variant="secondary"
               onClick={() => setIsCreateSprintOpen(false)}
@@ -1144,9 +1207,9 @@ function BurndownChart({ report }: { report: BurndownReport }) {
   const points = report.points || [];
   if (points.length === 0 || report.baseline_points <= 0) {
     return (
-      <div className="text-sm py-8 text-center space-y-2">
-        <div className="text-text-light">当前冲刺暂无可燃尽的数据</div>
-        <div className="text-text-light">
+      <div className="state-panel state-panel-empty space-y-2">
+        <div>当前冲刺暂无可燃尽的数据</div>
+        <div>
           请先把故事规划到该冲刺，并设置故事点；完成故事后实际线才会下降。
         </div>
       </div>

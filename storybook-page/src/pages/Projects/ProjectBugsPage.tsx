@@ -356,8 +356,8 @@ export default function ProjectBugsPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-lg">
-            <div className="text-xs uppercase tracking-[0.22em] text-white/70">Filter Focus</div>
+          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-md">
+            <div className="text-xs font-medium text-white/70">筛选重点</div>
             <div className="mt-3 text-2xl font-semibold">{activeFilterCount} 个筛选条件生效</div>
             <p className="mt-2 text-sm leading-6 text-white/80">
               {activeFilterCount > 0
@@ -377,28 +377,28 @@ export default function ProjectBugsPage() {
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="surface-card rounded-[1.5rem] p-4">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+          <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <BugIcon size={14} />
             全部
           </div>
           <div className="mt-3 text-3xl font-semibold text-text">{bugSummary.total}</div>
         </div>
         <div className="surface-card rounded-[1.5rem] p-4">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+          <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <InboxIcon size={14} />
             待处理
           </div>
           <div className="mt-3 text-3xl font-semibold text-info">{bugSummary.open}</div>
         </div>
         <div className="surface-card rounded-[1.5rem] p-4">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+          <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <WrenchIcon size={14} />
             处理中
           </div>
           <div className="mt-3 text-3xl font-semibold text-warning">{bugSummary.progressing}</div>
         </div>
         <div className="surface-card rounded-[1.5rem] p-4">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+          <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <UsersIcon size={14} />
             未指派
           </div>
@@ -425,7 +425,7 @@ export default function ProjectBugsPage() {
                 value={form.title}
                 onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder="一句话说清问题"
-                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                className="field-control"
               />
             </div>
             <div>
@@ -435,7 +435,7 @@ export default function ProjectBugsPage() {
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="补充复现方式、影响范围或截图说明"
                 rows={4}
-                className="w-full resize-none rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                className="field-control"
               />
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -444,7 +444,7 @@ export default function ProjectBugsPage() {
                 <select
                   value={form.severity}
                   onChange={(e) => setForm((prev) => ({ ...prev, severity: e.target.value }))}
-                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                  className="field-control"
                 >
                   {BUG_SEVERITY_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -458,7 +458,7 @@ export default function ProjectBugsPage() {
                 <select
                   value={form.story_id}
                   onChange={(e) => setForm((prev) => ({ ...prev, story_id: e.target.value }))}
-                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                  className="field-control"
                 >
                   <option value="">暂不关联</option>
                   {stories.map((story) => (
@@ -473,7 +473,7 @@ export default function ProjectBugsPage() {
                 <select
                   value={form.assigned_to}
                   onChange={(e) => setForm((prev) => ({ ...prev, assigned_to: e.target.value }))}
-                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                  className="field-control"
                 >
                   <option value="">暂不指派</option>
                   {assigneeOptions.map((member) => (
@@ -510,7 +510,7 @@ export default function ProjectBugsPage() {
               <select
                 value={filters.status}
                 onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                className="field-control"
               >
                 <option value="">全部状态</option>
                 {BUG_STATUS_OPTIONS.map((option) => (
@@ -525,7 +525,7 @@ export default function ProjectBugsPage() {
               <select
                 value={filters.severity}
                 onChange={(e) => setFilters((prev) => ({ ...prev, severity: e.target.value }))}
-                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                className="field-control"
               >
                 <option value="">全部级别</option>
                 {BUG_SEVERITY_OPTIONS.map((option) => (
@@ -540,7 +540,7 @@ export default function ProjectBugsPage() {
               <select
                 value={filters.assignee}
                 onChange={(e) => setFilters((prev) => ({ ...prev, assignee: e.target.value }))}
-                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                className="field-control"
               >
                 <option value="">全部负责人</option>
                 {assigneeOptions.map((member) => (
@@ -562,13 +562,13 @@ export default function ProjectBugsPage() {
         </div>
       </div>
 
-      {error && <div className="rounded-2xl bg-danger-light px-4 py-3 text-sm text-danger">{error}</div>}
+      {error && <div className="state-panel state-panel-error">{error}</div>}
       {loading ? (
-        <div className="surface-card rounded-[1.6rem] px-4 py-6 text-sm text-text-light">
+        <div className="state-panel state-panel-loading">
           缺陷列表加载中...
         </div>
       ) : bugs.length === 0 ? (
-        <div className="surface-card rounded-[1.6rem] border-dashed px-4 py-8 text-center text-sm text-text-light">
+        <div className="state-panel state-panel-empty">
           当前筛选下暂无缺陷
         </div>
       ) : (
@@ -581,11 +581,13 @@ export default function ProjectBugsPage() {
             {activeFilterCount > 0 && (
               <div className="flex flex-wrap gap-2 text-xs text-text-light">
                 {filters.status && (
-                  <span className="rounded-full bg-secondary-50 px-2.5 py-1">状态：{filters.status}</span>
+                  <span className="rounded-full bg-secondary-50 px-2.5 py-1">
+                    状态：{formatBugStatus(filters.status as BugItem['status'])}
+                  </span>
                 )}
                 {filters.severity && (
                   <span className="rounded-full bg-secondary-50 px-2.5 py-1">
-                    级别：{filters.severity}
+                    级别：{formatBugSeverity(filters.severity as BugItem['severity'])}
                   </span>
                 )}
                 {filters.assignee && (
@@ -657,7 +659,7 @@ export default function ProjectBugsPage() {
                             e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed'
                           )
                         }
-                        className="w-full rounded-2xl border border-border bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                        className="field-control"
                       >
                         {BUG_STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -674,7 +676,7 @@ export default function ProjectBugsPage() {
                             : ''
                         }
                         onChange={(e) => void handleAssign(bug.id, e.target.value)}
-                        className="w-full rounded-2xl border border-border bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                        className="field-control"
                       >
                         <option value="">未指派</option>
                         {assigneeOptions.map((member) => (
@@ -702,7 +704,7 @@ export default function ProjectBugsPage() {
 
       <Modal isOpen={detailOpen} onClose={closeBugDetail} title="缺陷详情" size="md">
         {loadingDetail || !detail ? (
-          <div className="text-sm text-text-light">加载详情中...</div>
+          <div className="state-panel state-panel-loading">加载详情中...</div>
         ) : (
           <div className="space-y-2 text-sm">
             <div>
@@ -714,11 +716,11 @@ export default function ProjectBugsPage() {
             </div>
             <div>
               <span className="text-text-light">状态：</span>
-              {detail.status}
+              {formatBugStatus(detail.status)}
             </div>
             <div>
               <span className="text-text-light">严重级别：</span>
-              {detail.severity}
+              {formatBugSeverity(detail.severity)}
             </div>
             {detail.story_id && (
               <div>

@@ -18,7 +18,7 @@ export function Skeleton({ className = '' }: SkeletonProps) {
 
 export function CardSkeleton() {
   return (
-    <div className="bg-white rounded-lg border border-border p-4 space-y-3">
+    <div className="surface-card space-y-3 rounded-2xl p-4">
       <Skeleton className="h-4 w-3/4" />
       <Skeleton className="h-3 w-1/2" />
       <Skeleton className="h-3 w-1/3" />
@@ -30,7 +30,7 @@ export function BoardSkeleton() {
   return (
     <div className="grid grid-cols-5 gap-4 p-4">
       {[1, 2, 3, 4, 5].map((i) => (
-        <div key={i} className="bg-secondary-50 rounded-lg border border-border p-4 space-y-3">
+        <div key={i} className="surface-card space-y-3 rounded-2xl p-4">
           <Skeleton className="h-6 w-20" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-24 w-full" />
@@ -50,19 +50,19 @@ export function StoryDetailSkeleton() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-lg border border-border p-6 space-y-3">
+          <div className="surface-card rounded-2xl p-6 space-y-3">
             <Skeleton className="h-6 w-24" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-3/4" />
           </div>
-          <div className="bg-white rounded-lg border border-border p-6 space-y-3">
+          <div className="surface-card rounded-2xl p-6 space-y-3">
             <Skeleton className="h-6 w-24" />
             <Skeleton className="h-20 w-full" />
           </div>
         </div>
         <div className="space-y-6">
-          <div className="bg-white rounded-lg border border-border p-6 space-y-3">
+          <div className="surface-card rounded-2xl p-6 space-y-3">
             <Skeleton className="h-6 w-24" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-full" />
@@ -93,7 +93,7 @@ export function ProjectListSkeleton() {
       {/* 项目卡片骨架屏 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="bg-white rounded-lg border border-border p-6 space-y-4">
+          <div key={i} className="surface-card space-y-4 rounded-[1.6rem] p-6">
             <div className="flex items-center space-x-3">
               <Skeleton className="h-12 w-12 rounded-lg" />
               <div className="flex-1 space-y-2">
