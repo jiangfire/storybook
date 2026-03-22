@@ -248,7 +248,7 @@ function BugSeverityDistribution({ data, total }: { data: Record<string, number>
           return (
             <div
               key={key}
-              className={`relative p-3 rounded-lg border-2 ${config.borderColor} ${config.bgColor} transition-all hover:shadow-md`}
+              className="rounded-lg border border-border bg-white p-3"
             >
               <div className="flex items-start justify-between">
                 <span className="inline-flex items-center gap-2">
@@ -651,7 +651,7 @@ export default function ProjectDetailPage() {
                   {project?.name || '项目详情'}
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-text-light sm:text-base">
-                  {project?.description || '暂无项目描述。这里汇总项目节奏、质量、成员和冲刺进展。'}
+                  {project?.description || '暂无项目描述。这里查看项目节奏、质量、成员和冲刺进展。'}
                 </p>
               </div>
             </div>
@@ -681,7 +681,7 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-md">
+          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
             <div className="text-xs font-medium text-white/70">当前重点</div>
             <div className="mt-3 text-3xl font-semibold">{statusBreakdown.in_progress || 0}</div>
             <p className="mt-1 text-sm text-white/80">个故事处于推进中</p>
@@ -726,14 +726,14 @@ export default function ProjectDetailPage() {
         </div>
       </section>
 
-      <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-text">冲刺管理</h2>
-            <p className="mt-1 text-sm text-text-light">统一查看每个冲刺的周期、完成量和下一步动作。</p>
-          </div>
-          <Button size="sm" onClick={() => setIsCreateSprintOpen(true)}>
-            + 新建冲刺
+        <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-text">冲刺管理</h2>
+              <p className="mt-1 text-sm text-text-light">统一查看每个冲刺的周期、完成量和下一步动作。</p>
+            </div>
+            <Button size="sm" onClick={() => setIsCreateSprintOpen(true)}>
+              + 新建冲刺
           </Button>
         </div>
 
@@ -1043,10 +1043,10 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="surface-card rounded-[1.8rem] p-5 sm:p-6">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-text">项目技术负责人</h2>
-          <p className="mt-1 text-sm text-text-light">明确技术把关角色，减少决策和审批链路的模糊地带。</p>
-        </div>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-text">项目技术负责人</h2>
+            <p className="mt-1 text-sm text-text-light">明确技术把关角色，减少决策链路里的模糊地带。</p>
+          </div>
         {canManageTechLeads && (
           <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2">
             <select

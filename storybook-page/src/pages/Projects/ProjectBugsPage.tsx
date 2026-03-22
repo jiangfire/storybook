@@ -56,17 +56,17 @@ const bugStatusMeta: Record<
   open: {
     badgeClass: 'bg-info-light text-info',
     icon: InboxIcon,
-    cardClass: 'border-info/30 bg-info-light/30',
+    cardClass: 'border-info/30 bg-white',
   },
   in_progress: {
     badgeClass: 'bg-warning-light text-warning',
     icon: WrenchIcon,
-    cardClass: 'border-warning/30 bg-warning-light/30',
+    cardClass: 'border-warning/30 bg-white',
   },
   resolved: {
     badgeClass: 'bg-success-light text-success',
     icon: CheckCircleIcon,
-    cardClass: 'border-success/30 bg-success-light/30',
+    cardClass: 'border-success/30 bg-white',
   },
   closed: {
     badgeClass: 'bg-secondary-100 text-text-light',
@@ -350,19 +350,19 @@ export default function ProjectBugsPage() {
                   缺陷管理
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-text-light sm:text-base">
-                  记录问题、快速分配责任，并把待处理项压缩到最少。先筛出高风险，再推进关闭。
+                  先筛出高风险问题，再明确责任并推进关闭。
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-md">
+          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
             <div className="text-xs font-medium text-white/70">筛选重点</div>
             <div className="mt-3 text-2xl font-semibold">{activeFilterCount} 个筛选条件生效</div>
             <p className="mt-2 text-sm leading-6 text-white/80">
               {activeFilterCount > 0
-                ? '当前列表已聚焦到重点问题，可以继续刷新或清空筛选。'
-                : '还没有启用筛选，建议优先关注待处理、高严重级别和未指派问题。'}
+                ? '当前列表已经收拢到重点问题，可继续刷新或清空筛选。'
+                : '建议优先关注待处理、高严重级别和未指派问题。'}
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-white/15 px-3 py-1">待处理 {bugSummary.open}</span>

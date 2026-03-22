@@ -85,7 +85,7 @@ export default function ProjectListPage() {
               <div>
                 <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">项目</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-text-light sm:text-base">
-                  在这里集中管理团队的交付空间。先找到目标项目，再进入详情、看板或冲刺节奏。
+                  在这里管理团队的交付空间。先找到项目，再进入详情、看板或冲刺。
                 </p>
               </div>
             </div>
@@ -118,11 +118,11 @@ export default function ProjectListPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-md">
+          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
             <div className="text-xs font-medium text-white/70">快速操作</div>
             <h2 className="mt-3 text-2xl font-semibold">创建新项目</h2>
             <p className="mt-2 text-sm leading-6 text-white/80">
-              新项目会自动带你进入详情页，后续即可配置成员、故事与工作方式。
+              创建后会直接进入项目页，再继续补充成员、故事和工作方式。
             </p>
             <Button className="mt-5 bg-white text-primary hover:bg-white/90" onClick={() => setIsCreateModalOpen(true)}>
               + 新建项目

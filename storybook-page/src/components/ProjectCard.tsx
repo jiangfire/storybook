@@ -18,12 +18,12 @@ export default function ProjectCard({ project }: ProjectCardProps) {
     project;
   const accentClass =
     agile_mode === 'scrum'
-      ? 'from-primary-50 via-white to-primary-100/70'
-      : 'from-accent-50 via-white to-accent-100/70';
+      ? 'from-white via-white to-primary-50/65'
+      : 'from-white via-white to-accent-50/70';
   const badgeClass =
     agile_mode === 'scrum'
-      ? 'bg-primary-100 text-primary-700'
-      : 'bg-success-light text-success';
+      ? 'bg-primary-50 text-primary-700'
+      : 'bg-accent-50 text-accent-700';
   const modeLabel = agile_mode === 'scrum' ? '冲刺' : '看板';
 
   return (
@@ -38,7 +38,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           </div>
           <div className="min-w-0">
             <h3 className="line-clamp-1 text-lg font-semibold text-text">{name}</h3>
-            <p className="mt-1 text-sm text-text-light">进入项目总览、看板与缺陷管理</p>
+            <p className="mt-1 text-sm text-text-light">查看项目总览与当前进展</p>
           </div>
         </div>
 
@@ -71,7 +71,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
         </p>
       ) : (
         <p className="mb-5 min-h-[3rem] text-sm leading-6 text-text-lighter">
-          暂无项目描述，进入后可以继续补充目标、成员与工作节奏。
+          暂无项目描述，进入后可继续补充目标与协作边界。
         </p>
       )}
 
@@ -106,7 +106,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 
       <div className="flex items-center justify-between border-t border-border/80 pt-4 text-xs text-text-light">
         <span>创建于 {new Date(created_at).toLocaleDateString()}</span>
-        <span className="font-medium text-primary">查看项目</span>
+        <span className="font-medium text-primary">查看</span>
       </div>
     </Link>
   );

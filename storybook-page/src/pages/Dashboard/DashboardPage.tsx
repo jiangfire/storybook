@@ -106,6 +106,7 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState('');
   const [selectedQuickProjectId, setSelectedQuickProjectId] = useState<number | null>(null);
   const canCreateStory = user?.role === 'product' || user?.role === 'admin';
+  const ownerProjects = projects.filter((project) => project.is_owner).length;
 
   const quickStartProject = useMemo(
     () => resolveQuickStartProject(projects, selectedQuickProjectId),
@@ -169,7 +170,7 @@ export default function DashboardPage() {
                   欢迎回来，{user?.email?.split('@')[0]}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-text-light sm:text-base">
-                  今天先从最重要的事情开始。这里汇总了你的当前交付、进展状态和快速入口。
+                  先处理最重要的事。这里汇总你当前的交付、进展和常用入口。
                 </p>
               </div>
             </div>
@@ -192,7 +193,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-md">
+          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
             <div className="text-xs font-medium text-white/70">今日重点</div>
             <div className="mt-3 text-3xl font-semibold">
               {dashboardData?.statistics.in_progress || 0}
@@ -268,7 +269,7 @@ export default function DashboardPage() {
               emptyTitle="还没有领取任何故事"
               emptyAction={
                 <Link to="/projects" className="mt-4 inline-block text-primary hover:text-primary-700">
-                  去看板看看 →
+                  查看项目
                 </Link>
               }
               items={dashboardData?.my_stories.assigned || []}
@@ -290,8 +291,8 @@ export default function DashboardPage() {
                 <h2 className="mb-1 text-lg font-semibold text-text sm:text-xl">快速开始</h2>
                 <p className="break-words text-sm text-text-light">
                   {quickStartProject
-                    ? `以下操作将作用于「${quickStartProject.name}」`
-                    : '先创建一个项目，再开始查看详情、进入看板或创建故事'}
+                    ? `以下操作将基于「${quickStartProject.name}」`
+                    : '先创建一个项目，再进入详情、看板或故事创建'}
                 </p>
               </div>
               {projects.length > 1 && quickStartProject && (
@@ -335,8 +336,8 @@ export default function DashboardPage() {
                   <div className="mb-2 text-primary">
                     <FolderIcon size={24} />
                   </div>
-                  <h3 className="mb-1 font-semibold text-text">查看项目</h3>
-                  <p className="text-sm text-text-light">查看「{quickStartProject.name}」详情</p>
+                  <h3 className="mb-1 font-semibold text-text">项目详情</h3>
+                  <p className="text-sm text-text-light">进入「{quickStartProject.name}」总览</p>
                 </Link>
 
                 <Link
@@ -346,8 +347,8 @@ export default function DashboardPage() {
                   <div className="mb-2 text-primary">
                     <BoardIcon size={24} />
                   </div>
-                  <h3 className="mb-1 font-semibold text-text">看板视图</h3>
-                  <p className="text-sm text-text-light">进入「{quickStartProject.name}」看板</p>
+                  <h3 className="mb-1 font-semibold text-text">进入看板</h3>
+                  <p className="text-sm text-text-light">查看「{quickStartProject.name}」当前流转</p>
                 </Link>
 
                 {canCreateStory && (
@@ -358,10 +359,8 @@ export default function DashboardPage() {
                     <div className="mb-2 text-primary">
                       <SparklesIcon size={24} />
                     </div>
-                    <h3 className="mb-1 font-semibold text-text">创建故事</h3>
-                    <p className="text-sm text-text-light">
-                      在「{quickStartProject.name}」中创建故事
-                    </p>
+                    <h3 className="mb-1 font-semibold text-text">新建故事</h3>
+                    <p className="text-sm text-text-light">为「{quickStartProject.name}」补充新需求</p>
                   </Link>
                 )}
               </div>
@@ -372,12 +371,14 @@ export default function DashboardPage() {
             <section className="surface-card rounded-[1.8rem] p-5 sm:p-6">
               <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-text sm:text-xl">最近项目</h2>
-                <div className="inline-flex items-center gap-1.5 text-xs text-text-light">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-secondary-50 px-2 py-1">
-                    <CrownIcon size={12} />
-                    你是负责人
-                  </span>
-                </div>
+                {ownerProjects > 0 && (
+                  <div className="inline-flex items-center gap-1.5 text-xs text-text-light">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary-50 px-2 py-1">
+                      <CrownIcon size={12} />
+                      你负责其中一部分项目
+                    </span>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {projects.slice(0, 6).map((project) => (
