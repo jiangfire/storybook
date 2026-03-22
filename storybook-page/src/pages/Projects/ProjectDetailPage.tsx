@@ -630,7 +630,7 @@ export default function ProjectDetailPage() {
   );
 
   return (
-    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
       <section className="surface-card overflow-hidden rounded-[2rem]">
         <div className="space-y-6 px-5 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="space-y-5">

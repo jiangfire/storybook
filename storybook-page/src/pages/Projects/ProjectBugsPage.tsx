@@ -329,7 +329,7 @@ export default function ProjectBugsPage() {
   }
 
   return (
-    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
       <section className="surface-card overflow-hidden rounded-[2rem]">
         <div className="grid gap-5 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] lg:px-8 lg:py-8">
           <div className="space-y-4">
