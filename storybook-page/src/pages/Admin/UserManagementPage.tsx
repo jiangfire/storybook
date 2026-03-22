@@ -9,6 +9,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
+import { useToast } from '../../components/ui/Toast';
 
 const roleLabels: Record<UserRole, string> = {
   product: '产品经理',
@@ -27,6 +28,7 @@ const roleColors: Record<UserRole, string> = {
 };
 
 export default function UserManagementPage() {
+  const { showError, showSuccess } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,6 +46,7 @@ export default function UserManagementPage() {
   const [workloadOpen, setWorkloadOpen] = useState(false);
   const [workloadLoading, setWorkloadLoading] = useState(false);
   const [workloadDetail, setWorkloadDetail] = useState<UserWorkloadDetail | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -53,12 +56,12 @@ export default function UserManagementPage() {
         search: searchQuery || undefined,
       });
       setUsers(res.users);
-    } catch (error) {
-      console.error('Failed to load users:', error);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '用户列表加载失败'));
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, selectedRole]);
+  }, [searchQuery, selectedRole, showError]);
 
   useEffect(() => {
     void loadUsers();
@@ -99,10 +102,10 @@ export default function UserManagementPage() {
         role: formData.role,
       });
       setIsCreateModalOpen(false);
+      showSuccess('用户创建成功');
       await loadUsers();
     } catch (error: unknown) {
-      console.error('Failed to create user:', error);
-      alert(getErrorMessage(error, '创建失败，请重试'));
+      showError(getErrorMessage(error, '创建失败，请重试'));
     } finally {
       setProcessing(false);
     }
@@ -120,26 +123,30 @@ export default function UserManagementPage() {
 
       await userManagementService.updateUser(selectedUser.id, updateData);
       setIsEditModalOpen(false);
+      showSuccess('用户更新成功');
       await loadUsers();
     } catch (error: unknown) {
-      console.error('Failed to update user:', error);
-      alert(getErrorMessage(error, '更新失败，请重试'));
+      showError(getErrorMessage(error, '更新失败，请重试'));
     } finally {
       setProcessing(false);
     }
   };
 
-  const handleDelete = async (user: User) => {
-    if (!confirm(`确定要删除用户 ${user.email} 吗？此操作不可恢复。`)) {
+  const handleDelete = async () => {
+    if (!deleteTarget) {
       return;
     }
 
     try {
-      await userManagementService.deleteUser(user.id);
+      setProcessing(true);
+      await userManagementService.deleteUser(deleteTarget.id);
+      setDeleteTarget(null);
+      showSuccess('用户删除成功');
       await loadUsers();
     } catch (error: unknown) {
-      console.error('Failed to delete user:', error);
-      alert(getErrorMessage(error, '删除失败，请重试'));
+      showError(getErrorMessage(error, '删除失败，请重试'));
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -150,8 +157,7 @@ export default function UserManagementPage() {
       const data = await userManagementService.getUserWorkload(user.id);
       setWorkloadDetail(data);
     } catch (error: unknown) {
-      console.error('Failed to load workload:', error);
-      alert(getErrorMessage(error, '工作负载获取失败'));
+      showError(getErrorMessage(error, '工作负载获取失败'));
       setWorkloadOpen(false);
     } finally {
       setWorkloadLoading(false);
@@ -168,18 +174,18 @@ export default function UserManagementPage() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-text mb-2">人员管理</h1>
           <p className="text-text-light">管理团队成员和权限</p>
         </div>
-        <Button onClick={openCreateModal}>+ 新建用户</Button>
+        <Button onClick={openCreateModal}>新建用户</Button>
       </div>
 
       {/* 筛选栏 */}
       <div className="bg-white rounded-lg shadow-sm border border-border p-4 mb-6">
-        <div className="flex flex-wrap gap-4">
-          <div className="w-48">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[12rem_minmax(0,2fr)]">
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-text mb-1">角色</label>
             <select
               value={selectedRole}
@@ -194,9 +200,9 @@ export default function UserManagementPage() {
               ))}
             </select>
           </div>
-          <div className="flex-[2] min-w-[300px]">
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-text mb-1">搜索</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 value={searchQuery}
@@ -212,7 +218,46 @@ export default function UserManagementPage() {
       </div>
 
       {/* 用户列表 */}
-      <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {users.length === 0 ? (
+          <div className="rounded-lg border border-border bg-white px-4 py-8 text-center text-text-light shadow-sm">
+            暂无用户
+          </div>
+        ) : (
+          users.map((user) => (
+            <div key={user.id} className="rounded-lg border border-border bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-medium text-text">{user.email}</div>
+                  <div className="text-xs text-text-light">ID: {user.id}</div>
+                </div>
+                <span
+                  className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${roleColors[user.role]}`}
+                >
+                  {roleLabels[user.role]}
+                </span>
+              </div>
+              <div className="mb-3 text-sm">
+                <div className="text-xs text-text-light">创建时间</div>
+                <div className="text-text">{new Date(user.created_at).toLocaleDateString()}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => openEditModal(user)}>
+                  编辑
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => openWorkload(user)}>
+                  负载
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => setDeleteTarget(user)}>
+                  删除
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-lg border border-border bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-secondary-50 border-b border-border">
@@ -262,7 +307,11 @@ export default function UserManagementPage() {
                         <Button variant="secondary" size="sm" onClick={() => openWorkload(user)}>
                           负载
                         </Button>
-                        <Button variant="danger" size="sm" onClick={() => handleDelete(user)}>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => setDeleteTarget(user)}
+                        >
                           删除
                         </Button>
                       </div>
@@ -332,6 +381,35 @@ export default function UserManagementPage() {
               disabled={processing || !formData.email || !formData.username || !formData.password}
             >
               {processing ? '创建中...' : '创建'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => {
+          if (!processing) {
+            setDeleteTarget(null);
+          }
+        }}
+        title="删除用户"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text">
+            确定要删除用户 {deleteTarget?.email} 吗？此操作不可恢复。
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteTarget(null)}
+              disabled={processing}
+            >
+              取消
+            </Button>
+            <Button variant="danger" onClick={handleDelete} isLoading={processing}>
+              确认删除
             </Button>
           </div>
         </div>

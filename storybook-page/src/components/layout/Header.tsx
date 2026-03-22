@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { getUserInitials } from '../../utils/formatters';
 import { searchService } from '../../services/searchService';
 import { getErrorMessage } from '../../utils/error';
 import type { SearchResponseData } from '../../types/api';
+import { SearchIcon } from '../ui/AppIcon';
 
 export default function Header() {
   const navigate = useNavigate();
@@ -15,7 +15,9 @@ export default function Header() {
   const [searchError, setSearchError] = useState('');
   const [searchData, setSearchData] = useState<SearchResponseData | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const searchRequestIDRef = useRef(0);
 
   const handleLogout = () => {
@@ -75,12 +77,14 @@ export default function Header() {
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
-      const container = searchContainerRef.current;
-      if (!container) {
-        return;
-      }
-      if (!container.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (searchContainerRef.current && !searchContainerRef.current.contains(target)) {
         setShowResult(false);
+      }
+
+      if (userMenuRef.current && !userMenuRef.current.contains(target)) {
+        setIsUserMenuOpen(false);
       }
     };
 
@@ -113,166 +117,191 @@ export default function Header() {
   const renderBugLink = (projectID: number, bugID: number) =>
     `/projects/${projectID}/bugs?bug=${bugID}`;
 
+  const roleLabel =
+    (user?.role === 'product' && '产品经理') ||
+    (user?.role === 'developer' && '开发人员') ||
+    (user?.role === 'tester' && '测试人员') ||
+    (user?.role === 'tech_lead' && '技术负责人') ||
+    (user?.role === 'admin' && '管理员') ||
+    '协作成员';
+
   return (
-    <header className="h-14 bg-white border-b border-border flex items-center justify-between px-4 sticky top-0 z-50 glass">
-      <div className="flex items-center gap-2">
-        {/* Logo */}
-        <Link to="/projects" className="flex items-center space-x-3">
-          <div className="w-7 h-7 bg-gradient-to-br from-primary to-accent rounded-md flex items-center justify-center">
-            <span className="text-white font-bold text-base">S</span>
-          </div>
-          <h1 className="font-display text-lg font-bold text-primary">Storybook</h1>
-        </Link>
-      </div>
-
-      <div ref={searchContainerRef} className="relative flex-1 max-w-lg mx-4">
-        <div className="relative">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => {
-              if (query.trim() && (searchData || searchError || searching)) {
-                setShowResult(true);
-              }
-            }}
-            onBlur={handleSearchBlur}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="搜索项目 / 故事 / 缺陷"
-            className="w-full pl-3 pr-8 py-1.5 border border-border rounded-lg text-sm"
-          />
-          <span
-            aria-hidden
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-text-light select-none"
-          >
-            {searching ? '⏳' : '🔍'}
-          </span>
-        </div>
-
-        {showResult && (
-          <div className="absolute top-full left-0 right-0 mt-2 max-h-96 overflow-auto bg-white border border-border rounded-lg shadow-lg p-3 z-50 space-y-3">
-            {searchError && <div className="text-sm text-danger">{searchError}</div>}
-            {!searchError && !searching && searchData && (
-              <>
-                <div>
-                  <div className="text-xs text-text-light mb-1">项目</div>
-                  {searchData.projects && searchData.projects.length > 0 ? (
-                    <div className="space-y-1">
-                      {searchData.projects.map((item) => (
-                        <button
-                          type="button"
-                          key={`project-${item.id}`}
-                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-primary-50"
-                          onClick={() => {
-                            setShowResult(false);
-                            navigate(`/projects/${item.id}`);
-                          }}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-text-light">无项目结果</div>
-                  )}
+    <header className="sticky top-0 z-50 px-3 pt-3 sm:px-4 lg:px-6">
+      <div className="mx-auto max-w-[1600px]">
+        <div className="surface-card rounded-[1.4rem] px-3 py-3 sm:px-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
+            <div className="flex items-center justify-between gap-3 lg:min-w-[330px]">
+              <Link to="/projects" className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary via-primary-700 to-accent text-white shadow-md">
+                  <span className="text-base font-bold">S</span>
                 </div>
-
-                <div>
-                  <div className="text-xs text-text-light mb-1">故事</div>
-                  {searchData.stories && searchData.stories.length > 0 ? (
-                    <div className="space-y-1">
-                      {searchData.stories.map((item) => (
-                        <button
-                          type="button"
-                          key={`story-${item.id}`}
-                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-primary-50"
-                          onClick={() => {
-                            setShowResult(false);
-                            navigate(`/stories/${item.id}`);
-                          }}
-                        >
-                          #{item.id} {item.title}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-text-light">无故事结果</div>
-                  )}
+                <div className="min-w-0">
+                  <h1 className="font-display text-lg font-bold text-primary">Storybook</h1>
+                  <p className="hidden text-xs text-text-light sm:block">敏捷协作工作台</p>
                 </div>
+              </Link>
 
-                <div>
-                  <div className="text-xs text-text-light mb-1">缺陷</div>
-                  {searchData.bugs && searchData.bugs.length > 0 ? (
-                    <div className="space-y-1">
-                      {searchData.bugs.map((item) => (
-                        <button
-                          type="button"
-                          key={`bug-${item.id}`}
-                          className="w-full text-left text-sm px-2 py-1 rounded hover:bg-primary-50"
-                          onClick={() => {
-                            setShowResult(false);
-                            navigate(renderBugLink(item.project_id, item.id));
-                          }}
-                        >
-                          #{item.id} {item.title}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-text-light">无缺陷结果</div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 右侧用户菜单 */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label="返回上一页"
-          onClick={handleGoBack}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-border text-xs text-text hover:bg-primary-50 transition-colors"
-        >
-          <span aria-hidden>←</span>
-          返回
-        </button>
-
-        {/* 用户信息 */}
-        <div className="flex items-center space-x-3">
-          <div className="text-right">
-            <div className="text-sm font-medium text-text">{user?.email}</div>
-            <div className="text-xs text-text-light">
-              {user?.role === 'product' && '产品经理'}
-              {user?.role === 'developer' && '开发人员'}
-              {user?.role === 'tester' && '测试人员'}
-              {user?.role === 'tech_lead' && '技术负责人'}
-              {user?.role === 'admin' && '管理员'}
-            </div>
-          </div>
-
-          {/* 头像 */}
-          <div className="relative group">
-            <div className="w-10 h-10 bg-primary-100 text-primary rounded-full flex items-center justify-center font-medium cursor-pointer hover:bg-primary-200 transition-colors">
-              {user?.email && getUserInitials(user.email)}
+              <button
+                type="button"
+                aria-label="返回上一页"
+                onClick={handleGoBack}
+                className="inline-flex items-center gap-1 rounded-full border border-border bg-white px-3 py-2 text-xs text-text transition-colors hover:border-primary-200 hover:bg-primary-50"
+              >
+                <span aria-hidden>←</span>
+                <span className="hidden sm:inline">返回</span>
+              </button>
             </div>
 
-            {/* 下拉菜单 */}
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
-              <div className="py-2">
-                <Link
-                  to="/dashboard"
-                  className="block px-4 py-2 text-sm text-text hover:bg-primary-50 transition-colors"
+            <div ref={searchContainerRef} className="relative order-3 w-full lg:order-none lg:flex-1">
+              <div className="relative">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onFocus={() => {
+                    if (query.trim() && (searchData || searchError || searching)) {
+                      setShowResult(true);
+                    }
+                  }}
+                  onBlur={handleSearchBlur}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="搜索项目 / 故事 / 缺陷"
+                  className="w-full rounded-2xl border border-border bg-white/90 py-3 pl-4 pr-10 text-sm text-text shadow-sm outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                />
+                <span
+                  aria-hidden
+                  className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center text-text-light"
                 >
-                  个人工作台
-                </Link>
+                  {searching ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-primary" />
+                  ) : (
+                    <SearchIcon size={16} />
+                  )}
+                </span>
+              </div>
+
+              {showResult && (
+                <div className="surface-card absolute left-0 right-0 top-full z-50 mt-2 max-h-96 overflow-auto rounded-2xl p-3 shadow-xl">
+                  {searchError && <div className="text-sm text-danger">{searchError}</div>}
+                  {!searchError && !searching && searchData && (
+                    <div className="space-y-3">
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-text-light">项目</div>
+                        {searchData.projects && searchData.projects.length > 0 ? (
+                          <div className="space-y-1">
+                            {searchData.projects.map((item) => (
+                              <button
+                                type="button"
+                                key={`project-${item.id}`}
+                                className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-primary-50"
+                                onClick={() => {
+                                  setShowResult(false);
+                                  navigate(`/projects/${item.id}`);
+                                }}
+                              >
+                                {item.name}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-text-light">无项目结果</div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-text-light">故事</div>
+                        {searchData.stories && searchData.stories.length > 0 ? (
+                          <div className="space-y-1">
+                            {searchData.stories.map((item) => (
+                              <button
+                                type="button"
+                                key={`story-${item.id}`}
+                                className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-primary-50"
+                                onClick={() => {
+                                  setShowResult(false);
+                                  navigate(`/stories/${item.id}`);
+                                }}
+                              >
+                                #{item.id} {item.title}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-text-light">无故事结果</div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="mb-1 text-xs font-medium text-text-light">缺陷</div>
+                        {searchData.bugs && searchData.bugs.length > 0 ? (
+                          <div className="space-y-1">
+                            {searchData.bugs.map((item) => (
+                              <button
+                                type="button"
+                                key={`bug-${item.id}`}
+                                className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-primary-50"
+                                onClick={() => {
+                                  setShowResult(false);
+                                  navigate(renderBugLink(item.project_id, item.id));
+                                }}
+                              >
+                                #{item.id} {item.title}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-text-light">无缺陷结果</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 sm:gap-3">
+              <div ref={userMenuRef} className="relative">
                 <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-danger hover:bg-danger-light transition-colors"
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={isUserMenuOpen}
+                  onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                  className="flex items-center gap-2 rounded-2xl border border-border bg-white/90 px-2 py-1.5 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 sm:px-2.5"
                 >
-                  退出登录
+                  <div className="hidden text-right lg:block">
+                    <div className="max-w-[180px] truncate text-sm font-medium text-text">
+                      {user?.email}
+                    </div>
+                    <div className="text-xs text-text-light">{roleLabel}</div>
+                  </div>
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary">
+                    {user?.email ? getUserInitials(user.email) : '?'}
+                  </div>
                 </button>
+
+                {isUserMenuOpen && (
+                  <div className="surface-card absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl shadow-xl">
+                    <div className="border-b border-border px-4 py-3 lg:hidden">
+                      <div className="truncate text-sm font-medium text-text">{user?.email}</div>
+                      <div className="mt-1 text-xs text-text-light">{roleLabel}</div>
+                    </div>
+                    <div className="py-2">
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="block px-4 py-2 text-sm text-text transition-colors hover:bg-primary-50"
+                      >
+                        个人工作台
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2 text-left text-sm text-danger transition-colors hover:bg-danger-light"
+                      >
+                        退出登录
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

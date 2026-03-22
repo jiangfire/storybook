@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
+import { XIcon } from './AppIcon';
 
 interface ModalProps {
   isOpen: boolean;
@@ -73,9 +74,10 @@ export default function Modal({
             {showCloseButton && (
               <button
                 onClick={onClose}
+                aria-label="关闭弹窗"
                 className="p-2 rounded-lg hover:bg-primary-50 transition-colors"
               >
-                ✕
+                <XIcon size={16} />
               </button>
             )}
           </div>

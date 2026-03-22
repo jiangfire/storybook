@@ -1,6 +1,13 @@
 import type { Activity } from '../../types/models';
 import { formatRelativeTime, getUserInitials } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
+import {
+  ClipboardIcon,
+  InboxIcon,
+  SparklesIcon,
+  UsersIcon,
+  WrenchIcon,
+} from '../ui/AppIcon';
 
 interface ActivityTimelineProps {
   activities: Activity[];
@@ -8,20 +15,25 @@ interface ActivityTimelineProps {
 
 const actionConfig: Record<
   string,
-  { label: string; icon: string; bgColor: string; iconColor: string }
+  {
+    label: string;
+    icon: typeof SparklesIcon;
+    bgColor: string;
+    iconColor: string;
+  }
 > = {
-  created: { label: '创建了', icon: '➕', bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
-  updated: { label: '更新了', icon: '✏️', bgColor: 'bg-yellow-50', iconColor: 'text-yellow-600' },
+  created: { label: '创建了', icon: SparklesIcon, bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
+  updated: { label: '更新了', icon: WrenchIcon, bgColor: 'bg-yellow-50', iconColor: 'text-yellow-600' },
   status_changed: {
     label: '状态变更为',
-    icon: '🔄',
+    icon: ClipboardIcon,
     bgColor: 'bg-purple-50',
     iconColor: 'text-purple-600',
   },
-  assigned: { label: '分配给', icon: '👤', bgColor: 'bg-green-50', iconColor: 'text-green-600' },
+  assigned: { label: '分配给', icon: UsersIcon, bgColor: 'bg-green-50', iconColor: 'text-green-600' },
   commented: {
     label: '评论了',
-    icon: '💬',
+    icon: ClipboardIcon,
     bgColor: 'bg-secondary-50',
     iconColor: 'text-text-light',
   },
@@ -31,7 +43,9 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
   if (activities.length === 0) {
     return (
       <div className="text-center py-8 text-text-light">
-        <div className="text-4xl mb-2">📭</div>
+        <div className="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-secondary-50">
+          <InboxIcon size={20} />
+        </div>
         <p>暂无活动记录</p>
       </div>
     );
@@ -41,6 +55,7 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
     <div className="space-y-4">
       {activities.map((activity, index) => {
         const config = actionConfig[activity.action] || actionConfig.updated;
+        const Icon = config.icon;
 
         return (
           <div key={activity.id} className="flex space-x-3">
@@ -53,7 +68,7 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
                   config.bgColor
                 )}
               >
-                <span className={config.iconColor}>{config.icon}</span>
+                <Icon size={14} className={config.iconColor} />
               </div>
               {/* 连接线 */}
               {index < activities.length - 1 && (

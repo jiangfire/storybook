@@ -3,12 +3,13 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import type { StoryBoardItem } from '../../types/models';
 import StoryCard from './StoryCard';
 import { cn } from '../../utils/cn';
+import { InboxIcon } from '../ui/AppIcon';
 
 interface BoardColumnProps {
   id: string;
   stories: StoryBoardItem[];
   title: string;
-  icon: string;
+  icon: typeof InboxIcon;
   count: number;
 }
 
@@ -28,7 +29,7 @@ const iconColors: Record<string, string> = {
   done: 'bg-success text-text-white',
 };
 
-export default function BoardColumn({ id, stories, title, icon, count }: BoardColumnProps) {
+export default function BoardColumn({ id, stories, title, icon: Icon, count }: BoardColumnProps) {
   const { setNodeRef } = useDroppable({
     id,
   });
@@ -50,7 +51,7 @@ export default function BoardColumn({ id, stories, title, icon, count }: BoardCo
               iconColors[id] || 'bg-secondary-200 text-text-light'
             )}
           >
-            <span className="text-lg">{icon}</span>
+            <Icon size={18} />
           </div>
           <h3 className="font-semibold text-text">{title}</h3>
         </div>
@@ -64,13 +65,14 @@ export default function BoardColumn({ id, stories, title, icon, count }: BoardCo
         <div className="space-y-3 min-h-[200px]">
           {stories.length === 0 ? (
             <div className="text-center py-8">
-              <div className="text-4xl mb-2">📭</div>
+              <div className="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-text-light">
+                <InboxIcon size={22} />
+              </div>
               <p className="text-text-light text-sm mb-3">暂无故事</p>
               {id === 'backlog' && (
                 <div className="text-xs text-text-light">
-                  <p>点击右上角</p>
-                  <p className="font-medium text-primary">"+ 创建故事"</p>
-                  <p>开始创建你的第一个用户故事</p>
+                  <p>点击“创建故事”</p>
+                  <p>开始添加第一条用户故事</p>
                 </div>
               )}
             </div>

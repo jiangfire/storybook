@@ -18,6 +18,19 @@ import type {
   VelocityReportData,
 } from '../../types/api';
 import type { User } from '../../types/models';
+import {
+  ArchiveIcon,
+  BoardIcon,
+  CheckCircleIcon,
+  ClipboardIcon,
+  CodeIcon,
+  CompassIcon,
+  CrownIcon,
+  InboxIcon,
+  SearchIcon,
+  SprintIcon,
+  WrenchIcon,
+} from '../../components/ui/AppIcon';
 
 interface MemberItem {
   id: number;
@@ -32,21 +45,91 @@ interface MemberItem {
   };
 }
 
+type ConfirmActionState =
+  | {
+      kind: 'remove_member';
+      title: string;
+      message: string;
+      userID: number;
+    }
+  | {
+      kind: 'remove_tech_lead';
+      title: string;
+      message: string;
+      userID: number;
+    };
+
+const memberRoleMeta: Record<
+  string,
+  { icon: typeof ClipboardIcon; label: string; colorClass: string; bgClass: string }
+> = {
+  product: {
+    icon: ClipboardIcon,
+    label: '产品经理',
+    colorClass: 'text-blue-700',
+    bgClass: 'bg-blue-50',
+  },
+  developer: {
+    icon: CodeIcon,
+    label: '开发',
+    colorClass: 'text-emerald-700',
+    bgClass: 'bg-emerald-50',
+  },
+  tester: {
+    icon: SearchIcon,
+    label: '测试',
+    colorClass: 'text-violet-700',
+    bgClass: 'bg-violet-50',
+  },
+  tech_lead: {
+    icon: CompassIcon,
+    label: '技术负责人',
+    colorClass: 'text-amber-700',
+    bgClass: 'bg-amber-50',
+  },
+};
+
+function getMemberRoleMeta(role: string) {
+  return (
+    memberRoleMeta[role] || {
+      icon: SearchIcon,
+      label: role,
+      colorClass: 'text-text',
+      bgClass: 'bg-secondary-50',
+    }
+  );
+}
+
 // 缺陷状态分布组件
 function BugStatusDistribution({ data, total }: { data: Record<string, number>; total: number }) {
   const statusConfig: Record<
     string,
-    { label: string; icon: string; color: string; bgColor: string }
+    {
+      label: string;
+      icon: typeof InboxIcon;
+      color: string;
+      bgColor: string;
+    }
   > = {
-    open: { label: '待处理', icon: '📥', color: 'text-info', bgColor: 'bg-info-light' },
+    open: { label: '待处理', icon: InboxIcon, color: 'text-info', bgColor: 'bg-info-light' },
     in_progress: {
       label: '处理中',
-      icon: '🔧',
+      icon: WrenchIcon,
       color: 'text-warning',
       bgColor: 'bg-warning-light',
     },
-    resolved: { label: '已解决', icon: '✅', color: 'text-success', bgColor: 'bg-success-light' },
-    closed: { label: '已关闭', icon: '📪', color: 'text-text-light', bgColor: 'bg-secondary-100' },
+    resolved: {
+      label: '已解决',
+      icon: CheckCircleIcon,
+      color: 'text-success',
+      bgColor: 'bg-success-light',
+    },
+    closed: {
+      label: '已关闭',
+      icon: ArchiveIcon,
+      color: 'text-text-light',
+      bgColor: 'bg-secondary-100',
+    },
   };
 
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
@@ -62,12 +145,14 @@ function BugStatusDistribution({ data, total }: { data: Record<string, number>; 
         {entries.map(([key, value]) => {
           const config = statusConfig[key] || {
             label: key,
-            icon: '📋',
+            icon: ClipboardIcon,
             color: 'text-text',
             bgColor: 'bg-secondary-100',
           };
           const percentage = total > 0 ? (value / total) * 100 : 0;
           const barWidth = maxValue > 0 ? (value / maxValue) * 100 : 0;
+
+          const StatusIcon = config.icon;
 
           return (
             <div key={key} className="group">
@@ -76,7 +161,7 @@ function BugStatusDistribution({ data, total }: { data: Record<string, number>; 
                   <span
                     className={`w-6 h-6 rounded-md ${config.bgColor} flex items-center justify-center text-sm`}
                   >
-                    {config.icon}
+                    <StatusIcon size={14} />
                   </span>
                   <span className="text-sm text-text">{config.label}</span>
                 </div>
@@ -107,35 +192,35 @@ function BugStatusDistribution({ data, total }: { data: Record<string, number>; 
 function BugSeverityDistribution({ data, total }: { data: Record<string, number>; total: number }) {
   const severityConfig: Record<
     string,
-    { label: string; icon: string; color: string; bgColor: string; borderColor: string }
+    { label: string; color: string; bgColor: string; borderColor: string; dotColor: string }
   > = {
     critical: {
       label: '严重',
-      icon: '🔴',
       color: 'text-danger',
       bgColor: 'bg-danger-light',
       borderColor: 'border-danger',
+      dotColor: 'bg-danger',
     },
     high: {
       label: '高',
-      icon: '🟠',
       color: 'text-warning',
       bgColor: 'bg-warning-light',
       borderColor: 'border-warning',
+      dotColor: 'bg-warning',
     },
     medium: {
       label: '中',
-      icon: '🟡',
       color: 'text-info',
       bgColor: 'bg-info-light',
       borderColor: 'border-info',
+      dotColor: 'bg-info',
     },
     low: {
       label: '低',
-      icon: '🟢',
       color: 'text-success',
       bgColor: 'bg-success-light',
       borderColor: 'border-success',
+      dotColor: 'bg-success',
     },
   };
 
@@ -151,10 +236,10 @@ function BugSeverityDistribution({ data, total }: { data: Record<string, number>
         {entries.map(([key, value]) => {
           const config = severityConfig[key] || {
             label: key,
-            icon: '⚪',
             color: 'text-text',
             bgColor: 'bg-secondary-100',
             borderColor: 'border-border',
+            dotColor: 'bg-secondary-400',
           };
           const percentage = total > 0 ? (value / total) * 100 : 0;
 
@@ -164,12 +249,14 @@ function BugSeverityDistribution({ data, total }: { data: Record<string, number>
               className={`relative p-3 rounded-lg border-2 ${config.borderColor} ${config.bgColor} transition-all hover:shadow-md`}
             >
               <div className="flex items-start justify-between">
-                <span className="text-lg">{config.icon}</span>
+                <span className="inline-flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${config.dotColor}`} />
+                  <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+                </span>
                 <span className={`text-2xl font-bold ${config.color}`}>{value}</span>
               </div>
-              <div className="mt-2 text-sm text-text font-medium">{config.label}</div>
               {total > 0 && (
-                <div className="mt-1 text-xs text-text-light">{percentage.toFixed(1)}%</div>
+                <div className="mt-2 text-xs text-text-light">{percentage.toFixed(1)}%</div>
               )}
             </div>
           );
@@ -212,6 +299,7 @@ export default function ProjectDetailPage() {
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
   const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
   const [statusUpdatingSprintID, setStatusUpdatingSprintID] = useState<number | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmActionState | null>(null);
   const [sprintForm, setSprintForm] = useState<CreateSprintRequest>({
     name: '',
     goal: '',
@@ -345,24 +433,17 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleRemoveMember = async (member: MemberItem) => {
+  const handleRemoveMember = (member: MemberItem) => {
     if (member.is_owner) {
       showError('项目 Owner 不能移除');
       return;
     }
-    if (!confirm(`确认移除成员 ${member.user?.email || member.user_id} 吗？`)) {
-      return;
-    }
-    try {
-      setIsMemberUpdating(true);
-      await projectService.removeProjectMember(projectID, member.user_id);
-      showSuccess('成员移除成功');
-      await loadMembers(projectID);
-    } catch (error: unknown) {
-      showError(getErrorMessage(error, '成员移除失败'));
-    } finally {
-      setIsMemberUpdating(false);
-    }
+    setConfirmAction({
+      kind: 'remove_member',
+      title: '移除项目成员',
+      message: `确认移除成员 ${member.user?.email || member.user_id} 吗？`,
+      userID: member.user_id,
+    });
   };
 
   const handleAddTechLead = async () => {
@@ -384,18 +465,42 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const handleRemoveTechLead = async (userID: number) => {
-    if (!confirm('确认移除该技术负责人吗？')) {
+  const handleRemoveTechLead = (userID: number, email?: string) => {
+    setConfirmAction({
+      kind: 'remove_tech_lead',
+      title: '移除技术负责人',
+      message: `确认移除技术负责人 ${email || '该成员'} 吗？`,
+      userID,
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) {
       return;
     }
+
     try {
-      setIsTechLeadUpdating(true);
-      await techLeadService.removeTechLead(projectID, userID);
-      showSuccess('技术负责人移除成功');
-      await loadProjectTechLeads(projectID);
+      if (confirmAction.kind === 'remove_member') {
+        setIsMemberUpdating(true);
+        await projectService.removeProjectMember(projectID, confirmAction.userID);
+        showSuccess('成员移除成功');
+        await loadMembers(projectID);
+      } else {
+        setIsTechLeadUpdating(true);
+        await techLeadService.removeTechLead(projectID, confirmAction.userID);
+        showSuccess('技术负责人移除成功');
+        await loadProjectTechLeads(projectID);
+      }
+      setConfirmAction(null);
     } catch (error: unknown) {
-      showError(getErrorMessage(error, '技术负责人移除失败'));
+      showError(
+        getErrorMessage(
+          error,
+          confirmAction.kind === 'remove_member' ? '成员移除失败' : '技术负责人移除失败'
+        )
+      );
     } finally {
+      setIsMemberUpdating(false);
       setIsTechLeadUpdating(false);
     }
   };
@@ -510,6 +615,7 @@ export default function ProjectDetailPage() {
   const activeMembers = projectOverview?.statistics?.active_members || members.length || 0;
   const canManageMembers = user?.role === 'product' || user?.role === 'admin';
   const canManageTechLeads = user?.role === 'admin';
+  const canCreateStory = user?.role === 'product' || user?.role === 'admin';
   const availableMemberUsers = allUsers.filter(
     (candidate) => !members.some((member) => member.user_id === candidate.id)
   );
@@ -520,16 +626,26 @@ export default function ProjectDetailPage() {
   );
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-text mb-2">{project?.name || '项目详情'}</h1>
-          <p className="text-text-light">{project?.description || '暂无项目描述'}</p>
+          <h1 className="mb-2 text-2xl font-bold text-text sm:text-3xl">
+            {project?.name || '项目详情'}
+          </h1>
+          <p className="text-sm text-text-light sm:text-base">
+            {project?.description || '暂无项目描述'}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link to={`/projects/${projectID}/stories/new`}>
-            <Button variant="secondary">+ 创建故事</Button>
-          </Link>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap xl:justify-end">
+          {canCreateStory ? (
+            <Link to={`/projects/${projectID}/stories/new`}>
+              <Button variant="secondary">创建故事</Button>
+            </Link>
+          ) : (
+            <span className="inline-flex items-center rounded-lg bg-secondary-50 px-3 py-2 text-xs text-text-light">
+              仅产品经理和管理员可创建故事
+            </span>
+          )}
           <Link to={`/projects/${projectID}/bugs`}>
             <Button variant="secondary">缺陷管理</Button>
           </Link>
@@ -539,7 +655,7 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <div className="bg-white rounded-xl border border-border p-4">
           <div className="text-sm text-text-light">总故事数</div>
           <div className="text-2xl font-bold text-text mt-1">{totalStories}</div>
@@ -555,13 +671,16 @@ export default function ProjectDetailPage() {
         <div className="bg-white rounded-xl border border-border p-4">
           <div className="text-sm text-text-light">敏捷模式</div>
           <div className="text-2xl font-bold text-primary mt-1">
-            {project?.agile_mode === 'scrum' ? 'Scrum' : 'Kanban'}
+            <span className="inline-flex items-center gap-2">
+              {project?.agile_mode === 'scrum' ? <SprintIcon size={20} /> : <BoardIcon size={20} />}
+              {project?.agile_mode === 'scrum' ? 'Scrum' : 'Kanban'}
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-text">冲刺管理</h2>
           <Button size="sm" onClick={() => setIsCreateSprintOpen(true)}>
             + 新建冲刺
@@ -578,7 +697,7 @@ export default function ProjectDetailPage() {
               return (
                 <div
                   key={sprint.id}
-                  className="border border-border rounded-lg px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                  className="flex flex-col gap-3 rounded-lg border border-border px-4 py-3 md:flex-row md:items-center md:justify-between"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -595,7 +714,7 @@ export default function ProjectDetailPage() {
                       {sprint.total_stories} 故事完成
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Button
                       size="sm"
                       variant="secondary"
@@ -618,10 +737,10 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-6">
-        <div className="flex items-center justify-between gap-4 mb-4">
+      <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <h2 className="text-lg font-semibold text-text">燃尽图</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <span className="text-sm text-text-light">冲刺</span>
             <select
               value={selectedSprintID || ''}
@@ -664,9 +783,9 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-border p-6">
-          <div className="flex items-center justify-between mb-4">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold text-text">速度报表</h2>
             <Button size="sm" variant="secondary" onClick={() => loadReports(projectID)}>
               刷新
@@ -694,7 +813,7 @@ export default function ProjectDetailPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-border p-6">
+        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-text mb-4">质量报表</h2>
           {isReportLoading && <div className="text-sm text-text-light">报表加载中...</div>}
           {!isReportLoading && reportError && (
@@ -731,8 +850,8 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl border border-border p-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-text mb-4">状态分布</h2>
           <div className="space-y-3">
             {Object.entries(statusBreakdown).map(([status, count]) => (
@@ -744,10 +863,30 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-border p-6">
-          <h2 className="text-lg font-semibold text-text mb-4">项目成员</h2>
+        <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
+          <div className="mb-4 flex flex-col gap-2">
+            <h2 className="text-lg font-semibold text-text">项目成员</h2>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-text-light">
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-blue-700">
+                <ClipboardIcon size={12} />
+                产品
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
+                <CodeIcon size={12} />
+                开发
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-1 text-violet-700">
+                <SearchIcon size={12} />
+                测试
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                <CrownIcon size={12} />
+                Owner
+              </span>
+            </div>
+          </div>
           {canManageMembers && (
-            <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-3">
               <select
                 value={selectedMemberUserID}
                 onChange={(e) => setSelectedMemberUserID(e.target.value)}
@@ -782,46 +921,69 @@ export default function ProjectDetailPage() {
             <div className="text-text-light text-sm">暂无成员</div>
           ) : (
             <div className="space-y-3">
-              {members.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between border border-border rounded-lg px-3 py-2 gap-2"
-                >
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-text truncate">
-                      {member.user?.email || `用户 #${member.user_id}`}
+              {members.map((member) => {
+                const roleMeta = getMemberRoleMeta(member.role_in_project);
+                const RoleIcon = roleMeta.icon;
+                return (
+                  <div
+                    key={member.id}
+                    className="flex flex-col gap-3 rounded-lg border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary">
+                          {(member.user?.email || `#${member.user_id}`).charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium text-text">
+                            {member.user?.email || `用户 #${member.user_id}`}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-text-light">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-1 ${roleMeta.bgClass} ${roleMeta.colorClass}`}
+                              title={roleMeta.label}
+                              aria-label={roleMeta.label}
+                            >
+                              <RoleIcon size={12} />
+                            </span>
+                            {member.is_owner && (
+                              <span
+                                className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-amber-700"
+                                title="项目 Owner"
+                                aria-label="项目 Owner"
+                              >
+                                <CrownIcon size={12} />
+                              </span>
+                            )}
+                            <span>{new Date(member.joined_at).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-text-light">
-                      {member.role_in_project}
-                      {member.is_owner ? ' · Owner' : ''}
+                    <div className="flex items-center justify-end gap-2">
+                      {canManageMembers && !member.is_owner && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleRemoveMember(member)}
+                          isLoading={isMemberUpdating}
+                        >
+                          移除
+                        </Button>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-xs text-text-light">
-                      {new Date(member.joined_at).toLocaleDateString()}
-                    </div>
-                    {canManageMembers && !member.is_owner && (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => handleRemoveMember(member)}
-                        isLoading={isMemberUpdating}
-                      >
-                        移除
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-border p-6">
+      <div className="bg-white rounded-xl border border-border p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-text mb-4">项目技术负责人</h2>
         {canManageTechLeads && (
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+          <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-2">
             <select
               value={selectedTechLeadUserID}
               onChange={(e) => setSelectedTechLeadUserID(e.target.value)}
@@ -846,14 +1008,19 @@ export default function ProjectDetailPage() {
             {techLeads.map((item) => (
               <div
                 key={item.id}
-                className="border border-border rounded-lg px-3 py-2 flex items-center justify-between gap-2"
+                className="flex flex-col gap-3 rounded-lg border border-border px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="text-sm text-text">{item.user?.email || '未知用户'}</div>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-amber-700">
+                    <CompassIcon size={12} />
+                  </div>
+                  <div className="text-sm text-text">{item.user?.email || '未知用户'}</div>
+                </div>
                 {canManageTechLeads && item.user && (
                   <Button
                     size="sm"
                     variant="danger"
-                    onClick={() => handleRemoveTechLead(item.user!.id)}
+                    onClick={() => handleRemoveTechLead(item.user!.id, item.user?.email)}
                     isLoading={isTechLeadUpdating}
                   >
                     移除
@@ -864,6 +1031,37 @@ export default function ProjectDetailPage() {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={Boolean(confirmAction)}
+        onClose={() => {
+          if (!isMemberUpdating && !isTechLeadUpdating) {
+            setConfirmAction(null);
+          }
+        }}
+        title={confirmAction?.title}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text">{confirmAction?.message}</p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setConfirmAction(null)}
+              disabled={isMemberUpdating || isTechLeadUpdating}
+            >
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleConfirmAction}
+              isLoading={isMemberUpdating || isTechLeadUpdating}
+            >
+              确认移除
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={isCreateSprintOpen}

@@ -16,13 +16,20 @@ import BoardColumn from './BoardColumn';
 import type { StoryBoardItem } from '../../types/models';
 import type { StoryStatusChangedMessage } from '../../types/api';
 import { useToast } from '../ui/Toast';
+import {
+  CheckCircleIcon,
+  ClipboardIcon,
+  InboxIcon,
+  SearchIcon,
+  WrenchIcon,
+} from '../ui/AppIcon';
 
 const COLUMNS = [
-  { id: 'backlog', title: '待办', icon: '📋' },
-  { id: 'ready', title: '就绪', icon: '✅' },
-  { id: 'in_progress', title: '开发中', icon: '🔨' },
-  { id: 'test', title: '测试中', icon: '🔍' },
-  { id: 'done', title: '已完成', icon: '✨' },
+  { id: 'backlog', title: '待办', icon: InboxIcon },
+  { id: 'ready', title: '就绪', icon: ClipboardIcon },
+  { id: 'in_progress', title: '开发中', icon: WrenchIcon },
+  { id: 'test', title: '测试中', icon: SearchIcon },
+  { id: 'done', title: '已完成', icon: CheckCircleIcon },
 ];
 
 interface KanbanBoardProps {
@@ -210,7 +217,7 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
   }
 
   return (
-    <div className="h-full">
+    <div className="relative h-full">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -246,14 +253,14 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
 
       {/* 加载指示器 */}
       {isUpdating && (
-        <div className="fixed top-4 right-4 bg-primary text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2">
+        <div className="pointer-events-none absolute right-3 top-3 z-10 flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-white shadow-lg sm:right-4 sm:top-4">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
           <span className="text-sm">更新中...</span>
         </div>
       )}
 
       {!wsConnected && (
-        <div className="fixed bottom-4 right-4 bg-warning-light text-text px-3 py-2 rounded-lg text-xs border border-warning">
+        <div className="pointer-events-none absolute bottom-3 right-3 z-10 max-w-[calc(100%-1.5rem)] rounded-lg border border-warning bg-warning-light px-3 py-2 text-xs text-text shadow-sm sm:bottom-4 sm:right-4 sm:max-w-xs">
           实时连接已断开
         </div>
       )}

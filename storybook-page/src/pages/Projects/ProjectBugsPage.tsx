@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import { bugService } from '../../services/bugService';
@@ -7,6 +7,17 @@ import { projectService } from '../../services/projectService';
 import { storyService } from '../../services/storyService';
 import { getErrorMessage } from '../../utils/error';
 import { useToast } from '../../components/ui/Toast';
+import { formatBugSeverity, formatBugStatus, formatDate } from '../../utils/formatters';
+import {
+  ArchiveIcon,
+  BugIcon,
+  CheckCircleIcon,
+  ClipboardIcon,
+  InboxIcon,
+  StoryIcon,
+  UsersIcon,
+  WrenchIcon,
+} from '../../components/ui/AppIcon';
 import type { BugItem } from '../../types/api';
 
 interface ProjectMemberOption {
@@ -23,6 +34,53 @@ interface StoryOption {
   id: number;
   title: string;
 }
+
+const BUG_STATUS_OPTIONS: Array<{ value: BugItem['status']; label: string }> = [
+  { value: 'open', label: '待处理' },
+  { value: 'in_progress', label: '处理中' },
+  { value: 'resolved', label: '已解决' },
+  { value: 'closed', label: '已关闭' },
+];
+
+const BUG_SEVERITY_OPTIONS: Array<{ value: BugItem['severity']; label: string }> = [
+  { value: 'low', label: '低' },
+  { value: 'medium', label: '中' },
+  { value: 'high', label: '高' },
+  { value: 'critical', label: '严重' },
+];
+
+const bugStatusMeta: Record<
+  BugItem['status'],
+  { badgeClass: string; icon: typeof InboxIcon; cardClass: string }
+> = {
+  open: {
+    badgeClass: 'bg-info-light text-info',
+    icon: InboxIcon,
+    cardClass: 'border-info/30 bg-info-light/30',
+  },
+  in_progress: {
+    badgeClass: 'bg-warning-light text-warning',
+    icon: WrenchIcon,
+    cardClass: 'border-warning/30 bg-warning-light/30',
+  },
+  resolved: {
+    badgeClass: 'bg-success-light text-success',
+    icon: CheckCircleIcon,
+    cardClass: 'border-success/30 bg-success-light/30',
+  },
+  closed: {
+    badgeClass: 'bg-secondary-100 text-text-light',
+    icon: ArchiveIcon,
+    cardClass: 'border-border bg-secondary-50',
+  },
+};
+
+const bugSeverityMeta: Record<BugItem['severity'], { badgeClass: string }> = {
+  low: { badgeClass: 'bg-success-light text-success' },
+  medium: { badgeClass: 'bg-info-light text-info' },
+  high: { badgeClass: 'bg-warning-light text-warning' },
+  critical: { badgeClass: 'bg-danger-light text-danger' },
+};
 
 export default function ProjectBugsPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,6 +123,25 @@ export default function ProjectBugsPage() {
         })),
     [members]
   );
+
+  const storyTitleMap = useMemo(
+    () => new Map(stories.map((story) => [story.id, story.title])),
+    [stories]
+  );
+
+  const bugSummary = useMemo(
+    () => ({
+      total: bugs.length,
+      open: bugs.filter((bug) => bug.status === 'open').length,
+      progressing: bugs.filter((bug) => bug.status === 'in_progress').length,
+      critical: bugs.filter((bug) => bug.severity === 'critical').length,
+      unassigned: bugs.filter((bug) => !bug.assigned_to).length,
+    }),
+    [bugs]
+  );
+
+  const activeFilterCount = [filters.status, filters.severity, filters.assignee].filter(Boolean)
+    .length;
 
   const loadBaseData = useCallback(async () => {
     if (Number.isNaN(projectID) || projectID <= 0) {
@@ -236,176 +313,391 @@ export default function ProjectBugsPage() {
     return bug.assigned_to.email;
   };
 
+  const getStatusMeta = (status: BugItem['status']) => bugStatusMeta[status];
+  const getSeverityMeta = (severity: BugItem['severity']) => bugSeverityMeta[severity];
+
+  const handleResetFilters = () => {
+    setFilters({
+      status: '',
+      severity: '',
+      assignee: '',
+    });
+  };
+
   if (Number.isNaN(projectID) || projectID <= 0) {
     return <div className="p-8 text-danger">项目ID无效</div>;
   }
 
   return (
-    <div className="p-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-text mb-2">缺陷管理</h1>
-        <p className="text-text-light">项目 #{projectID} 的缺陷跟踪与流转</p>
-      </div>
+    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <section className="surface-card overflow-hidden rounded-[2rem]">
+        <div className="grid gap-5 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] lg:px-8 lg:py-8">
+          <div className="space-y-4">
+            <span className="inline-flex items-center gap-2 rounded-full bg-danger-light px-3 py-1 text-xs font-medium text-danger">
+              <BugIcon size={14} />
+              缺陷管理
+            </span>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-text-light">
+                <Link to={`/projects/${projectID}`} className="transition-colors hover:text-primary">
+                  项目详情
+                </Link>
+                <span>›</span>
+                <span className="text-text">缺陷管理</span>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
+                  缺陷管理
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-text-light sm:text-base">
+                  记录问题、快速分配责任，并把待处理项压缩到最少。先筛出高风险，再推进关闭。
+                </p>
+              </div>
+            </div>
+          </div>
 
-      <div className="bg-white rounded-xl border border-border p-4 space-y-3">
-        <h2 className="font-medium text-text">新建缺陷</h2>
-        <input
-          value={form.title}
-          onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="缺陷标题"
-          className="w-full px-3 py-2 border border-border rounded-lg"
-        />
-        <textarea
-          value={form.description}
-          onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-          placeholder="缺陷描述（可选）"
-          rows={3}
-          className="w-full px-3 py-2 border border-border rounded-lg resize-none"
-        />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <select
-            value={form.severity}
-            onChange={(e) => setForm((prev) => ({ ...prev, severity: e.target.value }))}
-            className="px-3 py-2 border border-border rounded-lg"
-          >
-            <option value="low">低</option>
-            <option value="medium">中</option>
-            <option value="high">高</option>
-            <option value="critical">严重</option>
-          </select>
-          <select
-            value={form.story_id}
-            onChange={(e) => setForm((prev) => ({ ...prev, story_id: e.target.value }))}
-            className="px-3 py-2 border border-border rounded-lg"
-          >
-            <option value="">关联故事（可选）</option>
-            {stories.map((story) => (
-              <option key={story.id} value={story.id}>
-                #{story.id} {story.title}
-              </option>
-            ))}
-          </select>
-          <select
-            value={form.assigned_to}
-            onChange={(e) => setForm((prev) => ({ ...prev, assigned_to: e.target.value }))}
-            className="px-3 py-2 border border-border rounded-lg"
-          >
-            <option value="">初始指派（可选）</option>
-            {assigneeOptions.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.email}（{member.role_in_project}）
-              </option>
-            ))}
-          </select>
+          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-lg">
+            <div className="text-xs uppercase tracking-[0.22em] text-white/70">Filter Focus</div>
+            <div className="mt-3 text-2xl font-semibold">{activeFilterCount} 个筛选条件生效</div>
+            <p className="mt-2 text-sm leading-6 text-white/80">
+              {activeFilterCount > 0
+                ? '当前列表已聚焦到重点问题，可以继续刷新或清空筛选。'
+                : '还没有启用筛选，建议优先关注待处理、高严重级别和未指派问题。'}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-white/15 px-3 py-1">待处理 {bugSummary.open}</span>
+              <span className="rounded-full bg-white/15 px-3 py-1">严重 {bugSummary.critical}</span>
+              <span className="rounded-full bg-white/15 px-3 py-1">
+                未指派 {bugSummary.unassigned}
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex justify-end">
-          <Button size="sm" onClick={handleCreate} isLoading={creating}>
-            创建缺陷
-          </Button>
-        </div>
-      </div>
+      </section>
 
-      <div className="bg-white rounded-xl border border-border p-4 space-y-3">
-        <h2 className="font-medium text-text">筛选</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-          <select
-            value={filters.status}
-            onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
-            className="px-3 py-2 border border-border rounded-lg"
-          >
-            <option value="">全部状态</option>
-            <option value="open">open</option>
-            <option value="in_progress">in_progress</option>
-            <option value="resolved">resolved</option>
-            <option value="closed">closed</option>
-          </select>
-          <select
-            value={filters.severity}
-            onChange={(e) => setFilters((prev) => ({ ...prev, severity: e.target.value }))}
-            className="px-3 py-2 border border-border rounded-lg"
-          >
-            <option value="">全部严重级别</option>
-            <option value="low">low</option>
-            <option value="medium">medium</option>
-            <option value="high">high</option>
-            <option value="critical">critical</option>
-          </select>
-          <select
-            value={filters.assignee}
-            onChange={(e) => setFilters((prev) => ({ ...prev, assignee: e.target.value }))}
-            className="px-3 py-2 border border-border rounded-lg"
-          >
-            <option value="">全部负责人</option>
-            {assigneeOptions.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.email}
-              </option>
-            ))}
-          </select>
-          <Button size="sm" variant="secondary" onClick={() => void loadBugs()} disabled={loading}>
-            刷新列表
-          </Button>
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="surface-card rounded-[1.5rem] p-4">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+            <BugIcon size={14} />
+            全部
+          </div>
+          <div className="mt-3 text-3xl font-semibold text-text">{bugSummary.total}</div>
         </div>
-      </div>
+        <div className="surface-card rounded-[1.5rem] p-4">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+            <InboxIcon size={14} />
+            待处理
+          </div>
+          <div className="mt-3 text-3xl font-semibold text-info">{bugSummary.open}</div>
+        </div>
+        <div className="surface-card rounded-[1.5rem] p-4">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+            <WrenchIcon size={14} />
+            处理中
+          </div>
+          <div className="mt-3 text-3xl font-semibold text-warning">{bugSummary.progressing}</div>
+        </div>
+        <div className="surface-card rounded-[1.5rem] p-4">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-text-light">
+            <UsersIcon size={14} />
+            未指派
+          </div>
+          <div className="mt-3 text-3xl font-semibold text-text">{bugSummary.unassigned}</div>
+        </div>
+      </section>
 
-      {error && <div className="text-sm text-danger">{error}</div>}
-      {loading ? (
-        <div className="text-sm text-text-light">缺陷列表加载中...</div>
-      ) : bugs.length === 0 ? (
-        <div className="text-sm text-text-light">暂无缺陷</div>
-      ) : (
-        <div className="space-y-3">
-          {bugs.map((bug) => (
-            <div key={bug.id} className="bg-white rounded-xl border border-border p-4">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-text truncate">
-                    #{bug.id} {bug.title}
-                  </div>
-                  <div className="text-xs text-text-light">
-                    {bug.severity} · 当前负责人：{renderAssignedTo(bug)}
-                  </div>
-                </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="surface-card rounded-[1.8rem] p-4 sm:p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-text">新建缺陷</h2>
+              <p className="mt-1 text-sm text-text-light">先把问题记清楚，再决定归属。</p>
+            </div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-danger-light px-2.5 py-1 text-xs font-medium text-danger">
+              <BugIcon size={12} />
+              严重 {bugSummary.critical}
+            </span>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text">标题</label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                placeholder="一句话说清问题"
+                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text">描述</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="补充复现方式、影响范围或截图说明"
+                rows={4}
+                className="w-full resize-none rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">严重级别</label>
                 <select
-                  value={bug.status}
-                  onChange={(e) =>
-                    void handleStatusChange(
-                      bug.id,
-                      e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed'
-                    )
-                  }
-                  className="px-2 py-1 border border-border rounded text-sm"
+                  value={form.severity}
+                  onChange={(e) => setForm((prev) => ({ ...prev, severity: e.target.value }))}
+                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
                 >
-                  <option value="open">open</option>
-                  <option value="in_progress">in_progress</option>
-                  <option value="resolved">resolved</option>
-                  <option value="closed">closed</option>
-                </select>
-                <select
-                  value={
-                    bug.assigned_to
-                      ? typeof bug.assigned_to === 'number'
-                        ? String(bug.assigned_to)
-                        : String(bug.assigned_to.id)
-                      : ''
-                  }
-                  onChange={(e) => void handleAssign(bug.id, e.target.value)}
-                  className="px-2 py-1 border border-border rounded text-sm"
-                >
-                  <option value="">未指派</option>
-                  {assigneeOptions.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.email}
+                  {BUG_SEVERITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
-                <Button size="sm" variant="secondary" onClick={() => void openBugDetail(bug.id)}>
-                  详情
-                </Button>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">关联故事</label>
+                <select
+                  value={form.story_id}
+                  onChange={(e) => setForm((prev) => ({ ...prev, story_id: e.target.value }))}
+                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                >
+                  <option value="">暂不关联</option>
+                  {stories.map((story) => (
+                    <option key={story.id} value={story.id}>
+                      #{story.id} {story.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-text">初始负责人</label>
+                <select
+                  value={form.assigned_to}
+                  onChange={(e) => setForm((prev) => ({ ...prev, assigned_to: e.target.value }))}
+                  className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                >
+                  <option value="">暂不指派</option>
+                  {assigneeOptions.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.email}（{member.role_in_project}）
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-          ))}
+          </div>
+          <div className="mt-4 flex justify-end">
+            <Button size="sm" onClick={handleCreate} isLoading={creating}>
+              创建缺陷
+            </Button>
+          </div>
         </div>
+
+        <div className="surface-card rounded-[1.8rem] p-4 sm:p-5">
+          <div className="mb-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-text">筛选</h2>
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary">
+                  {activeFilterCount} 个筛选
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-text-light">优先把待处理和高严重级别问题收拢出来。</p>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text">状态</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters((prev) => ({ ...prev, status: e.target.value }))}
+                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+              >
+                <option value="">全部状态</option>
+                {BUG_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text">严重级别</label>
+              <select
+                value={filters.severity}
+                onChange={(e) => setFilters((prev) => ({ ...prev, severity: e.target.value }))}
+                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+              >
+                <option value="">全部级别</option>
+                {BUG_SEVERITY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text">负责人</label>
+              <select
+                value={filters.assignee}
+                onChange={(e) => setFilters((prev) => ({ ...prev, assignee: e.target.value }))}
+                className="w-full rounded-2xl border border-border bg-white px-3 py-2.5 outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+              >
+                <option value="">全部负责人</option>
+                {assigneeOptions.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={handleResetFilters} disabled={loading}>
+              清空
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => void loadBugs()} disabled={loading}>
+              刷新列表
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {error && <div className="rounded-2xl bg-danger-light px-4 py-3 text-sm text-danger">{error}</div>}
+      {loading ? (
+        <div className="surface-card rounded-[1.6rem] px-4 py-6 text-sm text-text-light">
+          缺陷列表加载中...
+        </div>
+      ) : bugs.length === 0 ? (
+        <div className="surface-card rounded-[1.6rem] border-dashed px-4 py-8 text-center text-sm text-text-light">
+          当前筛选下暂无缺陷
+        </div>
+      ) : (
+        <section className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-text">缺陷列表</h2>
+              <p className="mt-1 text-sm text-text-light">按状态和责任人推进处理，必要时直接进入详情。</p>
+            </div>
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap gap-2 text-xs text-text-light">
+                {filters.status && (
+                  <span className="rounded-full bg-secondary-50 px-2.5 py-1">状态：{filters.status}</span>
+                )}
+                {filters.severity && (
+                  <span className="rounded-full bg-secondary-50 px-2.5 py-1">
+                    级别：{filters.severity}
+                  </span>
+                )}
+                {filters.assignee && (
+                  <span className="rounded-full bg-secondary-50 px-2.5 py-1">负责人已筛选</span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="space-y-3">
+          {bugs.map((bug) => {
+            const statusMeta = getStatusMeta(bug.status);
+            const severityMeta = getSeverityMeta(bug.severity);
+            const StatusIcon = statusMeta.icon;
+
+            return (
+              <div
+                key={bug.id}
+                className={`card-hover rounded-[1.6rem] border p-4 shadow-sm sm:p-5 ${statusMeta.cardClass}`}
+              >
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-text">#{bug.id}</span>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.badgeClass}`}
+                        >
+                          <StatusIcon size={12} />
+                          {formatBugStatus(bug.status)}
+                        </span>
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${severityMeta.badgeClass}`}
+                        >
+                          {formatBugSeverity(bug.severity)}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-base font-semibold text-text sm:text-lg">
+                        {bug.title}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-light">
+                        <span className="inline-flex items-center gap-1">
+                          <UsersIcon size={12} />
+                          {renderAssignedTo(bug)}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <ClipboardIcon size={12} />
+                          更新于 {formatDate(bug.updated_at)}
+                        </span>
+                        {bug.story_id && (
+                          <span className="inline-flex items-center gap-1">
+                            <StoryIcon size={12} />
+                            故事 #{bug.story_id}
+                            {storyTitleMap.get(bug.story_id)
+                              ? ` · ${storyTitleMap.get(bug.story_id)}`
+                              : ''}
+                          </span>
+                        )}
+                      </div>
+                      {bug.description && (
+                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-text-light">{bug.description}</p>
+                      )}
+                    </div>
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px]">
+                      <select
+                        value={bug.status}
+                        onChange={(e) =>
+                          void handleStatusChange(
+                            bug.id,
+                            e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed'
+                          )
+                        }
+                        className="w-full rounded-2xl border border-border bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                      >
+                        {BUG_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={
+                          bug.assigned_to
+                            ? typeof bug.assigned_to === 'number'
+                              ? String(bug.assigned_to)
+                              : String(bug.assigned_to.id)
+                            : ''
+                        }
+                        onChange={(e) => void handleAssign(bug.id, e.target.value)}
+                        className="w-full rounded-2xl border border-border bg-white px-3 py-2 text-sm outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+                      >
+                        <option value="">未指派</option>
+                        {assigneeOptions.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.email}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void openBugDetail(bug.id)}
+                      >
+                        查看详情
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          </div>
+        </section>
       )}
 
       <Modal isOpen={detailOpen} onClose={closeBugDetail} title="缺陷详情" size="md">

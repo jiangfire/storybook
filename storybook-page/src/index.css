@@ -101,7 +101,16 @@ body {
   font-family: var(--font-body);
   color: var(--color-text);
   background-color: var(--color-bg-gray);
+  background-image:
+    radial-gradient(circle at top left, rgba(167, 201, 87, 0.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(30, 58, 95, 0.1), transparent 32%),
+    linear-gradient(180deg, #fbfcfe 0%, #f4f7fb 100%);
   line-height: 1.5;
+}
+
+::selection {
+  background: rgba(30, 58, 95, 0.14);
+  color: var(--color-text);
 }
 
 /* ===== 滚动条样式 ===== */
@@ -142,12 +151,45 @@ body {
 
 /* 卡片悬浮效果 */
 .card-hover {
-  transition: all var(--duration-normal) ease-out;
+  transition:
+    transform var(--duration-normal) ease-out,
+    box-shadow var(--duration-normal) ease-out,
+    border-color var(--duration-normal) ease-out,
+    background-color var(--duration-normal) ease-out;
 }
 
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
+}
+
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.app-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 14%, rgba(167, 201, 87, 0.12), transparent 20%),
+    radial-gradient(circle at 85% 18%, rgba(30, 58, 95, 0.08), transparent 22%);
+  z-index: 0;
+}
+
+.app-surface {
+  position: relative;
+  z-index: 1;
+}
+
+.surface-card {
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 40px -28px rgba(16, 42, 67, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* 按钮基础样式 */

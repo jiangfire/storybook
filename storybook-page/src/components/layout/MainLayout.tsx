@@ -11,17 +11,15 @@ export default function MainLayout({ showSidebar = true }: MainLayoutProps) {
   const { currentProject } = useProjectStore();
 
   return (
-    <div className="min-h-screen bg-bg-gray">
-      <Header />
-
-      <div className="flex items-start">
-        {/* 侧边栏 */}
-        {showSidebar && <Sidebar currentProject={currentProject} />}
-
-        {/* 主内容区 */}
-        <main className="flex-1 min-w-0">
-          <Outlet />
-        </main>
+    <div className="app-shell">
+      <div className="app-surface">
+        <Header />
+        <div className="mx-auto flex w-full max-w-[1600px] items-start gap-4 px-3 pb-8 sm:px-4 lg:px-6 xl:gap-6">
+          {showSidebar && <Sidebar currentProject={currentProject} />}
+          <main className="min-w-0 flex-1 pt-2 md:pt-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );

@@ -3,29 +3,30 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import type { RegisterRequest } from '../../types/api';
 import { isValidEmail, isValidPassword } from '../../utils/validators';
+import { ClipboardIcon, CodeIcon, SearchIcon } from '../../components/ui/AppIcon';
 
 const roleOptions: Array<{
   value: RegisterRequest['role'];
   label: string;
-  emoji: string;
+  icon: typeof ClipboardIcon;
   description: string;
 }> = [
   {
     value: 'product',
     label: '产品经理',
-    emoji: '📋',
+    icon: ClipboardIcon,
     description: '创建故事、管理需求',
   },
   {
     value: 'developer',
     label: '开发人员',
-    emoji: '💻',
+    icon: CodeIcon,
     description: '领取故事、开发功能',
   },
   {
     value: 'tester',
     label: '测试人员',
-    emoji: '🔍',
+    icon: SearchIcon,
     description: '验收测试、提交Bug',
   },
 ];
@@ -123,23 +124,28 @@ export default function RegisterPage() {
             <div>
               <label className="block text-sm font-medium text-text mb-2">角色</label>
               <div className="grid grid-cols-3 gap-3">
-                {roleOptions.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setRole(item.value)}
-                    className={`p-3 rounded-lg border-2 transition-all text-left ${
-                      role === item.value
-                        ? 'border-primary bg-primary-50 text-primary'
-                        : 'border-border hover:border-primary-300'
-                    }`}
-                    disabled={isLoading}
-                  >
-                    <div className="text-2xl mb-1">{item.emoji}</div>
-                    <div className="text-xs font-medium mb-1">{item.label}</div>
-                    <div className="text-xs text-text-light">{item.description}</div>
-                  </button>
-                ))}
+                {roleOptions.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setRole(item.value)}
+                      className={`p-3 rounded-lg border-2 transition-all text-left ${
+                        role === item.value
+                          ? 'border-primary bg-primary-50 text-primary'
+                          : 'border-border hover:border-primary-300'
+                      }`}
+                      disabled={isLoading}
+                    >
+                      <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/80">
+                        <Icon size={18} />
+                      </div>
+                      <div className="text-xs font-medium mb-1">{item.label}</div>
+                      <div className="text-xs text-text-light">{item.description}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

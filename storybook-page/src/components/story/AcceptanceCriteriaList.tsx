@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { AcceptanceCriteria, ACStatus } from '../../types/models';
 import { useStoryStore } from '../../stores/storyStore';
 import { cn } from '../../utils/cn';
+import { CheckCircleIcon, ClipboardIcon, XIcon } from '../ui/AppIcon';
+import Button from '../ui/Button';
 
 interface AcceptanceCriteriaListProps {
   storyId: number;
@@ -11,11 +13,31 @@ interface AcceptanceCriteriaListProps {
 
 const statusConfig: Record<
   ACStatus,
-  { label: string; color: string; bgColor: string; icon: string }
+  {
+    label: string;
+    color: string;
+    bgColor: string;
+    icon: typeof ClipboardIcon;
+  }
 > = {
-  pending: { label: '待验收', color: 'text-text', bgColor: 'bg-secondary-100', icon: '○' },
-  passed: { label: '已通过', color: 'text-green-700', bgColor: 'bg-green-100', icon: '✓' },
-  failed: { label: '未通过', color: 'text-red-700', bgColor: 'bg-red-100', icon: '✕' },
+  pending: {
+    label: '待验收',
+    color: 'text-text',
+    bgColor: 'bg-secondary-100',
+    icon: ClipboardIcon,
+  },
+  passed: {
+    label: '已通过',
+    color: 'text-green-700',
+    bgColor: 'bg-green-100',
+    icon: CheckCircleIcon,
+  },
+  failed: {
+    label: '未通过',
+    color: 'text-red-700',
+    bgColor: 'bg-red-100',
+    icon: XIcon,
+  },
 };
 
 export default function AcceptanceCriteriaList({
@@ -50,6 +72,7 @@ export default function AcceptanceCriteriaList({
       {criteria.map((ac) => {
         const config = statusConfig[ac.status];
         const isEditing = editingAC === ac.id;
+        const StatusIcon = config.icon;
 
         return (
           <div
@@ -96,7 +119,7 @@ export default function AcceptanceCriteriaList({
                     config.bgColor
                   )}
                 >
-                  <span className={cn('text-sm font-medium', config.color)}>{config.icon}</span>
+                  <StatusIcon size={14} className={cn('font-medium', config.color)} />
                 </div>
               )}
 
@@ -131,21 +154,22 @@ export default function AcceptanceCriteriaList({
                       rows={2}
                     />
                     <div className="flex space-x-2">
-                      <button
+                      <Button
+                        size="sm"
                         onClick={() => handleSaveEvidence(ac.id)}
-                        className="px-3 py-1 bg-primary text-white rounded text-sm hover:bg-primary-700 transition-colors"
                       >
                         保存
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
                         onClick={() => {
                           setEditingAC(null);
                           setEvidence('');
                         }}
-                        className="px-3 py-1 bg-secondary-200 text-text rounded text-sm hover:bg-secondary-300 transition-colors"
                       >
                         取消
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -154,9 +178,9 @@ export default function AcceptanceCriteriaList({
                 {editable && ac.status === 'passed' && !ac.evidence && !isEditing && (
                   <button
                     onClick={() => setEditingAC(ac.id)}
-                    className="mt-2 text-sm text-primary hover:text-primary-700"
+                    className="mt-2 text-sm text-primary transition-colors hover:text-primary-700"
                   >
-                    + 添加证据
+                    添加证据
                   </button>
                 )}
               </div>

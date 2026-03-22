@@ -476,7 +476,10 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 	_ = h.db.Model(&model.ProjectMember{}).Where("project_id = ?", project.ID).Count(&activeMembers).Error
 
 	var avgPoints float64
-	_ = h.db.Model(&model.UserStory{}).Where("project_id = ? AND points IS NOT NULL", project.ID).Select("AVG(points)").Scan(&avgPoints).Error
+	_ = h.db.Model(&model.UserStory{}).
+		Where("project_id = ? AND points IS NOT NULL", project.ID).
+		Select("COALESCE(AVG(points), 0)").
+		Scan(&avgPoints).Error
 
 	api.Success(c, "success", gin.H{
 		"project": gin.H{

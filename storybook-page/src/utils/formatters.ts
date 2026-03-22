@@ -114,6 +114,44 @@ export function formatSprintStatus(status: string): string {
 }
 
 /**
+ * 格式化缺陷状态
+ */
+export function formatBugStatus(status: string): string {
+  const labels: Record<string, string> = {
+    open: '待处理',
+    in_progress: '处理中',
+    resolved: '已解决',
+    closed: '已关闭',
+  };
+  return labels[status] || status;
+}
+
+/**
+ * 格式化缺陷严重级别
+ */
+export function formatBugSeverity(severity: string): string {
+  const labels: Record<string, string> = {
+    low: '低',
+    medium: '中',
+    high: '高',
+    critical: '严重',
+  };
+  return labels[severity] || severity;
+}
+
+/**
+ * 格式化 INVEST 检查状态
+ */
+export function formatInvestStatus(status: string): string {
+  const labels: Record<string, string> = {
+    pass: '通过',
+    warning: '关注',
+    fail: '未通过',
+  };
+  return labels[status] || status;
+}
+
+/**
  * 格式化用户角色
  */
 export function formatUserRole(role: string): string {

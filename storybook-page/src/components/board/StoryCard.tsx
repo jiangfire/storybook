@@ -1,6 +1,8 @@
 import type { StoryBoardItem } from '../../types/models';
 import {
+  formatPriority,
   formatStoryType,
+  getPriorityColor,
   getStoryTypeColor,
   getUserInitials,
   calculatePercentage,
@@ -41,7 +43,6 @@ export default function StoryCard({ story }: StoryCardProps) {
       {...attributes}
       {...listeners}
       className="bg-white rounded-lg shadow-sm border border-border p-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200"
-      onDoubleClick={() => navigate(`/stories/${story.id}`)}
     >
       {/* 类型标签 */}
       <div className="flex items-center justify-between mb-3">
@@ -51,14 +52,11 @@ export default function StoryCard({ story }: StoryCardProps) {
           {formatStoryType(story.story_type)}
         </span>
 
-        {/* 优先级 */}
-        <div className="flex items-center space-x-1">
-          {Array.from({ length: story.priority || 0 }).map((_, i) => (
-            <span key={i} className="text-xs">
-              🔴
-            </span>
-          ))}
-        </div>
+        <span
+          className={`rounded-full px-2 py-1 text-xs font-medium ${getPriorityColor(story.priority ?? 0)}`}
+        >
+          {formatPriority(story.priority ?? 0)}
+        </span>
       </div>
 
       {/* 标题 */}
@@ -84,13 +82,25 @@ export default function StoryCard({ story }: StoryCardProps) {
 
       {/* 底部信息 */}
       <div className="flex items-center justify-between pt-3 border-t border-border-light">
-        {/* 故事点 */}
-        {story.story_points && (
-          <div className="flex items-center space-x-1">
-            <span className="text-xs text-text-light">点数:</span>
-            <span className="text-sm font-medium text-text">{story.story_points}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {story.story_points && (
+            <div className="flex items-center space-x-1">
+              <span className="text-xs text-text-light">点数:</span>
+              <span className="text-sm font-medium text-text">{story.story_points}</span>
+            </div>
+          )}
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/stories/${story.id}`);
+            }}
+            className="rounded-md bg-primary-50 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary-100"
+          >
+            详情
+          </button>
+        </div>
 
         {/* 负责人 */}
         {story.assigned_to ? (

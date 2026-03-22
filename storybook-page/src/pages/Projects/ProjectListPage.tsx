@@ -8,15 +8,21 @@ import Modal from '../../components/ui/Modal';
 import { ProjectListSkeleton } from '../../components/ui/Skeleton';
 import { isValidProjectName } from '../../utils/validators';
 import { getErrorMessage } from '../../utils/error';
+import {
+  BoardIcon,
+  CrownIcon,
+  FolderIcon,
+  SearchIcon,
+  SprintIcon,
+} from '../../components/ui/AppIcon';
 
 const agileModeOptions: Array<{
   value: 'kanban' | 'scrum';
   label: string;
-  emoji: string;
   desc: string;
 }> = [
-  { value: 'kanban', label: 'Kanban', emoji: '📋', desc: '看板' },
-  { value: 'scrum', label: 'Scrum', emoji: '🏃', desc: '冲刺' },
+  { value: 'kanban', label: 'Kanban', desc: '看板' },
+  { value: 'scrum', label: 'Scrum', desc: '冲刺' },
 ];
 
 export default function ProjectListPage() {
@@ -36,6 +42,10 @@ export default function ProjectListPage() {
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
+
+  const ownerProjects = projects.filter((project) => project.is_owner).length;
+  const scrumProjects = projects.filter((project) => project.agile_mode === 'scrum').length;
+  const kanbanProjects = projects.filter((project) => project.agile_mode !== 'scrum').length;
 
   const filteredProjects = projects.filter(
     (project) =>
@@ -63,45 +73,112 @@ export default function ProjectListPage() {
   };
 
   return (
-    <div className="p-8">
-      {/* 头部 */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-text mb-2">项目</h1>
-          <p className="text-text-light">管理你的敏捷项目</p>
+    <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+      <section className="surface-card overflow-hidden rounded-[2rem]">
+        <div className="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8 lg:py-8">
+          <div className="space-y-5">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary">
+                <FolderIcon size={14} />
+                项目空间
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">项目</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-text-light sm:text-base">
+                  在这里集中管理团队的交付空间。先找到目标项目，再进入详情、看板或冲刺节奏。
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-white/80 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-text-light">全部项目</div>
+                <div className="mt-2 text-3xl font-semibold text-text">{projects.length}</div>
+              </div>
+              <div className="rounded-2xl border border-border bg-white/80 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-text-light">Owner</div>
+                <div className="mt-2 inline-flex items-center gap-2 text-3xl font-semibold text-text">
+                  <CrownIcon size={20} />
+                  {ownerProjects}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-white/80 p-4">
+                <div className="text-xs uppercase tracking-[0.18em] text-text-light">敏捷模式</div>
+                <div className="mt-2 flex items-center gap-3 text-sm text-text">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1">
+                    <SprintIcon size={13} />
+                    Scrum {scrumProjects}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-accent-50 px-2.5 py-1">
+                    <BoardIcon size={13} />
+                    Kanban {kanbanProjects}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.6rem] bg-gradient-to-br from-primary to-primary-700 p-5 text-white shadow-lg">
+            <div className="text-xs uppercase tracking-[0.22em] text-white/70">Quick Action</div>
+            <h2 className="mt-3 text-2xl font-semibold">创建新项目</h2>
+            <p className="mt-2 text-sm leading-6 text-white/80">
+              新项目会自动带你进入详情页，后续即可配置成员、故事与工作方式。
+            </p>
+            <Button className="mt-5 bg-white text-primary hover:bg-white/90" onClick={() => setIsCreateModalOpen(true)}>
+              + 新建项目
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>+ 新建项目</Button>
-      </div>
+      </section>
 
-      {/* 搜索框 */}
-      <div className="mb-6">
-        <input
-          type="text"
-          placeholder="搜索项目..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-md w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-      </div>
+      <section className="surface-card rounded-[1.7rem] px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-text">项目列表</h2>
+            <p className="mt-1 text-sm text-text-light">
+              {searchQuery ? `当前筛出 ${filteredProjects.length} 个结果` : '按名称或描述快速定位项目'}
+            </p>
+          </div>
+          <div className="w-full lg:max-w-md">
+            <label htmlFor="project-search" className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-text-light">
+              搜索
+            </label>
+            <div className="relative">
+              <input
+                id="project-search"
+                type="text"
+                placeholder="搜索项目..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-2xl border border-border bg-white px-4 py-3 pl-11 text-sm outline-none transition focus:border-primary-200 focus:ring-4 focus:ring-primary/10"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-light">
+                <SearchIcon size={16} />
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      {/* 项目列表 */}
       {isLoading ? (
         <ProjectListSkeleton />
       ) : error ? (
-        <div className="bg-danger-light text-danger px-4 py-3 rounded-lg">{error}</div>
+        <div className="rounded-2xl bg-danger-light px-4 py-3 text-danger">{error}</div>
       ) : filteredProjects.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">📁</div>
-          <h3 className="text-lg font-medium text-text mb-2">
+        <div className="surface-card rounded-[1.8rem] px-5 py-14 text-center">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-secondary-50 text-text-light">
+            <FolderIcon size={28} />
+          </div>
+          <h3 className="mb-2 text-lg font-medium text-text">
             {searchQuery ? '没有找到匹配的项目' : '还没有项目'}
           </h3>
-          <p className="text-text-light mb-6">
+          <p className="mb-6 text-text-light">
             {searchQuery ? '试试其他关键词' : '创建你的第一个项目，开始敏捷之旅'}
           </p>
           {!searchQuery && <Button onClick={() => setIsCreateModalOpen(true)}>+ 新建项目</Button>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredProjects.map((project) => (
             <ProjectCard key={project.id} project={project} />
           ))}
@@ -163,7 +240,13 @@ export default function ProjectListPage() {
                       : 'border-border hover:border-primary-300'
                   }`}
                 >
-                  <div className="text-3xl mb-2">{mode.emoji}</div>
+                  <div className="mb-2 flex justify-center">
+                    {mode.value === 'scrum' ? (
+                      <SprintIcon size={24} />
+                    ) : (
+                      <BoardIcon size={24} />
+                    )}
+                  </div>
                   <div className="font-medium mb-1">{mode.label}</div>
                   <div className="text-xs text-text-light">{mode.desc}</div>
                 </button>

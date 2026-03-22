@@ -1,6 +1,12 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../utils/cn';
+import {
+  CheckCircleIcon,
+  ClipboardIcon,
+  WrenchIcon,
+  XIcon,
+} from './AppIcon';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -96,11 +102,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) {
-  const icons: Record<ToastType, string> = {
-    success: '✓',
-    error: '✕',
-    warning: '⚠',
-    info: 'ℹ',
+  const icons: Record<
+    ToastType,
+    { icon: typeof CheckCircleIcon; className?: string }
+  > = {
+    success: { icon: CheckCircleIcon },
+    error: { icon: XIcon },
+    warning: { icon: WrenchIcon },
+    info: { icon: ClipboardIcon },
   };
 
   const colors: Record<ToastType, string> = {
@@ -113,17 +122,21 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: () => void }) 
   return (
     <div
       className={cn(
-        'flex items-center space-x-3 px-4 py-3 rounded-lg shadow-lg min-w-[300px] max-w-md animate-slideUp',
+        'flex items-center space-x-3 rounded-lg px-4 py-3 shadow-lg min-w-[280px] max-w-md animate-slideUp',
         colors[toast.type]
       )}
     >
-      <span className="text-xl flex-shrink-0">{icons[toast.type]}</span>
+      {(() => {
+        const Icon = icons[toast.type].icon;
+        return <Icon size={18} className="flex-shrink-0" />;
+      })()}
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
       <button
         onClick={onRemove}
-        className="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
+        aria-label="关闭提示"
+        className="flex-shrink-0 opacity-70 transition-opacity hover:opacity-100"
       >
-        ✕
+        <XIcon size={14} />
       </button>
     </div>
   );

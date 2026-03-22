@@ -248,49 +248,55 @@ export default function StoryDetailPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
       {/* 头部 */}
       <div className="mb-8">
-        <div className="flex items-center space-x-2 text-sm text-text-light mb-4">
-          <Link to={`/projects/${currentStory.project_id}`} className="hover:text-primary">
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-text-light">
+          <Link
+            to={`/projects/${currentStory.project_id}`}
+            className="transition-colors hover:text-primary"
+          >
             项目
           </Link>
           <span>›</span>
-          <Link to={`/projects/${currentStory.project_id}/board`} className="hover:text-primary">
+          <Link
+            to={`/projects/${currentStory.project_id}/board`}
+            className="transition-colors hover:text-primary"
+          >
             看板
           </Link>
           <span>›</span>
           <span className="text-text">故事详情</span>
         </div>
 
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-4">
-              <h1 className="text-3xl font-bold text-text">{currentStory.title}</h1>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <h1 className="text-2xl font-bold text-text sm:text-3xl">{currentStory.title}</h1>
               <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${getStoryTypeColor(currentStory.story_type)}`}
+                className={`inline-flex self-start rounded-full px-3 py-1 text-sm font-medium ${getStoryTypeColor(currentStory.story_type)}`}
               >
                 {formatStoryType(currentStory.story_type)}
               </span>
             </div>
 
             {/* 元信息 */}
-            <div className="flex items-center space-x-6 text-sm text-text-light">
-              <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-text-light sm:gap-6">
+              <div className="flex items-center gap-2">
                 <span>优先级:</span>
                 <span
-                  className={`px-2 py-1 rounded font-medium ${getPriorityColor(currentStory.priority)}`}
+                  className={`rounded px-2 py-1 font-medium ${getPriorityColor(currentStory.priority)}`}
                 >
                   {formatPriority(currentStory.priority)}
                 </span>
               </div>
               {currentStory.story_points && (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <span>故事点:</span>
                   <span className="font-medium text-text">{currentStory.story_points}</span>
                 </div>
               )}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <span>状态:</span>
                 <span className="font-medium text-text">
                   {formatStoryStatus(currentStory.status)}
@@ -305,7 +311,7 @@ export default function StoryDetailPage() {
           </div>
 
           {/* 操作按钮 */}
-          <div className="flex items-center gap-3 flex-wrap justify-end">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             {canEditStory && (
               <Button variant="secondary" size="sm" onClick={() => setIsEditOpen(true)}>
                 编辑故事
@@ -313,12 +319,12 @@ export default function StoryDetailPage() {
             )}
 
             {canManageAssignee ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <select
                   value={selectedAssigneeID}
                   onChange={(e) => setSelectedAssigneeID(e.target.value)}
                   disabled={isMembersLoading}
-                  className="px-3 py-2 border border-border rounded-lg text-sm bg-white min-w-[180px]"
+                  className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm sm:min-w-[180px]"
                 >
                   <option value="">未分配</option>
                   {developerMembers.map((member) => (
@@ -335,7 +341,7 @@ export default function StoryDetailPage() {
               canClaimStory && (
                 <>
                   {currentStory.assigned_to ? (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-primary-100 text-primary flex items-center justify-center text-sm font-medium">
                         {getUserInitials(currentStory.assigned_to.email)}
                       </div>
@@ -366,7 +372,7 @@ export default function StoryDetailPage() {
       </div>
 
       {/* 内容区 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* 左侧：故事信息 */}
         <div className="lg:col-span-2 space-y-6">
           {/* 描述 */}
@@ -428,7 +434,7 @@ export default function StoryDetailPage() {
                   当前项目暂无冲刺，可前往
                   <Link
                     to={`/projects/${currentStory.project_id}`}
-                    className="text-primary hover:underline mx-1"
+                    className="mx-1 text-primary transition-colors hover:text-primary-700"
                   >
                     项目详情
                   </Link>

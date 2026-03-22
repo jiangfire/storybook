@@ -49,6 +49,7 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
   const [detailSaving, setDetailSaving] = useState(false);
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [codeRef, setCodeRef] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<TaskItem | null>(null);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -148,17 +149,18 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
     }
   };
 
-  const handleDeleteTask = async (task: TaskItem) => {
-    if (!confirm(`确认删除任务「${task.title}」吗？`)) {
+  const handleDeleteTask = async () => {
+    if (!deleteTarget) {
       return;
     }
     try {
-      await taskService.deleteTask(task.id);
-      setTasks((prev) => prev.filter((item) => item.id !== task.id));
-      if (selectedTask?.id === task.id) {
+      await taskService.deleteTask(deleteTarget.id);
+      setTasks((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      if (selectedTask?.id === deleteTarget.id) {
         setDetailOpen(false);
         setSelectedTask(null);
       }
+      setDeleteTarget(null);
       showSuccess('任务删除成功');
     } catch (err: unknown) {
       showError(getErrorMessage(err, '任务删除失败'));
@@ -335,7 +337,7 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                 >
                   {assignedTo ? '释放' : '领取'}
                 </Button>
-                <Button size="sm" variant="danger" onClick={() => void handleDeleteTask(task)}>
+                <Button size="sm" variant="danger" onClick={() => setDeleteTarget(task)}>
                   删除
                 </Button>
               </div>
@@ -343,6 +345,25 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
           })}
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        title="删除任务"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text">确认删除任务「{deleteTarget?.title}」吗？</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
+              取消
+            </Button>
+            <Button variant="danger" onClick={() => void handleDeleteTask()}>
+              确认删除
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={detailOpen}

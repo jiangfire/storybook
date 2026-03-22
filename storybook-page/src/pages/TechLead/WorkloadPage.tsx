@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { techLeadService } from '../../services/techLeadService';
 import type { UserWorkload } from '../../types/models';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
+import { useToast } from '../../components/ui/Toast';
+import { getErrorMessage } from '../../utils/error';
+import { ClipboardIcon, StoryIcon, UsersIcon, WrenchIcon } from '../../components/ui/AppIcon';
 
 interface ProjectInfo {
   id: number;
@@ -11,6 +14,7 @@ interface ProjectInfo {
 }
 
 export default function WorkloadPage() {
+  const { showError } = useToast();
   const [workloads, setWorkloads] = useState<UserWorkload[]>([]);
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,12 +29,12 @@ export default function WorkloadPage() {
       ]);
       setWorkloads(workloadRes.workloads);
       setProjects(projectsRes.projects);
-    } catch (error) {
-      console.error('Failed to load workload:', error);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '工作负载加载失败'));
     } finally {
       setLoading(false);
     }
-  }, [selectedProject]);
+  }, [selectedProject, showError]);
 
   useEffect(() => {
     loadData();
@@ -67,8 +71,8 @@ export default function WorkloadPage() {
 
       {/* 筛选栏 */}
       <div className="bg-white rounded-lg shadow-sm border border-border p-4 mb-6">
-        <div className="flex flex-wrap gap-4">
-          <div className="w-64">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_minmax(0,1fr)]">
+          <div className="min-w-0">
             <label className="block text-sm font-medium text-text mb-1">项目</label>
             <select
               value={selectedProject}
@@ -87,24 +91,36 @@ export default function WorkloadPage() {
       </div>
 
       {/* 统计概览 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-4">
         <div className="bg-white rounded-lg shadow-sm border border-border p-4">
+          <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary">
+            <UsersIcon size={18} />
+          </div>
           <div className="text-2xl font-bold text-text">{workloads.length}</div>
           <div className="text-sm text-text-light">团队成员</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-border p-4">
+          <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary">
+            <StoryIcon size={18} />
+          </div>
           <div className="text-2xl font-bold text-text">
             {workloads.reduce((sum, w) => sum + w.active_stories, 0)}
           </div>
           <div className="text-sm text-text-light">活跃故事</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-border p-4">
+          <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary">
+            <ClipboardIcon size={18} />
+          </div>
           <div className="text-2xl font-bold text-text">
             {workloads.reduce((sum, w) => sum + w.total_story_points, 0)}
           </div>
           <div className="text-sm text-text-light">总故事点</div>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-border p-4">
+          <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary">
+            <WrenchIcon size={18} />
+          </div>
           <div className="text-2xl font-bold text-text">
             {workloads.reduce((sum, w) => sum + w.estimated_hours, 0).toFixed(1)}
           </div>
@@ -113,7 +129,63 @@ export default function WorkloadPage() {
       </div>
 
       {/* 负载详情表格 */}
-      <div className="bg-white rounded-lg shadow-sm border border-border overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {workloads.length === 0 ? (
+          <div className="rounded-lg border border-border bg-white px-4 py-8 text-center text-text-light shadow-sm">
+            暂无数据
+          </div>
+        ) : (
+          workloads.map((workload) => {
+            const workloadInfo = getWorkloadLevel(workload);
+            return (
+              <div
+                key={workload.user.id}
+                className="rounded-lg border border-border bg-white p-4 shadow-sm"
+              >
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-text">{workload.user.email}</div>
+                    <div className="text-xs text-text-light">ID: {workload.user.id}</div>
+                  </div>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${workloadInfo.color}`}
+                  >
+                    {workloadInfo.label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-xs text-text-light">活跃故事</div>
+                    <div className="font-medium text-text">{workload.active_stories}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-text-light">活跃任务</div>
+                    <div className="font-medium text-text">{workload.active_tasks}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-text-light">故事点</div>
+                    <div className="font-medium text-text">{workload.total_story_points}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-text-light">预估工时</div>
+                    <div className="font-medium text-text">
+                      {workload.estimated_hours.toFixed(1)}h
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-xs text-text-light">完成率</div>
+                    <div className={`font-medium ${getCompletionRateColor(workload.completion_rate)}`}>
+                      {workload.completion_rate.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-lg border border-border bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-secondary-50 border-b border-border">
