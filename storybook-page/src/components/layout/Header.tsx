@@ -257,14 +257,14 @@ export default function Header() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 sm:gap-2.5">
+            <div className="flex items-center justify-end gap-2 sm:gap-2.5 lg:ml-auto">
               <div ref={userMenuRef} className="relative">
                 <button
                   type="button"
                   aria-haspopup="menu"
                   aria-expanded={isUserMenuOpen}
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-2 rounded-xl border border-border bg-white px-2 py-1.5 transition-colors hover:border-primary-200 hover:bg-primary-50 sm:px-2.5"
+                  className="flex items-center justify-end gap-2 rounded-xl border border-border bg-white px-2 py-1.5 text-right transition-colors hover:border-primary-200 hover:bg-primary-50 sm:px-2.5"
                 >
                   <div className="hidden text-right lg:block">
                     <div className="max-w-[180px] truncate text-sm font-medium text-text">

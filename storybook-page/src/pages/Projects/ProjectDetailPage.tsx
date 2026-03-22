@@ -615,6 +615,7 @@ export default function ProjectDetailPage() {
   const completionRate = projectOverview?.statistics?.completion_rate || 0;
   const totalStories = projectOverview?.statistics?.total_stories || 0;
   const activeMembers = projectOverview?.statistics?.active_members || members.length || 0;
+  const inProgressStories = statusBreakdown.in_progress || 0;
   const projectModeLabel = project?.agile_mode === 'scrum' ? '冲刺模式' : '看板模式';
   const canManageMembers = user?.role === 'product' || user?.role === 'admin';
   const canManageTechLeads = user?.role === 'admin';
@@ -631,7 +632,7 @@ export default function ProjectDetailPage() {
   return (
     <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <section className="surface-card overflow-hidden rounded-[2rem]">
-        <div className="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:px-8 lg:py-8">
+        <div className="space-y-6 px-5 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div className="space-y-5">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -656,12 +657,19 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               <div className="rounded-2xl border border-border bg-white p-4">
                 <div className="text-xs font-medium text-text-light">总故事数</div>
                 <div className="mt-2 inline-flex items-center gap-2 text-2xl font-semibold text-text">
                   <StoryIcon size={20} />
                   {totalStories}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-border bg-white p-4">
+                <div className="text-xs font-medium text-text-light">推进中</div>
+                <div className="mt-2 inline-flex items-center gap-2 text-2xl font-semibold text-primary">
+                  <WrenchIcon size={20} />
+                  {inProgressStories}
                 </div>
               </div>
               <div className="rounded-2xl border border-border bg-white p-4">
@@ -681,46 +689,35 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
-            <div className="text-xs font-medium text-white/70">当前重点</div>
-            <div className="mt-3 text-3xl font-semibold">{statusBreakdown.in_progress || 0}</div>
-            <p className="mt-1 text-sm text-white/80">个故事处于推进中</p>
-            <div className="mt-5 space-y-2 text-sm text-white/85">
-              <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
-                <span>待开始</span>
-                <span className="font-semibold">{statusBreakdown.backlog || 0}</span>
+          <div className="rounded-[1.6rem] border border-border bg-secondary-50 p-4 sm:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-text sm:text-lg">工作入口</h2>
+                <p className="mt-1 text-sm text-text-light">
+                  从这里继续进入看板、缺陷或故事创建，首屏统计只负责说明项目状态。
+                </p>
               </div>
-              <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
-                <span>待提测 / 测试中</span>
-                <span className="font-semibold">
-                  {(statusBreakdown.ready || 0) + (statusBreakdown.test || 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-xl bg-white/10 px-3 py-2">
-                <span>已完成</span>
-                <span className="font-semibold">{statusBreakdown.done || 0}</span>
-              </div>
-            </div>
-            <div className="mt-5 flex flex-col gap-2">
-              <Link to={`/projects/${projectID}/board`}>
-                <Button className="w-full bg-white text-primary hover:bg-white/90">进入看板</Button>
-              </Link>
-              <Link to={`/projects/${projectID}/bugs`}>
-                <Button variant="secondary" className="w-full border-white/30 bg-white/10 text-white hover:bg-white/15">
-                  缺陷管理
-                </Button>
-              </Link>
-              {canCreateStory ? (
-                <Link to={`/projects/${projectID}/stories/new`}>
-                  <Button variant="secondary" className="w-full border-white/30 bg-white/10 text-white hover:bg-white/15">
-                    创建故事
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                <Link to={`/projects/${projectID}/board`}>
+                  <Button className="w-full sm:w-auto">进入看板</Button>
+                </Link>
+                <Link to={`/projects/${projectID}/bugs`}>
+                  <Button variant="secondary" className="w-full sm:w-auto">
+                    缺陷管理
                   </Button>
                 </Link>
-              ) : (
-                <div className="rounded-xl bg-white/10 px-3 py-2 text-xs text-white/75">
-                  仅产品经理和管理员可创建故事
-                </div>
-              )}
+                {canCreateStory ? (
+                  <Link to={`/projects/${projectID}/stories/new`}>
+                    <Button variant="secondary" className="w-full sm:w-auto">
+                      创建故事
+                    </Button>
+                  </Link>
+                ) : (
+                  <div className="rounded-xl border border-border bg-white px-3 py-2 text-xs text-text-light">
+                    当前角色无创建故事权限
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
