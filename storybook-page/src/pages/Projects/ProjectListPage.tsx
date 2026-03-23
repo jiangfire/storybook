@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../../stores/projectStore';
 import { useToast } from '../../components/ui/Toast';
+import { PageContainer, PageHero } from '../../components/page/PageLayout';
 import ProjectCard from '../../components/ProjectCard';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -53,6 +54,16 @@ export default function ProjectListPage() {
       project.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const resetCreateProjectForm = () => {
+    setNewProject({ name: '', description: '', agile_mode: 'kanban' });
+    setFormError('');
+  };
+
+  const closeCreateProjectModal = () => {
+    setIsCreateModalOpen(false);
+    resetCreateProjectForm();
+  };
+
   const handleCreateProject = async () => {
     // 验证
     if (!isValidProjectName(newProject.name)) {
@@ -63,9 +74,7 @@ export default function ProjectListPage() {
     try {
       const project = await createProject(newProject);
       showSuccess('项目创建成功');
-      setIsCreateModalOpen(false);
-      setNewProject({ name: '', description: '', agile_mode: 'kanban' });
-      setFormError('');
+      closeCreateProjectModal();
       navigate(`/projects/${project.id}`);
     } catch (error: unknown) {
       showError(getErrorMessage(error, '创建失败'));
@@ -73,10 +82,10 @@ export default function ProjectListPage() {
   };
 
   return (
-    <div className="space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
-      <section className="surface-card overflow-hidden rounded-[2rem]">
-        <div className="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8 lg:py-8">
-          <div className="space-y-5">
+    <PageContainer>
+      <PageHero className="border-primary-100 bg-gradient-to-br from-white via-secondary-50 to-primary-50/60 shadow-[0_20px_44px_-38px_rgba(16,42,67,0.28)]">
+        <div className="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-7 lg:py-6">
+          <div className="space-y-4">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary">
                 <FolderIcon size={14} />
@@ -91,18 +100,18 @@ export default function ProjectListPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-white/80 p-4">
+              <div className="hero-subcard rounded-2xl p-4">
                 <div className="text-xs font-medium text-text-light">全部项目</div>
                 <div className="mt-2 text-3xl font-semibold text-text">{projects.length}</div>
               </div>
-              <div className="rounded-2xl border border-border bg-white/80 p-4">
+              <div className="hero-subcard rounded-2xl p-4">
                 <div className="text-xs font-medium text-text-light">负责项目</div>
                 <div className="mt-2 inline-flex items-center gap-2 text-3xl font-semibold text-text">
                   <CrownIcon size={20} />
                   {ownerProjects}
                 </div>
               </div>
-              <div className="rounded-2xl border border-border bg-white/80 p-4">
+              <div className="hero-subcard rounded-2xl p-4">
                 <div className="text-xs font-medium text-text-light">敏捷模式</div>
                 <div className="mt-2 flex items-center gap-3 text-sm text-text">
                   <span className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1">
@@ -118,7 +127,7 @@ export default function ProjectListPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
+          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white">
             <div className="text-xs font-medium text-white/70">快速操作</div>
             <h2 className="mt-3 text-2xl font-semibold">创建新项目</h2>
             <p className="mt-2 text-sm leading-6 text-white/80">
@@ -129,9 +138,9 @@ export default function ProjectListPage() {
             </Button>
           </div>
         </div>
-      </section>
+      </PageHero>
 
-      <section className="surface-card rounded-[1.7rem] px-5 py-5 sm:px-6">
+      <section className="section-card rounded-[1.7rem] px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-text">项目列表</h2>
@@ -165,7 +174,7 @@ export default function ProjectListPage() {
       ) : error ? (
         <div className="state-panel state-panel-error">{error}</div>
       ) : filteredProjects.length === 0 ? (
-        <div className="surface-card rounded-[1.8rem] px-5 py-14 text-center">
+        <div className="section-card rounded-[1.8rem] px-4 py-12 text-center">
           <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-secondary-50 text-text-light">
             <FolderIcon size={28} />
           </div>
@@ -178,7 +187,7 @@ export default function ProjectListPage() {
           {!searchQuery && <Button onClick={() => setIsCreateModalOpen(true)}>+ 新建项目</Button>}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {filteredProjects.map((project) => (
             <ProjectCard key={project.id} project={project} />
           ))}
@@ -188,11 +197,7 @@ export default function ProjectListPage() {
       {/* 创建项目弹窗 */}
       <Modal
         isOpen={isCreateModalOpen}
-        onClose={() => {
-          setIsCreateModalOpen(false);
-          setNewProject({ name: '', description: '', agile_mode: 'kanban' });
-          setFormError('');
-        }}
+        onClose={closeCreateProjectModal}
         title="新建项目"
         size="md"
       >
@@ -263,11 +268,7 @@ export default function ProjectListPage() {
           <div className="flex flex-col-reverse gap-3 pt-4 sm:flex-row sm:justify-end">
             <Button
               variant="secondary"
-              onClick={() => {
-                setIsCreateModalOpen(false);
-                setNewProject({ name: '', description: '', agile_mode: 'kanban' });
-                setFormError('');
-              }}
+              onClick={closeCreateProjectModal}
             >
               取消
             </Button>
@@ -275,6 +276,6 @@ export default function ProjectListPage() {
           </div>
         </div>
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

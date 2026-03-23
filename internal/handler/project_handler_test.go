@@ -5,10 +5,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -82,5 +84,100 @@ func TestGetOverviewReturnsZeroWhenAveragePointsIsNull(t *testing.T) {
 	}
 	if avgPoints != 0 {
 		t.Fatalf("expected avg_story_points=0, got %v", avgPoints)
+	}
+}
+
+func TestParseAggregatedTime(t *testing.T) {
+	t.Parallel()
+
+	expected := time.Date(2026, 3, 23, 22, 10, 15, 0, time.UTC)
+	testCases := []struct {
+		name  string
+		input any
+		want  time.Time
+		ok    bool
+	}{
+		{
+			name:  "time value",
+			input: expected,
+			want:  expected,
+			ok:    true,
+		},
+		{
+			name:  "pointer time value",
+			input: &expected,
+			want:  expected,
+			ok:    true,
+		},
+		{
+			name:  "sqlite timestamp string",
+			input: "2026-03-23 22:10:15",
+			want:  expected,
+			ok:    true,
+		},
+		{
+			name:  "timestamp bytes",
+			input: []byte("2026-03-23 22:10:15"),
+			want:  expected,
+			ok:    true,
+		},
+		{
+			name:  "invalid value",
+			input: 123,
+			ok:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := parseAggregatedTime(tc.input)
+			if ok != tc.ok {
+				t.Fatalf("expected ok=%v, got %v", tc.ok, ok)
+			}
+			if !tc.ok {
+				return
+			}
+			if !got.Equal(tc.want) {
+				t.Fatalf("expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestQueryProjectMaxTimeHandlesSQLiteAggregateString(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db, err := gorm.Open(sqlite.Open("file:project_handler_max_time_test?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.UserStory{}); err != nil {
+		t.Fatalf("migrate db: %v", err)
+	}
+
+	updatedAt := time.Date(2026, 3, 23, 22, 10, 15, 0, time.UTC)
+	story := model.UserStory{
+		ProjectID:          2,
+		Title:              "测试故事",
+		StoryType:          model.StoryTypeFeature,
+		Status:             model.StoryStatusBacklog,
+		ReviewStatus:       model.ReviewStatusPending,
+		CreatedBy:          1,
+		AcceptanceCriteria: datatypes.JSON([]byte("[]")),
+		Tags:               datatypes.JSON([]byte("[]")),
+		CodeReferences:     datatypes.JSON([]byte("[]")),
+		UpdatedAt:          updatedAt,
+	}
+	if err := db.Create(&story).Error; err != nil {
+		t.Fatalf("create story: %v", err)
+	}
+
+	h := NewProjectHandler(db)
+	got, ok := h.queryProjectMaxTime(&model.UserStory{}, "updated_at", 2)
+	if !ok {
+		t.Fatal("expected queryProjectMaxTime to return a value")
+	}
+	if !got.Equal(updatedAt) {
+		t.Fatalf("expected %v, got %v", updatedAt, got)
 	}
 }

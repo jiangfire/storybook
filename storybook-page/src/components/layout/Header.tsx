@@ -4,6 +4,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { getUserInitials } from '../../utils/formatters';
 import { searchService } from '../../services/searchService';
 import { getErrorMessage } from '../../utils/error';
+import { getUserRoleLabel } from '../../utils/roleLabel';
 import type { SearchResponseData } from '../../types/api';
 import { SearchIcon } from '../ui/AppIcon';
 
@@ -117,18 +118,12 @@ export default function Header() {
   const renderBugLink = (projectID: number, bugID: number) =>
     `/projects/${projectID}/bugs?bug=${bugID}`;
 
-  const roleLabel =
-    (user?.role === 'product' && '产品经理') ||
-    (user?.role === 'developer' && '开发人员') ||
-    (user?.role === 'tester' && '测试人员') ||
-    (user?.role === 'tech_lead' && '技术负责人') ||
-    (user?.role === 'admin' && '管理员') ||
-    '协作成员';
+  const roleLabel = getUserRoleLabel(user?.role);
 
   return (
-    <header className="relative z-20 px-3 pt-3 sm:px-4 lg:px-6">
+    <header className="relative z-20 px-2 pt-2 sm:px-3 lg:px-4">
       <div className="mx-auto max-w-[1600px]">
-        <div className="surface-card rounded-[1rem] px-3 py-2.5 sm:px-4">
+        <div className="section-card rounded-[1.25rem] px-3 py-2.5 sm:px-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-4">
             <div className="flex items-center justify-between gap-3 lg:min-w-[280px]">
               <Link to="/projects" className="flex min-w-0 items-center gap-2.5">

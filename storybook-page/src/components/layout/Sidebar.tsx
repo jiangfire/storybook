@@ -84,8 +84,8 @@ export default function Sidebar({ currentProject }: SidebarProps) {
 
   return (
     <>
-      <div className="mb-3 md:hidden">
-        <div className="surface-card rounded-[1.2rem] px-3 py-3">
+      <div className="md:hidden">
+        <div className="section-card rounded-[1.2rem] px-3 py-3">
           <nav className="flex gap-2 overflow-x-auto">
             {visibleMenuItems.map((item) => {
               const Icon = item.icon;
@@ -111,7 +111,7 @@ export default function Sidebar({ currentProject }: SidebarProps) {
             <div className="mt-3 border-t border-border pt-3">
               <Link
                 to={`/projects/${currentProject.id}`}
-                className="flex items-center justify-between rounded-2xl border border-border bg-secondary-50 px-4 py-3 transition-colors hover:border-primary-200 hover:bg-white"
+                className="section-block flex items-center justify-between rounded-2xl px-4 py-3 transition-colors hover:border-primary-200 hover:bg-white"
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-text">{currentProject.name}</div>
@@ -133,8 +133,8 @@ export default function Sidebar({ currentProject }: SidebarProps) {
         </div>
       </div>
 
-      <aside className="sticky top-6 hidden w-72 self-start md:block">
-        <div className="surface-card flex max-h-[calc(100dvh-2.5rem)] min-h-[calc(100dvh-2.5rem)] flex-col rounded-[1.4rem] p-3">
+      <aside className="sticky top-3 hidden w-72 self-start md:block">
+        <div className="section-card flex max-h-[calc(100dvh-2rem)] min-h-[calc(100dvh-2rem)] flex-col rounded-[1.5rem] p-3">
           <div className="px-1 pb-2 text-[11px] font-medium text-text-light">
             主导航
           </div>
@@ -174,7 +174,7 @@ export default function Sidebar({ currentProject }: SidebarProps) {
               <div className="px-1 text-[11px] font-medium text-text-light">
                 当前项目
               </div>
-              <div className="rounded-2xl border border-border bg-secondary-50 p-4">
+              <div className="section-block rounded-2xl p-4">
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold text-text">

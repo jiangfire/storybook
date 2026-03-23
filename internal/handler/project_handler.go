@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -786,20 +787,68 @@ func (h *ProjectHandler) lastUpdatedAt(projectID uint, fallback time.Time) time.
 }
 
 func (h *ProjectHandler) queryProjectMaxTime(target any, column string, projectID uint) (time.Time, bool) {
-	var row struct {
-		T *time.Time `gorm:"column:t"`
-	}
-	if err := h.db.Model(target).
+	var raw any
+	row := h.db.Model(target).
 		Select(fmt.Sprintf("MAX(%s) AS t", column)).
 		Where("project_id = ?", projectID).
-		Scan(&row).Error; err != nil {
+		Row()
+	if err := row.Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, false
+		}
 		return time.Time{}, false
 	}
 
-	if row.T == nil || row.T.IsZero() {
+	t, ok := parseAggregatedTime(raw)
+	if !ok || t.IsZero() {
 		return time.Time{}, false
 	}
-	return *row.T, true
+	return t, true
+}
+
+func parseAggregatedTime(raw any) (time.Time, bool) {
+	switch value := raw.(type) {
+	case nil:
+		return time.Time{}, false
+	case time.Time:
+		return value, !value.IsZero()
+	case *time.Time:
+		if value == nil {
+			return time.Time{}, false
+		}
+		return *value, !value.IsZero()
+	case string:
+		return parseAggregatedTimeString(value)
+	case []byte:
+		return parseAggregatedTimeString(string(value))
+	default:
+		return time.Time{}, false
+	}
+}
+
+func parseAggregatedTimeString(raw string) (time.Time, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, false
+	}
+
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999-07:00",
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+	}
+
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return t, true
+		}
+	}
+
+	return time.Time{}, false
 }
 
 func actionText(action string) string {

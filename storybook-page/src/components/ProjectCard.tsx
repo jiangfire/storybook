@@ -29,11 +29,11 @@ export default function ProjectCard({ project }: ProjectCardProps) {
   return (
     <Link
       to={`/projects/${id}`}
-      className={`card-hover block rounded-[1.6rem] border border-border bg-gradient-to-br ${accentClass} p-5 shadow-sm transition-all duration-200 hover:border-primary-200 sm:p-6`}
+      className={`section-card card-hover block rounded-[1.6rem] bg-gradient-to-br ${accentClass} p-5 transition-colors duration-200 hover:border-primary-200 sm:p-6`}
     >
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-base font-semibold text-primary shadow-sm">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/85 text-base font-semibold text-primary">
             {name[0]}
           </div>
           <div className="min-w-0">
@@ -77,7 +77,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
 
       <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-text-light">
         <div
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-sm"
+          className="section-block inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
           title={`${member_count ?? 0} 名成员`}
         >
           <UsersIcon size={14} />
@@ -85,7 +85,7 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           <span className="text-xs text-text-light">成员</span>
         </div>
         <div
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 shadow-sm"
+          className="section-block inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
           title={`${story_count ?? 0} 个故事`}
         >
           <StoryIcon size={14} />

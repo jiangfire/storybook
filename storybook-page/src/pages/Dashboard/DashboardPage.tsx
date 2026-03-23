@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useProjectStore } from '../../stores/projectStore';
 import apiClient from '../../services/api';
+import { PageContainer, PageHero } from '../../components/page/PageLayout';
 import {
   formatStoryStatus,
   formatStoryType,
@@ -10,6 +11,7 @@ import {
   formatPriority,
   getPriorityColor,
 } from '../../utils/formatters';
+import { getUserRoleLabel } from '../../utils/roleLabel';
 import type { ApiResponse, DashboardData } from '../../types/api';
 import { resolveQuickStartProject } from './quickStart';
 import {
@@ -45,8 +47,8 @@ function StoryListSection({
   items: DashboardStoryItem[];
 }) {
   return (
-    <section className="surface-card rounded-[1.7rem] p-5 sm:p-6">
-      <div className="mb-6 flex items-center justify-between gap-3">
+    <section className="section-card rounded-[1.7rem] p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-text sm:text-xl">{title}</h2>
         <span className={`rounded-full px-3 py-1 text-sm font-medium ${badgeClass}`}>{count}</span>
       </div>
@@ -60,12 +62,12 @@ function StoryListSection({
           {emptyAction}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {items.map((story) => (
             <Link
               key={story.id}
               to={`/stories/${story.id}`}
-              className="card-hover block rounded-2xl border border-border bg-white p-4 transition-all hover:border-primary-200"
+              className="section-block block rounded-2xl p-4 transition-colors hover:border-primary-200 hover:bg-white"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex-1">
@@ -112,13 +114,7 @@ export default function DashboardPage() {
     () => resolveQuickStartProject(projects, selectedQuickProjectId),
     [projects, selectedQuickProjectId]
   );
-  const roleLabel =
-    (user?.role === 'product' && '产品经理') ||
-    (user?.role === 'developer' && '开发人员') ||
-    (user?.role === 'tester' && '测试人员') ||
-    (user?.role === 'tech_lead' && '技术负责人') ||
-    (user?.role === 'admin' && '管理员') ||
-    '协作成员';
+  const roleLabel = getUserRoleLabel(user?.role);
 
   useEffect(() => {
     if (!projects || projects.length === 0) {
@@ -156,10 +152,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
-      <section className="surface-card overflow-hidden rounded-[2rem]">
-        <div className="grid gap-6 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-8 lg:py-8">
-          <div className="space-y-5">
+    <PageContainer>
+      <PageHero className="border-primary-100 bg-gradient-to-br from-white via-secondary-50 to-primary-50/60 shadow-[0_20px_44px_-38px_rgba(16,42,67,0.28)]">
+        <div className="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:px-7 lg:py-6">
+          <div className="space-y-4">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary">
                 <ChartIcon size={14} />
@@ -176,15 +172,15 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-white p-4">
+              <div className="hero-subcard rounded-2xl p-4">
                 <div className="text-xs font-medium text-text-light">当前角色</div>
                 <div className="mt-2 text-lg font-semibold text-text">{roleLabel}</div>
               </div>
-              <div className="rounded-2xl border border-border bg-white p-4">
+              <div className="hero-subcard rounded-2xl p-4">
                 <div className="text-xs font-medium text-text-light">可见项目</div>
                 <div className="mt-2 text-lg font-semibold text-text">{projects.length}</div>
               </div>
-              <div className="rounded-2xl border border-border bg-white p-4">
+              <div className="hero-subcard rounded-2xl p-4">
                 <div className="text-xs font-medium text-text-light">我的创建权限</div>
                 <div className="mt-2 text-lg font-semibold text-text">
                   {canCreateStory ? '可创建故事' : '浏览与协作'}
@@ -193,7 +189,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
+          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white">
             <div className="text-xs font-medium text-white/70">今日重点</div>
             <div className="mt-3 text-3xl font-semibold">
               {dashboardData?.statistics.in_progress || 0}
@@ -211,16 +207,16 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-      </section>
+      </PageHero>
 
       {isLoading ? (
         <div className="state-panel state-panel-loading py-12">工作台加载中...</div>
       ) : loadError ? (
         <div className="state-panel state-panel-error">{loadError}</div>
       ) : (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 sm:gap-6">
-            <div className="surface-card card-hover rounded-[1.7rem] p-5 sm:p-6">
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 sm:gap-3">
+            <div className="section-card rounded-[1.7rem] p-4 sm:p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-base font-semibold text-text sm:text-lg">总领取</h3>
                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary-100 text-primary sm:h-12 sm:w-12">
@@ -233,7 +229,7 @@ export default function DashboardPage() {
               <p className="text-sm text-text-light">个故事</p>
             </div>
 
-            <div className="surface-card card-hover rounded-[1.7rem] p-5 sm:p-6">
+            <div className="section-card rounded-[1.7rem] p-4 sm:p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-base font-semibold text-text sm:text-lg">进行中</h3>
                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-warning-light text-warning sm:h-12 sm:w-12">
@@ -246,7 +242,7 @@ export default function DashboardPage() {
               <p className="text-sm text-text-light">个故事</p>
             </div>
 
-            <div className="surface-card card-hover rounded-[1.7rem] p-5 sm:col-span-2 sm:p-6 xl:col-span-1">
+            <div className="section-card rounded-[1.7rem] p-4 sm:col-span-2 sm:p-5 xl:col-span-1">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-base font-semibold text-text sm:text-lg">已完成</h3>
                 <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-success text-white sm:h-12 sm:w-12">
@@ -260,7 +256,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-4">
             <StoryListSection
               title="我领取的故事"
               count={dashboardData?.my_stories.assigned.length || 0}
@@ -285,8 +281,8 @@ export default function DashboardPage() {
             />
           </div>
 
-          <section className="surface-card rounded-[1.8rem] p-5 sm:p-6">
-            <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <section className="section-card rounded-[1.8rem] p-4 sm:p-5">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <h2 className="mb-1 text-lg font-semibold text-text sm:text-xl">快速开始</h2>
                 <p className="break-words text-sm text-text-light">
@@ -314,7 +310,7 @@ export default function DashboardPage() {
             </div>
 
             {!quickStartProject ? (
-              <div className="rounded-2xl border border-dashed border-border bg-secondary-50 p-5">
+              <div className="section-block rounded-2xl border-dashed p-5">
                 <div className="mb-4 text-sm text-text-light">当前还没有可操作的项目</div>
                 <Link
                   to="/projects"
@@ -331,7 +327,7 @@ export default function DashboardPage() {
               >
                 <Link
                   to={`/projects/${quickStartProject.id}`}
-                  className="rounded-2xl border border-border bg-secondary-50 p-4 transition-colors hover:border-primary-200 hover:bg-white"
+                  className="section-block rounded-2xl p-4 transition-colors hover:border-primary-200 hover:bg-white"
                 >
                   <div className="mb-2 text-primary">
                     <FolderIcon size={24} />
@@ -342,7 +338,7 @@ export default function DashboardPage() {
 
                 <Link
                   to={`/projects/${quickStartProject.id}/board`}
-                  className="rounded-2xl border border-border bg-secondary-50 p-4 transition-colors hover:border-primary-200 hover:bg-white"
+                  className="section-block rounded-2xl p-4 transition-colors hover:border-primary-200 hover:bg-white"
                 >
                   <div className="mb-2 text-primary">
                     <BoardIcon size={24} />
@@ -354,7 +350,7 @@ export default function DashboardPage() {
                 {canCreateStory && (
                   <Link
                     to={`/projects/${quickStartProject.id}/stories/new`}
-                    className="rounded-2xl border border-border bg-secondary-50 p-4 text-left transition-colors hover:border-primary-200 hover:bg-white"
+                    className="section-block rounded-2xl p-4 text-left transition-colors hover:border-primary-200 hover:bg-white"
                   >
                     <div className="mb-2 text-primary">
                       <SparklesIcon size={24} />
@@ -368,7 +364,7 @@ export default function DashboardPage() {
           </section>
 
           {projects && projects.length > 0 && (
-            <section className="surface-card rounded-[1.8rem] p-5 sm:p-6">
+            <section className="section-card rounded-[1.8rem] p-4 sm:p-5">
               <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-text sm:text-xl">最近项目</h2>
                 {ownerProjects > 0 && (
@@ -380,12 +376,12 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {projects.slice(0, 6).map((project) => (
                   <Link
                     key={project.id}
                     to={`/projects/${project.id}`}
-                    className="card-hover rounded-2xl border border-border bg-white p-4 transition-all hover:border-primary-200"
+                    className="section-block rounded-2xl p-4 transition-colors hover:border-primary-200 hover:bg-white"
                   >
                     <div className="mb-2 flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
@@ -427,6 +423,6 @@ export default function DashboardPage() {
           )}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

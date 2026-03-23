@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
+import { PageContainer, PageHero } from '../../components/page/PageLayout';
 import { bugService } from '../../services/bugService';
 import { projectService } from '../../services/projectService';
 import { storyService } from '../../services/storyService';
@@ -329,9 +330,9 @@ export default function ProjectBugsPage() {
   }
 
   return (
-    <div className="space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
-      <section className="surface-card overflow-hidden rounded-[2rem]">
-        <div className="grid gap-5 px-5 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] lg:px-8 lg:py-8">
+    <PageContainer>
+      <PageHero className="border-danger/20 bg-gradient-to-br from-white via-secondary-50 to-danger-light/50 shadow-[0_20px_44px_-38px_rgba(16,42,67,0.28)]">
+        <div className="grid gap-4 px-5 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)] lg:px-7 lg:py-6">
           <div className="space-y-4">
             <span className="inline-flex items-center gap-2 rounded-full bg-danger-light px-3 py-1 text-xs font-medium text-danger">
               <BugIcon size={14} />
@@ -356,7 +357,7 @@ export default function ProjectBugsPage() {
             </div>
           </div>
 
-          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white shadow-md">
+          <div className="rounded-[1.6rem] border border-primary-700 bg-primary-800 p-5 text-white">
             <div className="text-xs font-medium text-white/70">筛选重点</div>
             <div className="mt-3 text-2xl font-semibold">{activeFilterCount} 个筛选条件生效</div>
             <p className="mt-2 text-sm leading-6 text-white/80">
@@ -373,31 +374,31 @@ export default function ProjectBugsPage() {
             </div>
           </div>
         </div>
-      </section>
+      </PageHero>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="surface-card rounded-[1.5rem] p-4">
+      <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="section-card rounded-[1.5rem] p-3.5">
           <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <BugIcon size={14} />
             全部
           </div>
           <div className="mt-3 text-3xl font-semibold text-text">{bugSummary.total}</div>
         </div>
-        <div className="surface-card rounded-[1.5rem] p-4">
+        <div className="section-card rounded-[1.5rem] p-3.5">
           <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <InboxIcon size={14} />
             待处理
           </div>
           <div className="mt-3 text-3xl font-semibold text-info">{bugSummary.open}</div>
         </div>
-        <div className="surface-card rounded-[1.5rem] p-4">
+        <div className="section-card rounded-[1.5rem] p-3.5">
           <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <WrenchIcon size={14} />
             处理中
           </div>
           <div className="mt-3 text-3xl font-semibold text-warning">{bugSummary.progressing}</div>
         </div>
-        <div className="surface-card rounded-[1.5rem] p-4">
+        <div className="section-card rounded-[1.5rem] p-3.5">
           <div className="flex items-center gap-2 text-xs font-medium text-text-light">
             <UsersIcon size={14} />
             未指派
@@ -406,8 +407,8 @@ export default function ProjectBugsPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <div className="surface-card rounded-[1.8rem] p-4 sm:p-5">
+      <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="section-card rounded-[1.8rem] p-3.5 sm:p-4">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-text">新建缺陷</h2>
@@ -418,7 +419,7 @@ export default function ProjectBugsPage() {
               严重 {bugSummary.critical}
             </span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div>
               <label className="mb-2 block text-sm font-medium text-text">标题</label>
               <input
@@ -492,7 +493,7 @@ export default function ProjectBugsPage() {
           </div>
         </div>
 
-        <div className="surface-card rounded-[1.8rem] p-4 sm:p-5">
+        <div className="section-card rounded-[1.8rem] p-3.5 sm:p-4">
           <div className="mb-4">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-text">筛选</h2>
@@ -504,7 +505,7 @@ export default function ProjectBugsPage() {
             </div>
             <p className="mt-1 text-sm text-text-light">优先把待处理和高严重级别问题收拢出来。</p>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div>
               <label className="mb-2 block text-sm font-medium text-text">状态</label>
               <select
@@ -572,7 +573,7 @@ export default function ProjectBugsPage() {
           当前筛选下暂无缺陷
         </div>
       ) : (
-        <section className="space-y-3">
+        <section className="section-card space-y-2.5 rounded-[1.8rem] p-3.5 sm:p-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold text-text">缺陷列表</h2>
@@ -596,108 +597,110 @@ export default function ProjectBugsPage() {
               </div>
             )}
           </div>
-          <div className="space-y-3">
-          {bugs.map((bug) => {
-            const statusMeta = getStatusMeta(bug.status);
-            const severityMeta = getSeverityMeta(bug.severity);
-            const StatusIcon = statusMeta.icon;
+          <div className="space-y-2">
+            {bugs.map((bug) => {
+              const statusMeta = getStatusMeta(bug.status);
+              const severityMeta = getSeverityMeta(bug.severity);
+              const StatusIcon = statusMeta.icon;
 
-            return (
-              <div
-                key={bug.id}
-                className={`card-hover rounded-[1.6rem] border p-4 shadow-sm sm:p-5 ${statusMeta.cardClass}`}
-              >
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold text-text">#{bug.id}</span>
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.badgeClass}`}
-                        >
-                          <StatusIcon size={12} />
-                          {formatBugStatus(bug.status)}
-                        </span>
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${severityMeta.badgeClass}`}
-                        >
-                          {formatBugSeverity(bug.severity)}
-                        </span>
-                      </div>
-                      <div className="mt-2 text-base font-semibold text-text sm:text-lg">
-                        {bug.title}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-light">
-                        <span className="inline-flex items-center gap-1">
-                          <UsersIcon size={12} />
-                          {renderAssignedTo(bug)}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <ClipboardIcon size={12} />
-                          更新于 {formatDate(bug.updated_at)}
-                        </span>
-                        {bug.story_id && (
-                          <span className="inline-flex items-center gap-1">
-                            <StoryIcon size={12} />
-                            故事 #{bug.story_id}
-                            {storyTitleMap.get(bug.story_id)
-                              ? ` · ${storyTitleMap.get(bug.story_id)}`
-                              : ''}
+              return (
+                <div
+                  key={bug.id}
+                  className={`rounded-[1.6rem] border p-3.5 sm:p-4 ${statusMeta.cardClass}`}
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-text">#{bug.id}</span>
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${statusMeta.badgeClass}`}
+                          >
+                            <StatusIcon size={12} />
+                            {formatBugStatus(bug.status)}
                           </span>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${severityMeta.badgeClass}`}
+                          >
+                            {formatBugSeverity(bug.severity)}
+                          </span>
+                        </div>
+                        <div className="mt-2 text-base font-semibold text-text sm:text-lg">
+                          {bug.title}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-light">
+                          <span className="inline-flex items-center gap-1">
+                            <UsersIcon size={12} />
+                            {renderAssignedTo(bug)}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <ClipboardIcon size={12} />
+                            更新于 {formatDate(bug.updated_at)}
+                          </span>
+                          {bug.story_id && (
+                            <span className="inline-flex items-center gap-1">
+                              <StoryIcon size={12} />
+                              故事 #{bug.story_id}
+                              {storyTitleMap.get(bug.story_id)
+                                ? ` · ${storyTitleMap.get(bug.story_id)}`
+                                : ''}
+                            </span>
+                          )}
+                        </div>
+                        {bug.description && (
+                          <p className="mt-3 line-clamp-2 text-sm leading-6 text-text-light">
+                            {bug.description}
+                          </p>
                         )}
                       </div>
-                      {bug.description && (
-                        <p className="mt-3 line-clamp-2 text-sm leading-6 text-text-light">{bug.description}</p>
-                      )}
-                    </div>
-                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px]">
-                      <select
-                        value={bug.status}
-                        onChange={(e) =>
-                          void handleStatusChange(
-                            bug.id,
-                            e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed'
-                          )
-                        }
-                        className="field-control"
-                      >
-                        {BUG_STATUS_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={
-                          bug.assigned_to
-                            ? typeof bug.assigned_to === 'number'
-                              ? String(bug.assigned_to)
-                              : String(bug.assigned_to.id)
-                            : ''
-                        }
-                        onChange={(e) => void handleAssign(bug.id, e.target.value)}
-                        className="field-control"
-                      >
-                        <option value="">未指派</option>
-                        {assigneeOptions.map((member) => (
-                          <option key={member.id} value={member.id}>
-                            {member.email}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => void openBugDetail(bug.id)}
-                      >
-                        查看详情
-                      </Button>
+                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px]">
+                        <select
+                          value={bug.status}
+                          onChange={(e) =>
+                            void handleStatusChange(
+                              bug.id,
+                              e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed'
+                            )
+                          }
+                          className="field-control"
+                        >
+                          {BUG_STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={
+                            bug.assigned_to
+                              ? typeof bug.assigned_to === 'number'
+                                ? String(bug.assigned_to)
+                                : String(bug.assigned_to.id)
+                              : ''
+                          }
+                          onChange={(e) => void handleAssign(bug.id, e.target.value)}
+                          className="field-control"
+                        >
+                          <option value="">未指派</option>
+                          {assigneeOptions.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.email}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => void openBugDetail(bug.id)}
+                        >
+                          查看详情
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
         </section>
       )}
@@ -744,6 +747,6 @@ export default function ProjectBugsPage() {
           </div>
         )}
       </Modal>
-    </div>
+    </PageContainer>
   );
 }

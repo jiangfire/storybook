@@ -1,6 +1,8 @@
 package router
 
 import (
+	"log/slog"
+
 	"git.neolidy.top/neo/storybook/internal/auth"
 	"git.neolidy.top/neo/storybook/internal/handler"
 	"git.neolidy.top/neo/storybook/internal/middleware"
@@ -12,10 +14,14 @@ import (
 )
 
 func New(db *gorm.DB, tokenManager *auth.TokenManager) *gin.Engine {
+	return NewWithLogger(db, tokenManager, slog.Default())
+}
+
+func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Logger) *gin.Engine {
 	// 统一启用严格JSON解码，避免未知字段静默吞掉。
 	gin.EnableJsonDecoderDisallowUnknownFields()
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery(), middleware.CORS())
+	r.Use(middleware.RequestLogger(logger), middleware.Recovery(logger), middleware.CORS())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})

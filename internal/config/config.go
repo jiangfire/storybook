@@ -12,6 +12,8 @@ type Config struct {
 	DBDriver        string
 	DBDSN           string
 	JWTSecret       string
+	LogLevel        string
+	LogFormat       string
 	AccessTokenTTL  int // 小时
 	RefreshTokenTTL int // 小时
 }
@@ -22,6 +24,8 @@ func Load() (*Config, error) {
 		DBDriver:        getEnv("DB_DRIVER", "sqlite"),
 		DBDSN:           getEnv("DB_DSN", "storybook.db"),
 		JWTSecret:       strings.TrimSpace(os.Getenv("JWT_SECRET")),
+		LogLevel:        getEnv("LOG_LEVEL", "info"),
+		LogFormat:       getEnv("LOG_FORMAT", "text"),
 		AccessTokenTTL:  24,
 		RefreshTokenTTL: 24 * 7,
 	}

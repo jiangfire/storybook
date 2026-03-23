@@ -185,6 +185,23 @@ body {
   box-shadow: 0 10px 24px -26px rgba(16, 42, 67, 0.2);
 }
 
+.section-card {
+  border: 1px solid #d7e1ea;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  box-shadow: 0 14px 28px -34px rgba(16, 42, 67, 0.22);
+}
+
+.section-block {
+  border: 1px solid #e2e8f0;
+  background: #f7f9fc;
+}
+
+.hero-subcard {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.74);
+  backdrop-filter: blur(4px);
+}
+
 /* 按钮基础样式 */
 .btn {
   display: inline-flex;
