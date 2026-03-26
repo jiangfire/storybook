@@ -1,0 +1,247 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1774535001401,
+  "projectRoot": "C:\\Users\\yimo\\Codes\\storybook\\storybook-page",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "react",
+        "version": "19.2.3",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.3",
+        "category": "frontend"
+      },
+      {
+        "name": "vitest",
+        "version": "4.0.18",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": "pnpm test",
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "build": "rsbuild build",
+      "build:embed": "rsbuild build && node scripts/copy-dist.js",
+      "dev": "rsbuild dev --open",
+      "format": "prettier --write .",
+      "lint": "eslint .",
+      "preview": "rsbuild preview",
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "test:coverage": "vitest run --coverage"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "scripts",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "coverage": {
+      "path": "coverage",
+      "purpose": null,
+      "fileCount": 9,
+      "lastAccessed": 1774535001380,
+      "keyFiles": [
+        "base.css",
+        "block-navigation.js",
+        "coverage-summary.json",
+        "favicon.png",
+        "index.html"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 2,
+      "lastAccessed": 1774535001381,
+      "keyFiles": [
+        "favicon.png",
+        "index.html"
+      ]
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 2,
+      "lastAccessed": 1774535001390,
+      "keyFiles": [
+        "favicon.png",
+        "index.html"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1774535001390,
+      "keyFiles": [
+        "copy-dist.js"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 5,
+      "lastAccessed": 1774535001391,
+      "keyFiles": [
+        "App.css",
+        "App.tsx",
+        "env.d.ts",
+        "index.css",
+        "index.tsx"
+      ]
+    },
+    "coverage\\src": {
+      "path": "coverage\\src",
+      "purpose": "Source code",
+      "fileCount": 2,
+      "lastAccessed": 1774535001391,
+      "keyFiles": [
+        "App.tsx.html",
+        "index.html"
+      ]
+    },
+    "dist\\static": {
+      "path": "dist\\static",
+      "purpose": "Static files",
+      "fileCount": 0,
+      "lastAccessed": 1774535001392,
+      "keyFiles": []
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 3,
+      "lastAccessed": 1774535001392,
+      "keyFiles": [
+        "ErrorBoundary.tsx",
+        "ProjectCard.tsx",
+        "ProtectedRoute.tsx"
+      ]
+    },
+    "src\\pages": {
+      "path": "src\\pages",
+      "purpose": "Page components",
+      "fileCount": 0,
+      "lastAccessed": 1774535001392,
+      "keyFiles": []
+    },
+    "src\\services": {
+      "path": "src\\services",
+      "purpose": "Business logic services",
+      "fileCount": 11,
+      "lastAccessed": 1774535001393,
+      "keyFiles": [
+        "aiService.ts",
+        "api.ts",
+        "authService.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src\\components\\story\\StoryForm.tsx",
+      "accessCount": 43,
+      "lastAccessed": 1774535498307,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\__tests__\\StoryForm.test.tsx",
+      "accessCount": 11,
+      "lastAccessed": 1774535437477,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\__tests__\\AICreator.test.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1774535113736,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\__tests__\\AcceptanceCriteriaManager.test.tsx",
+      "accessCount": 5,
+      "lastAccessed": 1774535546807,
+      "type": "file"
+    },
+    {
+      "path": "src\\services\\aiService.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774535095453,
+      "type": "directory"
+    },
+    {
+      "path": "src\\types\\api.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774535102822,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\story\\AICreator.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774535032151,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 1,
+      "lastAccessed": 1774535062945,
+      "type": "directory"
+    },
+    {
+      "path": "src\\utils\\validators.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774535394893,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\story\\AcceptanceCriteriaManager.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774535511221,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

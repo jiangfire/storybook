@@ -496,6 +496,24 @@ export interface SearchResponseData {
   }>;
 }
 
+export interface SemanticStorySearchItem {
+  id: number;
+  project_id: number;
+  title: string;
+  story_type: string;
+  status: string;
+  priority: number;
+  similarity: number;
+}
+
+export interface SemanticStorySearchResponse {
+  stories: SemanticStorySearchItem[];
+}
+
+export interface SearchCapabilitiesResponse {
+  semantic_enabled: boolean;
+}
+
 // ===== AI相关 =====
 
 // AI生成故事请求

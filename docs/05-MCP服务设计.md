@@ -2,6 +2,8 @@
 
 > Model Context Protocol (MCP) 服务，让Claude Code深度参与开发过程，确保AC（验收标准）被系统化验证。
 
+> 注意：本文中的 `cmd/mcp` 是独立的标准 MCP HTTP 服务；主应用进程里现有的 `/mcp/...` 业务 REST 路由不等同于标准 MCP transport。
+
 ---
 
 ## 一、MCP服务概述
@@ -31,7 +33,7 @@
 │                  Storybook MCP Server                    │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │              MCP Transport Layer                  │  │
-│  │  (stdio / HTTP / WebSocket)                      │  │
+│  │              (HTTP MCP Transport)               │  │
 │  └──────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │              MCP Tool Handlers                   │  │
@@ -384,8 +386,7 @@
 pkg/mcp/
 ├── server.go              # MCP服务器
 ├── transport/             # 传输层
-│   ├── stdio.go          # stdio传输
-│   └── http.go           # HTTP传输
+│   └── http.go           # HTTP MCP transport
 ├── handlers/              # 工具处理器
 │   ├── story_reader.go   # 故事读取
 │   ├── ac_validator.go   # AC验证
@@ -494,100 +495,76 @@ type ACMapItem struct {
 
 ### 4.3 MCP服务器实现
 
-```go
-// pkg/mcp/server.go
-package mcp
+当前仓库中的 `pkg/mcp/server.go` 已改为 **标准 MCP HTTP + JSON-RPC 2.0** 实现，不再使用早期的自定义 `{tool, arguments}` CLI 协议。
 
-import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "os"
-)
+当前行为摘要：
 
-type MCPServer struct {
-    name    string
-    version string
-    db      *gorm.DB
-    tools   map[string]ToolHandler
+- 独立入口为 `cmd/mcp`
+- HTTP endpoint 固定挂载在 `/mcp`
+- 默认只监听 `127.0.0.1:8081`
+- 新会话通过 `initialize` 创建，服务端返回 `Mcp-Session-Id`
+- 后续请求通过 `tools/list`、`tools/call` 访问工具
+- `DELETE /mcp` + `Mcp-Session-Id` 可主动结束会话
+- 当前实现使用纯 JSON 响应模式，不提供 SSE 流式返回
+
+初始化示例：
+
+```http
+POST /mcp
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26"
+  }
 }
+```
 
-type ToolHandler func(ctx context.Context, args map[string]interface{}) (interface{}, error)
+返回示例：
 
-func NewMCPServer(db *gorm.DB) *MCPServer {
-    server := &MCPServer{
-        name:    "storybook-mcp",
-        version: "1.0.0",
-        db:      db,
-        tools:   make(map[string]ToolHandler),
+```http
+HTTP/1.1 200 OK
+Mcp-Session-Id: 9d88d6...
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {
+      "tools": {
+        "listChanged": false
+      }
+    },
+    "serverInfo": {
+      "name": "storybook-mcp",
+      "version": "1.1.0"
     }
-
-    server.registerTools()
-    return server
+  }
 }
+```
 
-func (s *MCPServer) registerTools() {
-    s.tools["get_story"] = s.handleGetStory
-    s.tools["get_acceptance_criteria"] = s.handleGetAC
-    s.tools["validate_ac"] = s.handleValidateAC
-    s.tools["check_ac_coverage"] = s.handleCheckACCoverage
-    s.tools["generate_ac_tests"] = s.handleGenerateACTests
-    s.tools["analyze_code_ac"] = s.handleAnalyzeCodeAC
-    s.tools["update_ac_status"] = s.handleUpdateACStatus
-}
+工具调用示例：
 
-func (s *MCPServer) Start() error {
-    decoder := json.NewDecoder(os.Stdin)
-    encoder := json.NewEncoder(os.Stdout)
+```http
+POST /mcp
+Mcp-Session-Id: 9d88d6...
+Content-Type: application/json
 
-    for {
-        var request MCPRequest
-        if err := decoder.Decode(&request); err != nil {
-            return err
-        }
-
-        response := s.handleRequest(request)
-        encoder.Encode(response)
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "get_story",
+    "arguments": {
+      "story_id": 123
     }
-}
-
-func (s *MCPServer) handleRequest(req MCPRequest) MCPResponse {
-    handler, ok := s.tools[req.Tool]
-    if !ok {
-        return MCPResponse{
-            ID:      req.ID,
-            Success: false,
-            Error:   fmt.Sprintf("Unknown tool: %s", req.Tool),
-        }
-    }
-
-    result, err := handler(context.Background(), req.Arguments)
-    if err != nil {
-        return MCPResponse{
-            ID:      req.ID,
-            Success: false,
-            Error:   err.Error(),
-        }
-    }
-
-    return MCPResponse{
-        ID:      req.ID,
-        Success: true,
-        Result:  result,
-    }
-}
-
-type MCPRequest struct {
-    ID        string                 `json:"id"`
-    Tool      string                 `json:"tool"`
-    Arguments map[string]interface{} `json:"arguments"`
-}
-
-type MCPResponse struct {
-    ID      string      `json:"id"`
-    Success bool        `json:"success"`
-    Result  interface{} `json:"result,omitempty"`
-    Error   string      `json:"error,omitempty"`
+  }
 }
 ```
 
@@ -819,12 +796,9 @@ func TestLoginWithWrongCredentials(t *testing.T) {
 
 ```yaml
 # config/mcp.yaml
-server:
-  name: storybook-mcp
-  version: 1.0.0
-
 transport:
-  type: stdio  # stdio or http
+  type: http
+  addr: 127.0.0.1:8081
 
 database:
   host: localhost
@@ -832,44 +806,35 @@ database:
   name: storybook
   user: postgres
   password: postgres
-
-tools:
-  - name: get_story
-    enabled: true
-  - name: get_acceptance_criteria
-    enabled: true
-  - name: validate_ac
-    enabled: true
-  - name: check_ac_coverage
-    enabled: true
-  - name: generate_ac_tests
-    enabled: true
-  - name: analyze_code_ac
-    enabled: true
-  - name: update_ac_status
-    enabled: true
-
-logging:
-  level: info
-  file: logs/mcp.log
+  sslmode: disable
 ```
+
+说明：
+
+- 当前实现只识别 `transport.type=http`
+- `transport.addr` 或 `server.addr` 可以覆盖监听地址
+- `database.dsn` 与拆分字段二选一即可
+- `tools`、`logging`、`server.name/version` 这些字段当前实现不会读取
+- 如无配置文件，`cmd/mcp` 会回退到主应用默认数据库配置，并监听 `127.0.0.1:8081`
 
 ### 6.2 启动命令
 
 ```bash
-# 启动MCP服务
-./storybook-mcp --config config/mcp.yaml
+# 使用默认配置启动
+go run ./cmd/mcp
 
-# Claude Code配置
-# ~/.config/claude-code/mcp-servers.json
-{
-  "mcpServers": {
-    "storybook": {
-      "command": "/path/to/storybook-mcp",
-      "args": ["--config", "/path/to/config/mcp.yaml"]
-    }
-  }
-}
+# 使用自定义配置启动
+go run ./cmd/mcp -config config/mcp.yaml
+```
+
+### 6.3 客户端接入
+
+```bash
+# Claude Code
+claude mcp add --transport http storybook http://127.0.0.1:8081/mcp
+
+# Codex CLI
+codex mcp add storybook --url http://127.0.0.1:8081/mcp
 ```
 
 ---

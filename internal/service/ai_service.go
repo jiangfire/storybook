@@ -27,7 +27,13 @@ type StoryResult struct {
 	StoryPoints int      `json:"story_points"`
 	Tags        []string `json:"tags"`
 	Warnings    []string `json:"warnings,omitempty"`
+	Source      string   `json:"-"`
 }
+
+const (
+	AIResponseSourceOpenAI    = "openai"
+	AIResponseSourceHeuristic = "heuristic"
+)
 
 // StreamCallback receives incremental content chunks during streaming.
 // Return non-nil error to abort the stream.
@@ -166,7 +172,11 @@ func (s *openAIService) GenerateStory(ctx context.Context, requirement string) (
 		return nil, errors.New("openai: empty response")
 	}
 
-	return parseStoryFromContent(resp.Choices[0].Message.Content, requirement)
+	result, err := parseStoryFromContent(resp.Choices[0].Message.Content, requirement)
+	if err != nil {
+		return nil, err
+	}
+	return withOpenAIFallbackWarning(result), nil
 }
 
 func (s *openAIService) StreamGenerateStory(ctx context.Context, requirement string, cb StreamCallback) (_ *StoryResult, err error) {
@@ -213,7 +223,11 @@ func (s *openAIService) StreamGenerateStory(ctx context.Context, requirement str
 		}
 	}
 
-	return parseStoryFromContent(fullContent.String(), requirement)
+	result, err := parseStoryFromContent(fullContent.String(), requirement)
+	if err != nil {
+		return nil, err
+	}
+	return withOpenAIFallbackWarning(result), nil
 }
 
 func (s *openAIService) ChatRefine(ctx context.Context, original *StoryResult, feedback string) (*StoryResult, error) {
@@ -252,7 +266,11 @@ func (s *openAIService) ChatRefine(ctx context.Context, original *StoryResult, f
 		return nil, errors.New("openai: empty refine response")
 	}
 
-	return parseStoryFromContent(resp.Choices[0].Message.Content, original.Action)
+	result, err := parseStoryFromContent(resp.Choices[0].Message.Content, original.Action)
+	if err != nil {
+		return nil, err
+	}
+	return withOpenAIFallbackWarning(result), nil
 }
 
 func (s *openAIService) BatchGenerate(ctx context.Context, requirement string, count int) ([]*StoryResult, error) {
@@ -313,6 +331,7 @@ func (s *heuristicAIService) GenerateStory(_ context.Context, requirement string
 		StoryPoints: estimatePoints(reqText, len(ac)),
 		Tags:        tags,
 		Warnings:    warnings,
+		Source:      AIResponseSourceHeuristic,
 	}, nil
 }
 
@@ -457,6 +476,7 @@ func parseStoryFromContent(content, fallbackRequirement string) (*StoryResult, e
 		result.StoryPoints = estimatePoints(result.Action, len(result.SuggestedAC))
 	}
 	result.StoryPoints = normalizeStoryPoints(result.StoryPoints)
+	result.Source = AIResponseSourceOpenAI
 
 	return &result, nil
 }
@@ -694,7 +714,38 @@ func IsOpenAIConfigured(db *gorm.DB) bool {
 
 func ResolveAIResponseSource(svc AIService) string {
 	if svc != nil && svc.IsConfigured() {
-		return "openai"
+		return AIResponseSourceOpenAI
 	}
-	return "heuristic"
+	return AIResponseSourceHeuristic
+}
+
+func ResolveStoryResultSource(result *StoryResult, fallbackSvc AIService) string {
+	if result != nil && strings.TrimSpace(result.Source) != "" {
+		return result.Source
+	}
+	return ResolveAIResponseSource(fallbackSvc)
+}
+
+func withOpenAIFallbackWarning(result *StoryResult) *StoryResult {
+	if result == nil || result.Source == AIResponseSourceOpenAI {
+		return result
+	}
+	result.Warnings = prependStoryWarning(
+		result.Warnings,
+		"OpenAI 返回结果不可解析，已自动回退到规则草稿，请人工确认后再保存",
+	)
+	return result
+}
+
+func prependStoryWarning(warnings []string, warning string) []string {
+	warning = strings.TrimSpace(warning)
+	if warning == "" {
+		return warnings
+	}
+	for _, item := range warnings {
+		if item == warning {
+			return warnings
+		}
+	}
+	return append([]string{warning}, warnings...)
 }

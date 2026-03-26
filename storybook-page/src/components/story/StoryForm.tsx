@@ -18,6 +18,7 @@ import { getErrorMessage } from '../../utils/error';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { ArchiveIcon, BugIcon, SparklesIcon, XIcon } from '../ui/AppIcon';
+import { AICreator } from './AICreator';
 
 interface StoryFormProps {
   isOpen: boolean;
@@ -107,10 +108,6 @@ export default function StoryForm({
   const [selectedSprintID, setSelectedSprintID] = useState('');
   const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
   const [sprintError, setSprintError] = useState('');
-  const [aiRequirement, setAIRequirement] = useState('');
-  const [isAIGenerating, setIsAIGenerating] = useState(false);
-  const [aiError, setAIError] = useState('');
-  const [lastAIResult, setLastAIResult] = useState<AIGeneratedStoryResponse | null>(null);
   const [aiFieldState, setAIFieldState] = useState(initialAIFieldState);
 
   const loadStoryData = useCallback(async () => {
@@ -177,9 +174,6 @@ export default function StoryForm({
     setFieldErrors({});
     setNewACText('');
     setNewTag('');
-    setAIRequirement('');
-    setAIError('');
-    setLastAIResult(null);
     setAIFieldState(initialAIFieldState);
     setSelectedSprintID('');
   }, [isOpen, isCreateMode]);
@@ -367,30 +361,6 @@ export default function StoryForm({
     }));
   };
 
-  const handleAIGenerate = async (strategy: 'replace' | 'fill_empty') => {
-    const requirement = aiRequirement.trim();
-    if (!requirement) {
-      setAIError('请输入需求描述');
-      return;
-    }
-    try {
-      setIsAIGenerating(true);
-      setAIError('');
-      const data = await aiService.generateStory({ requirement });
-      setLastAIResult(data);
-      applyAIDraft(data.form_draft, strategy);
-      if (!data.is_configured) {
-        showSuccess('当前未配置 OpenAI，已使用内置规则草稿填充表单');
-      } else {
-        showSuccess(strategy === 'replace' ? 'AI 已覆盖填充表单' : 'AI 已补充空白字段');
-      }
-    } catch (error: unknown) {
-      setAIError(getErrorMessage(error, 'AI生成失败'));
-    } finally {
-      setIsAIGenerating(false);
-    }
-  };
-
   return (
     <Modal
       isOpen={isOpen}
@@ -399,82 +369,11 @@ export default function StoryForm({
       size="lg"
     >
       <div className="space-y-6">
-        <section
-          className={`rounded-2xl border p-5 shadow-sm ${
-            isCreateMode
-              ? 'border-primary-200 bg-gradient-to-br from-primary-50 via-white to-accent-50'
-              : 'border-blue-100 bg-blue-50/70'
-          }`}
-        >
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="space-y-1">
-              <h3 className="text-lg font-semibold text-text">AI 自动填表</h3>
-              <p className="text-sm text-text-light">根据需求生成故事草稿</p>
-            </div>
-            {lastAIResult && (
-              <span
-                className={`inline-flex items-center self-start rounded-full px-2.5 py-1 text-xs font-medium ${
-                  lastAIResult.source === 'openai'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}
-              >
-                {lastAIResult.source === 'openai' ? 'OpenAI 协作' : '规则草稿'}
-              </span>
-            )}
-          </div>
-
-          <div className="mt-5 space-y-3">
-            <div>
-              <label
-                htmlFor="ai-requirement"
-                className="mb-2 block text-sm font-medium text-text"
-              >
-                需求描述
-              </label>
-              <textarea
-                id="ai-requirement"
-                value={aiRequirement}
-                onChange={(e) => setAIRequirement(e.target.value)}
-                rows={isCreateMode ? 4 : 3}
-                placeholder="输入需求、会议纪要或原话"
-                className="w-full rounded-xl border border-primary-200 bg-white/90 px-3 py-3 text-sm leading-6 text-text shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
-              />
-            </div>
-
-            {aiError && <div className="text-xs text-danger">{aiError}</div>}
-
-            {lastAIResult?.warnings && lastAIResult.warnings.length > 0 && (
-              <div className="rounded-xl border border-blue-100 bg-white/85 px-3 py-2 space-y-1">
-                {lastAIResult.warnings.map((warning) => (
-                  <div key={warning} className="text-xs text-text-light">
-                    {warning}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => void handleAIGenerate('replace')}
-                  isLoading={isAIGenerating}
-                >
-                  生成草稿
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void handleAIGenerate('fill_empty')}
-                  isLoading={isAIGenerating}
-                >
-                  补空白
-                </Button>
-              </div>
-            </div>
-          </div>
-        </section>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+          {user?.role === 'product' || user?.role === 'admin' ? (
+            <AICreator onGenerated={applyAIDraft} />
+          ) : null}
+        </div>
 
         <section className="space-y-6 rounded-xl border border-border bg-white p-4 md:p-5">
           {/* 标题 */}

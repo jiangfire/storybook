@@ -2,12 +2,15 @@ package router
 
 import (
 	"log/slog"
+	"os"
+	"strings"
 
 	"git.neolidy.top/neo/storybook/internal/auth"
 	"git.neolidy.top/neo/storybook/internal/handler"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/realtime"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"git.neolidy.top/neo/storybook/internal/webui"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -30,7 +33,8 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	authHandler := handler.NewAuthHandler(db, tokenManager)
 	projectHandler := handler.NewProjectHandler(db)
 	hub := realtime.NewHub(db)
-	storyHandler := handler.NewStoryHandler(db, hub)
+	vectorSvc := buildVectorService(db, logger)
+	storyHandler := handler.NewStoryHandlerWithVector(db, hub, vectorSvc)
 	meHandler := handler.NewMeHandler(db)
 	aiHandler := handler.NewAIHandler(db)
 	testCaseHandler := handler.NewTestCaseHandler(db)
@@ -38,7 +42,10 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	sprintHandler := handler.NewSprintHandler(db)
 	bugHandler := handler.NewBugHandler(db)
 	reportHandler := handler.NewReportHandler(db)
-	searchHandler := handler.NewSearchHandler(db)
+	searchHandler := handler.NewSearchHandlerWithVector(db, vectorSvc)
+	if vectorSvc == nil {
+		searchHandler = handler.NewSearchHandler(db)
+	}
 	mcpHandler := handler.NewMCPHandler(db)
 	wsHandler := handler.NewWSHandler(tokenManager, hub)
 	techLeadHandler := handler.NewTechLeadHandler(db)
@@ -82,6 +89,13 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 
 		protected.GET("/me/dashboard", meHandler.Dashboard)
 		protected.GET("/search", searchHandler.Search)
+		protected.GET("/search/capabilities", searchHandler.Capabilities)
+
+		// 语义搜索（向量搜索）
+		protected.GET("/search/semantic", searchHandler.SearchSemantic)
+		protected.GET("/search/projects", searchHandler.SearchProjectsSemantic)
+		protected.POST("/stories/similar", searchHandler.SimilarStories)
+		protected.POST("/tags/suggest", searchHandler.SuggestTags)
 
 		protected.GET("/stories/:id", storyHandler.GetStory)
 		protected.PUT("/stories/:id", storyHandler.UpdateStory)
@@ -180,4 +194,36 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	webui.Register(r)
 
 	return r
+}
+
+func buildVectorService(db *gorm.DB, logger *slog.Logger) service.VectorService {
+	provider := strings.TrimSpace(os.Getenv("EMBEDDING_PROVIDER"))
+	if provider == "" {
+		return nil
+	}
+
+	if db == nil || db.Dialector.Name() != "postgres" {
+		logger.Warn("vector search disabled: postgres + pgvector is required", "provider", provider)
+		return nil
+	}
+
+	embeddingSvc, err := service.NewEmbeddingServiceFromConfig(service.EmbeddingConfig{
+		Provider:        provider,
+		OpenAIKey:       strings.TrimSpace(os.Getenv("OPENAI_API_KEY")),
+		OllamaURL:       strings.TrimSpace(os.Getenv("OLLAMA_URL")),
+		OllamaModel:     strings.TrimSpace(os.Getenv("OLLAMA_MODEL")),
+		OllamaDimension: service.ReadPositiveIntEnv("OLLAMA_DIMENSION"),
+	})
+	if err != nil {
+		logger.Warn("vector search disabled: failed to init embedding service", "provider", provider, "error", err)
+		return nil
+	}
+
+	if err := service.ValidateStoryEmbeddingDimension(db, embeddingSvc); err != nil {
+		logger.Warn("vector search disabled: invalid vector schema", "provider", provider, "error", err, "service_dimension", embeddingSvc.GetDimension())
+		return nil
+	}
+
+	logger.Info("vector search enabled", "provider", provider, "dimension", embeddingSvc.GetDimension())
+	return service.NewVectorService(db, embeddingSvc)
 }

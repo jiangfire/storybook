@@ -111,7 +111,10 @@ export default function AIConfigPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text mb-2">AI 配置</h1>
-          <p className="text-text-light">配置 OpenAI，用于根据需求自动生成并回填用户故事表单。</p>
+          <p className="text-text-light">
+            配置 OpenAI，用于根据需求自动生成并回填用户故事表单。当前故事拆分与 INVEST
+            检查仍为规则辅助。
+          </p>
         </div>
         <div
           className={`px-3 py-1.5 rounded-full text-xs font-medium ${

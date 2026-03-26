@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,6 +16,7 @@ type StoryService struct {
 	events    EventPublisher
 	workflow  *WorkflowService
 	storyRepo *repository.StoryRepository
+	vectorSvc VectorService
 }
 
 type CreateStoryInput struct {
@@ -40,11 +43,16 @@ type UpdateStoryInput struct {
 }
 
 func NewStoryService(db *gorm.DB, events EventPublisher) *StoryService {
+	return NewStoryServiceWithVector(db, events, nil)
+}
+
+func NewStoryServiceWithVector(db *gorm.DB, events EventPublisher, vectorSvc VectorService) *StoryService {
 	return &StoryService{
 		db:        db,
 		events:    events,
 		workflow:  Workflow,
 		storyRepo: repository.NewStoryRepository(db),
+		vectorSvc: vectorSvc,
 	}
 }
 
@@ -114,6 +122,7 @@ func (s *StoryService) Create(input CreateStoryInput) (*model.UserStory, error) 
 	if err := s.db.Create(&story).Error; err != nil {
 		return nil, err
 	}
+	s.indexStoryIfEnabled(&story)
 
 	_ = createActivityLog(s.db, story.ProjectID, input.UserID, "story", story.ID, "created", nil, map[string]any{
 		"title":      story.Title,
@@ -128,6 +137,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 	oldFields := map[string]any{}
 	newFields := map[string]any{}
 	changed := false
+	contentChanged := false
 
 	if input.Title != nil {
 		title := strings.TrimSpace(*input.Title)
@@ -139,6 +149,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 			newFields["title"] = title
 			story.Title = title
 			changed = true
+			contentChanged = true
 		}
 	}
 
@@ -152,6 +163,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 			newFields["description"] = desc
 			story.Description = desc
 			changed = true
+			contentChanged = true
 		}
 	}
 
@@ -165,6 +177,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 			newFields["story_type"] = storyType
 			story.StoryType = storyType
 			changed = true
+			contentChanged = true
 		}
 	}
 
@@ -203,6 +216,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 		newFields["tags"] = *input.Tags
 		story.Tags = model.MarshalJSON(*input.Tags)
 		changed = true
+		contentChanged = true
 	}
 
 	if input.AcceptanceCriteria != nil {
@@ -210,6 +224,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 		newFields["acceptance_criteria"] = *input.AcceptanceCriteria
 		story.AcceptanceCriteria = model.MarshalJSON(*input.AcceptanceCriteria)
 		changed = true
+		contentChanged = true
 	}
 
 	if !changed {
@@ -218,6 +233,9 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 
 	if err := s.db.Save(story).Error; err != nil {
 		return false, err
+	}
+	if contentChanged {
+		s.indexStoryIfEnabled(story)
 	}
 	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "updated", oldFields, newFields)
 	return true, nil
@@ -490,6 +508,23 @@ func (s *StoryService) Assign(story *model.UserStory, assignerID uint, assigneeI
 	})
 
 	return nil
+}
+
+func (s *StoryService) indexStoryIfEnabled(story *model.UserStory) {
+	if s.vectorSvc == nil || story == nil || story.Archived {
+		return
+	}
+
+	err := s.vectorSvc.IndexStory(context.Background(), story)
+	if err != nil {
+		// 记录索引错误，但不影响故事创建/更新的成功
+		slog.Warn("failed to index story",
+			"story_id", story.ID,
+			"project_id", story.ProjectID,
+			"title", story.Title,
+			"error", err,
+		)
+	}
 }
 
 var validStoryPoints = map[int]struct{}{

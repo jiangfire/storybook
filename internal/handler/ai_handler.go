@@ -76,7 +76,7 @@ func (h *AIHandler) GenerateStory(c *gin.Context) {
 		"story_points":  result.StoryPoints,
 		"tags":          result.Tags,
 		"warnings":      result.Warnings,
-		"source":        service.ResolveAIResponseSource(resolvedService),
+		"source":        service.ResolveStoryResultSource(result, resolvedService),
 		"is_configured": aiService.IsConfigured(),
 		"form_draft": gin.H{
 			"title":               result.Title,

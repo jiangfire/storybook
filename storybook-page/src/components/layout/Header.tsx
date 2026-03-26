@@ -1,12 +1,124 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { getUserInitials } from '../../utils/formatters';
 import { searchService } from '../../services/searchService';
 import { getErrorMessage } from '../../utils/error';
 import { getUserRoleLabel } from '../../utils/roleLabel';
-import type { SearchResponseData } from '../../types/api';
-import { SearchIcon } from '../ui/AppIcon';
+import type { SearchResponseData, SemanticStorySearchResponse } from '../../types/api';
+import { BugIcon, CompassIcon, FolderIcon, SearchIcon, StoryIcon } from '../ui/AppIcon';
+
+type SemanticSearchState = 'idle' | 'available' | 'unavailable' | 'error';
+
+type SemanticCapabilityState = 'enabled' | 'disabled' | 'unknown';
+
+function SemanticCapabilityIcon({ enabled }: { enabled: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      width={16}
+      height={16}
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <circle
+        cx="10"
+        cy="10"
+        r="6.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        className={enabled ? 'text-emerald-600' : 'text-slate-300'}
+      />
+      <circle
+        cx="7"
+        cy="10"
+        r="1"
+        fill="currentColor"
+        className={enabled ? 'text-emerald-600' : 'text-slate-300'}
+      />
+      <circle
+        cx="13"
+        cy="8"
+        r="1"
+        fill="currentColor"
+        className={enabled ? 'text-emerald-600' : 'text-slate-300'}
+      />
+      <circle
+        cx="12"
+        cy="13"
+        r="1"
+        fill="currentColor"
+        className={enabled ? 'text-emerald-600' : 'text-slate-300'}
+      />
+      <path
+        d="M7.8 9.6 11.9 8.4 11.2 12"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={enabled ? 'text-emerald-600' : 'text-slate-300'}
+      />
+      {!enabled && (
+        <path
+          d="M4.6 15.4 15.4 4.6"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          className="text-slate-400"
+        />
+      )}
+    </svg>
+  );
+}
+
+function SearchSectionIcon({
+  title,
+  tone = 'neutral',
+  children,
+}: {
+  title: string;
+  tone?: 'neutral' | 'semantic';
+  children: ReactNode;
+}) {
+  return (
+    <span
+      aria-label={title}
+      title={title}
+      className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
+        tone === 'semantic' ? 'bg-primary-50 text-primary' : 'bg-secondary-50 text-text-light'
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function SearchSectionPlaceholder({
+  title,
+  tone = 'neutral',
+  children,
+}: {
+  title: string;
+  tone?: 'neutral' | 'semantic';
+  children: ReactNode;
+}) {
+  return (
+    <div className="px-3 py-2">
+      <span
+        aria-label={title}
+        title={title}
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border ${
+          tone === 'semantic'
+            ? 'border-primary-100 bg-primary-50/60 text-primary/45'
+            : 'border-border bg-secondary-50 text-text-light/45'
+        }`}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
 
 export default function Header() {
   const navigate = useNavigate();
@@ -15,6 +127,10 @@ export default function Header() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchData, setSearchData] = useState<SearchResponseData | null>(null);
+  const [semanticData, setSemanticData] = useState<SemanticStorySearchResponse | null>(null);
+  const [semanticState, setSemanticState] = useState<SemanticSearchState>('idle');
+  const [semanticError, setSemanticError] = useState('');
+  const [semanticCapability, setSemanticCapability] = useState<SemanticCapabilityState>('unknown');
   const [showResult, setShowResult] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
@@ -35,12 +151,39 @@ export default function Header() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadCapabilities = async () => {
+      try {
+        const data = await searchService.getCapabilities();
+        if (cancelled) {
+          return;
+        }
+        setSemanticCapability(data.semantic_enabled ? 'enabled' : 'disabled');
+      } catch {
+        if (!cancelled) {
+          setSemanticCapability('disabled');
+        }
+      }
+    };
+
+    void loadCapabilities();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const q = query.trim();
     if (!q) {
       searchRequestIDRef.current += 1;
       setSearching(false);
       setSearchError('');
       setSearchData(null);
+      setSemanticData(null);
+      setSemanticState('idle');
+      setSemanticError('');
       setShowResult(false);
       return;
     }
@@ -51,17 +194,51 @@ export default function Header() {
       try {
         setSearching(true);
         setSearchError('');
-        const data = await searchService.search({ q, type: 'all', limit: 8 });
+        setSemanticError('');
+        const [keywordResult, semanticResult] = await Promise.allSettled([
+          searchService.search({ q, type: 'all', limit: 8 }),
+          searchService.searchSemanticStories(q, 5),
+        ]);
         if (searchRequestIDRef.current !== requestID) {
           return;
         }
-        setSearchData(data);
+
+        if (keywordResult.status === 'fulfilled') {
+          setSearchData(keywordResult.value);
+        } else {
+          setSearchData(null);
+          setSearchError(getErrorMessage(keywordResult.reason, '搜索失败'));
+        }
+
+        if (semanticResult.status === 'fulfilled') {
+          setSemanticData(semanticResult.value);
+          setSemanticState('available');
+          setSemanticCapability('enabled');
+        } else {
+          const message = getErrorMessage(semanticResult.reason, '');
+          const lowerMessage = message.toLowerCase();
+          const disabled =
+            message.includes('向量搜索服务未启用') ||
+            message.includes('postgres') ||
+            message.includes('embedding') ||
+            lowerMessage.includes('vector search');
+          setSemanticData(null);
+          setSemanticState(disabled ? 'unavailable' : 'error');
+          setSemanticError(disabled ? '' : message || '语义搜索失败');
+          if (disabled) {
+            setSemanticCapability('disabled');
+          }
+        }
+
         setShowResult(true);
       } catch (err: unknown) {
         if (searchRequestIDRef.current !== requestID) {
           return;
         }
         setSearchData(null);
+        setSemanticData(null);
+        setSemanticState('error');
+        setSemanticError('');
         setShowResult(true);
         setSearchError(getErrorMessage(err, '搜索失败'));
       } finally {
@@ -154,13 +331,28 @@ export default function Header() {
                   onFocus={() => {
                     if (query.trim() && (searchData || searchError || searching)) {
                       setShowResult(true);
+                      return;
+                    }
+                    if (query.trim() && (semanticData || semanticError || semanticState === 'available')) {
+                      setShowResult(true);
                     }
                   }}
                   onBlur={handleSearchBlur}
                   onKeyDown={handleSearchKeyDown}
                   placeholder="搜索项目 / 故事 / 缺陷"
-                  className="w-full rounded-xl border border-border bg-secondary-50 py-2.5 pl-4 pr-10 text-sm text-text outline-none transition focus:border-primary-200 focus:bg-white focus:ring-4 focus:ring-primary/10"
+                  className="w-full rounded-xl border border-border bg-secondary-50 py-2.5 pl-4 pr-16 text-sm text-text outline-none transition focus:border-primary-200 focus:bg-white focus:ring-4 focus:ring-primary/10"
                 />
+                {semanticCapability !== 'unknown' && (
+                  <span
+                    aria-label={
+                      semanticCapability === 'enabled' ? '语义搜索已启用' : '语义搜索未启用'
+                    }
+                    title={semanticCapability === 'enabled' ? '语义搜索已启用' : '语义搜索未启用'}
+                    className="absolute right-9 top-1/2 inline-flex -translate-y-1/2 items-center justify-center"
+                  >
+                    <SemanticCapabilityIcon enabled={semanticCapability === 'enabled'} />
+                  </span>
+                )}
                 <span
                   aria-hidden
                   className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center text-text-light"
@@ -179,7 +371,11 @@ export default function Header() {
                   {!searchError && !searching && searchData && (
                     <div className="space-y-3">
                       <div>
-                        <div className="mb-1 text-xs font-medium text-text-light">项目</div>
+                        <div className="mb-1">
+                          <SearchSectionIcon title="项目结果">
+                            <FolderIcon size={12} />
+                          </SearchSectionIcon>
+                        </div>
                         {searchData.projects && searchData.projects.length > 0 ? (
                           <div className="space-y-1">
                             {searchData.projects.map((item) => (
@@ -197,12 +393,18 @@ export default function Header() {
                             ))}
                           </div>
                         ) : (
-                          <div className="text-xs text-text-light">无项目结果</div>
+                          <SearchSectionPlaceholder title="无项目结果">
+                            <FolderIcon size={12} />
+                          </SearchSectionPlaceholder>
                         )}
                       </div>
 
                       <div>
-                        <div className="mb-1 text-xs font-medium text-text-light">故事</div>
+                        <div className="mb-1">
+                          <SearchSectionIcon title="故事结果">
+                            <StoryIcon size={12} />
+                          </SearchSectionIcon>
+                        </div>
                         {searchData.stories && searchData.stories.length > 0 ? (
                           <div className="space-y-1">
                             {searchData.stories.map((item) => (
@@ -220,12 +422,63 @@ export default function Header() {
                             ))}
                           </div>
                         ) : (
-                          <div className="text-xs text-text-light">无故事结果</div>
+                          <SearchSectionPlaceholder title="无故事结果">
+                            <StoryIcon size={12} />
+                          </SearchSectionPlaceholder>
                         )}
                       </div>
 
+                      {semanticState !== 'idle' && semanticState !== 'unavailable' && (
+                        <div>
+                          <div className="mb-1">
+                            <SearchSectionIcon title="语义搜索结果" tone="semantic">
+                              <CompassIcon size={12} />
+                            </SearchSectionIcon>
+                          </div>
+                          {semanticState === 'error' ? (
+                            <SearchSectionPlaceholder
+                              title={semanticError || '语义搜索暂时不可用'}
+                              tone="semantic"
+                            >
+                              <SemanticCapabilityIcon enabled={false} />
+                            </SearchSectionPlaceholder>
+                          ) : semanticData && semanticData.stories.length > 0 ? (
+                            <div className="space-y-1">
+                              {semanticData.stories.map((item) => (
+                                <button
+                                  type="button"
+                                  key={`semantic-story-${item.id}`}
+                                  className="w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-primary-50"
+                                  onClick={() => {
+                                    setShowResult(false);
+                                    navigate(`/stories/${item.id}`);
+                                  }}
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <span className="min-w-0 truncate">
+                                      #{item.id} {item.title}
+                                    </span>
+                                    <span className="shrink-0 text-xs text-primary">
+                                      {(item.similarity * 100).toFixed(0)}%
+                                    </span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <SearchSectionPlaceholder title="无语义结果" tone="semantic">
+                              <CompassIcon size={12} />
+                            </SearchSectionPlaceholder>
+                          )}
+                        </div>
+                      )}
+
                       <div>
-                        <div className="mb-1 text-xs font-medium text-text-light">缺陷</div>
+                        <div className="mb-1">
+                          <SearchSectionIcon title="缺陷结果">
+                            <BugIcon size={12} />
+                          </SearchSectionIcon>
+                        </div>
                         {searchData.bugs && searchData.bugs.length > 0 ? (
                           <div className="space-y-1">
                             {searchData.bugs.map((item) => (
@@ -243,7 +496,9 @@ export default function Header() {
                             ))}
                           </div>
                         ) : (
-                          <div className="text-xs text-text-light">无缺陷结果</div>
+                          <SearchSectionPlaceholder title="无缺陷结果">
+                            <BugIcon size={12} />
+                          </SearchSectionPlaceholder>
                         )}
                       </div>
                     </div>

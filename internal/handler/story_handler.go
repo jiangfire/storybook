@@ -27,10 +27,14 @@ type EventPublisher interface {
 }
 
 func NewStoryHandler(db *gorm.DB, events EventPublisher) *StoryHandler {
+	return NewStoryHandlerWithVector(db, events, nil)
+}
+
+func NewStoryHandlerWithVector(db *gorm.DB, events EventPublisher, vectorSvc service.VectorService) *StoryHandler {
 	return &StoryHandler{
 		db:       db,
 		events:   events,
-		storySvc: service.NewStoryService(db, events),
+		storySvc: service.NewStoryServiceWithVector(db, events, vectorSvc),
 	}
 }
 

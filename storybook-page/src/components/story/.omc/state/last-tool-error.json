@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"wc -l storybook-page/src/components/story/StoryForm.tsx\",\"description\":\"Check StoryForm line count\"}",
+  "error": "Exit code 1\nwc: storybook-page/src/components/story/StoryForm.tsx: No such file or directory",
+  "timestamp": "2026-03-26T14:26:41.911Z",
+  "retry_count": 1
+}

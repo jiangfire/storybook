@@ -461,84 +461,107 @@ export default function StoryDetailPage() {
           )}
 
           {canUseAI && (
-            <div className="bg-white rounded-xl border border-border p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-text">AI 辅助</h2>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-text-light">INVEST 质量检查</span>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleInvestCheck}
-                    isLoading={isInvestLoading}
-                  >
-                    执行检查
-                  </Button>
+            <>
+              <div className="bg-white rounded-xl border border-primary-100 p-6">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold text-text">模型辅助</h2>
+                  <p className="text-sm text-text-light">
+                    当前详情页未接入直接模型操作；模型草稿生成在创建/编辑故事表单中使用。
+                  </p>
                 </div>
-                {investError && <div className="text-xs text-danger">{investError}</div>}
-                {investResult && (
-                  <div className="bg-secondary-50 border border-border rounded-lg p-3 text-sm space-y-2">
-                    <div>
-                      总分：
-                      <span className="font-semibold">{investResult.invest_score.toFixed(1)}</span>
-                    </div>
-                    <div className="space-y-1 text-xs">
-                      {Object.entries(investResult.checks).map(([key, val]) => (
-                        <div key={key} className="flex items-center justify-between">
-                          <span>{val.title}</span>
-                          <span>
-                            {val.score.toFixed(2)} · {val.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                    {investResult.suggestions.length > 0 && (
-                      <div className="text-xs text-text-light">
-                        建议：{investResult.suggestions.join('；')}
-                      </div>
-                    )}
+                {canEditStory && (
+                  <div className="mt-4">
+                    <Button variant="secondary" size="sm" onClick={() => setIsEditOpen(true)}>
+                      打开编辑表单
+                    </Button>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <div className="text-sm text-text-light">AI 拆分大故事</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={8}
-                    value={splitTargetCount}
-                    onChange={(e) => setSplitTargetCount(Number(e.target.value) || 3)}
-                    className="w-24 px-2 py-1 border border-border rounded text-sm"
-                  />
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleSplitStory}
-                    isLoading={isSplitLoading}
-                  >
-                    生成拆分建议
-                  </Button>
+              <div className="bg-white rounded-xl border border-border p-6 space-y-4">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold text-text">规则辅助</h2>
+                  <p className="text-sm text-text-light">
+                    当前为规则/启发式分析，不调用大模型
+                  </p>
                 </div>
-                {splitError && <div className="text-xs text-danger">{splitError}</div>}
-                {splitResult && splitResult.sub_stories.length > 0 && (
-                  <div className="space-y-2">
-                    {splitResult.sub_stories.map((item, idx) => (
-                      <div
-                        key={`${item.title}-${idx}`}
-                        className="border border-border rounded-lg p-2"
-                      >
-                        <div className="text-sm font-medium text-text">{item.title}</div>
-                        <div className="text-xs text-text-light mt-1">
-                          点数 {item.story_points} · AC {item.acceptance_criteria.length} 条
-                        </div>
-                      </div>
-                    ))}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-light">INVEST 规则检查</span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleInvestCheck}
+                      isLoading={isInvestLoading}
+                    >
+                      执行检查
+                    </Button>
                   </div>
-                )}
+                  {investError && <div className="text-xs text-danger">{investError}</div>}
+                  {investResult && (
+                    <div className="bg-secondary-50 border border-border rounded-lg p-3 text-sm space-y-2">
+                      <div>
+                        总分：
+                        <span className="font-semibold">{investResult.invest_score.toFixed(1)}</span>
+                      </div>
+                      <div className="space-y-1 text-xs">
+                        {Object.entries(investResult.checks).map(([key, val]) => (
+                          <div key={key} className="flex items-center justify-between">
+                            <span>{val.title}</span>
+                            <span>
+                              {val.score.toFixed(2)} · {val.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {investResult.suggestions.length > 0 && (
+                        <div className="text-xs text-text-light">
+                          建议：{investResult.suggestions.join('；')}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-sm text-text-light">规则拆分建议</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={8}
+                      value={splitTargetCount}
+                      onChange={(e) => setSplitTargetCount(Number(e.target.value) || 3)}
+                      className="w-24 px-2 py-1 border border-border rounded text-sm"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleSplitStory}
+                      isLoading={isSplitLoading}
+                    >
+                      生成拆分建议
+                    </Button>
+                  </div>
+                  {splitError && <div className="text-xs text-danger">{splitError}</div>}
+                  {splitResult && splitResult.sub_stories.length > 0 && (
+                    <div className="space-y-2">
+                      {splitResult.sub_stories.map((item, idx) => (
+                        <div
+                          key={`${item.title}-${idx}`}
+                          className="border border-border rounded-lg p-2"
+                        >
+                          <div className="text-sm font-medium text-text">{item.title}</div>
+                          <div className="text-xs text-text-light mt-1">
+                            点数 {item.story_points} · AC {item.acceptance_criteria.length} 条
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* 基本信息 */}

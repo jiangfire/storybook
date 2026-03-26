@@ -10,9 +10,8 @@ import (
 )
 
 type runConfig struct {
-	TransportType string
-	HTTPAddr      string
-	DBConfig      *config.Config
+	HTTPAddr string
+	DBConfig *config.Config
 }
 
 type mcpFileConfig struct {
@@ -42,9 +41,8 @@ func loadRunConfig(configPath string) (*runConfig, error) {
 	}
 
 	rc := &runConfig{
-		TransportType: "stdio",
-		HTTPAddr:      ":8081",
-		DBConfig:      base,
+		HTTPAddr: "127.0.0.1:8081",
+		DBConfig: base,
 	}
 
 	configPath = strings.TrimSpace(configPath)
@@ -63,7 +61,9 @@ func loadRunConfig(configPath string) (*runConfig, error) {
 	}
 
 	if t := strings.ToLower(strings.TrimSpace(fileCfg.Transport.Type)); t != "" {
-		rc.TransportType = t
+		if t != "http" {
+			return nil, fmt.Errorf("unsupported transport.type %q: only http is supported", t)
+		}
 	}
 	if addr := strings.TrimSpace(fileCfg.Transport.Addr); addr != "" {
 		rc.HTTPAddr = addr
