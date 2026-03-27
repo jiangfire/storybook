@@ -5,7 +5,7 @@ import { projectService } from '../../services/projectService';
 import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../ui/Toast';
 import { aiService } from '../../services/aiService';
-import { isValidStoryTitle, isValidStoryDescription } from '../../utils/validators';
+import { useStoryFormValidation } from '../../hooks/useStoryFormValidation';
 import type {
   AIGeneratedStoryResponse,
   AIFormDraft,
@@ -19,6 +19,13 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { ArchiveIcon, BugIcon, SparklesIcon, XIcon } from '../ui/AppIcon';
 import { AICreator } from './AICreator';
+import { AcceptanceCriteriaManager } from './AcceptanceCriteriaManager';
+import type { AcceptanceCriterion } from './AcceptanceCriteriaManager';
+import { TagManager } from './TagManager';
+import { PrioritySelector } from './PrioritySelector';
+import { StoryPointsSelector } from './StoryPointsSelector';
+import { StoryTypeSelector } from './StoryTypeSelector';
+import { SprintPlanner } from './SprintPlanner';
 
 interface StoryFormProps {
   isOpen: boolean;
@@ -49,40 +56,6 @@ const initialStoryFormState = {
   tags: [] as string[],
 };
 
-const storyTypeOptions: Array<{
-  value: StoryType;
-  label: string;
-  icon: typeof SparklesIcon;
-  activeClass: string;
-}> = [
-  {
-    value: 'feature',
-    label: '功能',
-    icon: SparklesIcon,
-    activeClass: 'border-blue-500 bg-blue-50 text-blue-700',
-  },
-  {
-    value: 'bug',
-    label: 'Bug',
-    icon: BugIcon,
-    activeClass: 'border-red-500 bg-red-50 text-red-700',
-  },
-  {
-    value: 'chore',
-    label: '杂项',
-    icon: ArchiveIcon,
-    activeClass: 'border-primary-500 bg-secondary-50 text-text',
-  },
-];
-
-const priorityOptions = [
-  { value: 0, label: '无' },
-  { value: 1, label: '低' },
-  { value: 2, label: '中' },
-  { value: 3, label: '高' },
-  { value: 4, label: '紧急' },
-];
-
 export default function StoryForm({
   isOpen,
   onClose,
@@ -99,10 +72,8 @@ export default function StoryForm({
 
   const [formData, setFormData] = useState(initialStoryFormState);
 
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string | undefined>>({});
+  const { errors, validate, clearErrors } = useStoryFormValidation();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [newACText, setNewACText] = useState('');
-  const [newTag, setNewTag] = useState('');
   const [sprints, setSprints] = useState<SprintSummary[]>([]);
   const [isSprintsLoading, setIsSprintsLoading] = useState(false);
   const [selectedSprintID, setSelectedSprintID] = useState('');
@@ -171,32 +142,14 @@ export default function StoryForm({
     }
 
     setFormData(initialStoryFormState);
-    setFieldErrors({});
-    setNewACText('');
-    setNewTag('');
+    clearErrors();
     setAIFieldState(initialAIFieldState);
     setSelectedSprintID('');
-  }, [isOpen, isCreateMode]);
-
-  const validateForm = () => {
-    const errors: Record<string, string> = {};
-
-    if (!formData.title) {
-      errors.title = '请输入故事标题';
-    } else if (!isValidStoryTitle(formData.title)) {
-      errors.title = '标题长度应在2-200字符之间';
-    }
-
-    if (formData.description && !isValidStoryDescription(formData.description)) {
-      errors.description = '描述最多2000字符';
-    }
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  }, [isOpen, isCreateMode, clearErrors]);
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    const validationErrors = validate(formData);
+    if (Object.keys(validationErrors).length > 0) return;
 
     setIsSubmitting(true);
     try {
@@ -280,51 +233,6 @@ export default function StoryForm({
     }
   };
 
-  const addAC = () => {
-    if (!newACText.trim()) return;
-
-    setFormData({
-      ...formData,
-      acceptance_criteria: [
-        ...formData.acceptance_criteria,
-        {
-          description: newACText.trim(),
-          order: formData.acceptance_criteria.length,
-        },
-      ],
-    });
-    setAIFieldState((prev) => ({ ...prev, acceptance_criteria: true }));
-    setNewACText('');
-  };
-
-  const removeAC = (index: number) => {
-    setFormData({
-      ...formData,
-      acceptance_criteria: formData.acceptance_criteria.filter((_, i) => i !== index),
-    });
-    setAIFieldState((prev) => ({ ...prev, acceptance_criteria: true }));
-  };
-
-  const addTag = () => {
-    if (!newTag.trim()) return;
-    if (formData.tags.includes(newTag.trim())) return;
-
-    setFormData({
-      ...formData,
-      tags: [...formData.tags, newTag.trim()],
-    });
-    setAIFieldState((prev) => ({ ...prev, tags: true }));
-    setNewTag('');
-  };
-
-  const removeTag = (tag: string) => {
-    setFormData({
-      ...formData,
-      tags: formData.tags.filter((t) => t !== tag),
-    });
-    setAIFieldState((prev) => ({ ...prev, tags: true }));
-  };
-
   const applyAIDraft = (draft: AIFormDraft, strategy: 'replace' | 'fill_empty') => {
     const shouldReplace = strategy === 'replace';
     setFormData((prev) => ({
@@ -388,15 +296,15 @@ export default function StoryForm({
               onChange={(e) => {
                 setFormData({ ...formData, title: e.target.value });
                 setAIFieldState((prev) => ({ ...prev, title: true }));
-                if (fieldErrors.title) {
-                  setFieldErrors({ ...fieldErrors, title: undefined });
+                if (errors.title) {
+                  clearErrors();
                 }
               }}
-              className={`w-full px-3 py-2 border ${fieldErrors.title ? 'border-danger' : 'border-border'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary`}
+              className={`w-full px-3 py-2 border ${errors.title ? 'border-danger' : 'border-border'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary`}
               placeholder="例如：支持用户用邮箱和密码登录"
               maxLength={200}
             />
-            {fieldErrors.title && <p className="mt-1 text-sm text-danger">{fieldErrors.title}</p>}
+            {errors.title && <p className="mt-1 text-sm text-danger">{errors.title}</p>}
           </div>
 
           {/* 描述 */}
@@ -410,235 +318,80 @@ export default function StoryForm({
               onChange={(e) => {
                 setFormData({ ...formData, description: e.target.value });
                 setAIFieldState((prev) => ({ ...prev, description: true }));
-                if (fieldErrors.description) {
-                  setFieldErrors({ ...fieldErrors, description: undefined });
+                if (errors.description) {
+                  clearErrors();
                 }
               }}
-              className={`w-full px-3 py-2 border ${fieldErrors.description ? 'border-danger' : 'border-border'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none`}
+              className={`w-full px-3 py-2 border ${errors.description ? 'border-danger' : 'border-border'} rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none`}
               placeholder="作为已注册用户，我想要通过邮箱和密码登录，以便安全访问自己的数据。"
               rows={4}
               maxLength={2000}
             />
-            {fieldErrors.description && (
-              <p className="mt-1 text-sm text-danger">{fieldErrors.description}</p>
+            {errors.description && (
+              <p className="mt-1 text-sm text-danger">{errors.description}</p>
             )}
           </div>
 
           <div className="space-y-6 border-t border-border pt-6">
 
           {/* 故事类型 */}
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">故事类型</label>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {storyTypeOptions.map((type) => {
-                const Icon = type.icon;
-                return (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, story_type: type.value });
-                      setAIFieldState((prev) => ({ ...prev, story_type: true }));
-                    }}
-                    className={`rounded-lg border-2 p-3 text-left transition-all ${
-                      formData.story_type === type.value
-                        ? type.activeClass
-                        : 'border-border bg-white hover:border-primary-300'
-                    }`}
-                  >
-                    <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/80">
-                      <Icon size={18} />
-                    </div>
-                    <div className="text-sm font-medium">{type.label}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <StoryTypeSelector
+            value={formData.story_type}
+            onChange={(value) => {
+              setFormData({ ...formData, story_type: value });
+              setAIFieldState((prev) => ({ ...prev, story_type: true }));
+            }}
+          />
 
           {/* 优先级和故事点 */}
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">优先级</label>
-              <div className="flex flex-wrap items-center gap-2">
-                {priorityOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => {
-                      setFormData({ ...formData, priority: option.value });
-                      setAIFieldState((prev) => ({ ...prev, priority: true }));
-                    }}
-                    className={`rounded-full px-3 py-1.5 text-sm transition-all ${
-                      formData.priority === option.value
-                        ? option.value === 4
-                          ? 'bg-danger text-white'
-                          : option.value === 3
-                            ? 'bg-warning text-text'
-                            : option.value === 2
-                              ? 'bg-warning-light text-warning'
-                              : option.value === 1
-                                ? 'bg-info-light text-info'
-                                : 'bg-secondary-200 text-text'
-                        : 'bg-secondary-100 text-text-light hover:bg-secondary-200'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PrioritySelector
+              value={formData.priority}
+              onChange={(value) => {
+                setFormData({ ...formData, priority: value });
+                setAIFieldState((prev) => ({ ...prev, priority: true }));
+              }}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">故事点</label>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                {[1, 2, 3, 5, 8, 13].map((points) => (
-                  <button
-                    key={points}
-                    type="button"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        story_points: formData.story_points === points ? undefined : points,
-                      });
-                      setAIFieldState((prev) => ({ ...prev, story_points: true }));
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-all ${
-                      formData.story_points === points
-                        ? 'border-primary bg-primary text-white'
-                        : 'border-border bg-white text-text hover:border-primary-300'
-                    }`}
-                  >
-                    {points}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <StoryPointsSelector
+              value={formData.story_points}
+              onChange={(value) => {
+                setFormData({ ...formData, story_points: value });
+                setAIFieldState((prev) => ({ ...prev, story_points: true }));
+              }}
+            />
           </div>
 
           {!isCreateMode && (
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">冲刺规划</label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <select
-                  value={selectedSprintID}
-                  onChange={(e) => setSelectedSprintID(e.target.value)}
-                  disabled={isSprintsLoading || !canPlanSprint}
-                  className="flex-1 rounded-lg border border-border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-secondary-50"
-                >
-                  <option value="">不加入冲刺</option>
-                  {sprints.map((sprint) => (
-                    <option key={sprint.id} value={sprint.id}>
-                      {sprint.name}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleUpdateSprint}
-                  disabled={isSprintsLoading || !canPlanSprint}
-                  isLoading={isSprintSubmitting}
-                >
-                  更新冲刺
-                </Button>
-              </div>
-              {isSprintsLoading && <p className="mt-2 text-xs text-text-light">冲刺列表加载中...</p>}
-              {!canPlanSprint && <p className="mt-2 text-xs text-text-light">仅产品经理可规划冲刺</p>}
-              {sprintError && <p className="mt-2 text-xs text-danger">{sprintError}</p>}
-            </div>
+            <SprintPlanner
+              sprintId={selectedSprintID}
+              sprints={sprints}
+              isLoading={isSprintsLoading}
+              canPlan={canPlanSprint}
+              isSubmitting={isSprintSubmitting}
+              error={sprintError}
+              onSprintChange={setSelectedSprintID}
+              onUpdate={handleUpdateSprint}
+            />
           )}
 
           {/* 验收标准 */}
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">验收标准 (AC)</label>
-            <div className="mb-3 space-y-2">
-              {formData.acceptance_criteria.map((ac, index) => (
-                <div
-                  key={index}
-                  className="flex items-start space-x-2 rounded-lg bg-secondary-50 p-3"
-                >
-                  <span className="mt-1 text-text-light">{index + 1}.</span>
-                  <span className="flex-1 text-sm">{ac.description}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAC(index)}
-                    aria-label="删除验收标准"
-                    className="text-danger hover:text-danger-700"
-                  >
-                    <XIcon size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                value={newACText}
-                onChange={(e) => setNewACText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addAC();
-                  }
-                }}
-                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="添加验收标准...（按 Enter 快速添加）"
-              />
-              <button
-                type="button"
-                onClick={addAC}
-                className="rounded-lg bg-secondary px-4 py-2 text-text transition-colors hover:bg-primary-50"
-              >
-                添加
-              </button>
-            </div>
-          </div>
+          <AcceptanceCriteriaManager
+            criteria={formData.acceptance_criteria}
+            onChange={(criteria) => {
+              setFormData({ ...formData, acceptance_criteria: criteria });
+              setAIFieldState((prev) => ({ ...prev, acceptance_criteria: true }));
+            }}
+          />
 
           {/* 标签 */}
-          <div>
-            <label className="block text-sm font-medium text-text mb-2">标签</label>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {formData.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-sm text-primary"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag)}
-                    aria-label="删除标签"
-                    className="ml-2 text-primary hover:text-primary-700"
-                  >
-                    <XIcon size={12} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                type="text"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addTag();
-                  }
-                }}
-                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="添加标签...（按 Enter 快速添加）"
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                className="rounded-lg bg-secondary px-4 py-2 text-text transition-colors hover:bg-primary-50"
-              >
-                添加
-              </button>
-            </div>
-          </div>
+          <TagManager
+            tags={formData.tags}
+            onChange={(tags) => {
+              setFormData({ ...formData, tags });
+              setAIFieldState((prev) => ({ ...prev, tags: true }));
+            }}
+          />
           </div>
         </section>
 
