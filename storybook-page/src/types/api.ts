@@ -357,6 +357,10 @@ export interface ProjectMembersResponse {
   }>;
 }
 
+export interface ProjectMemberCandidatesResponse {
+  users: User[];
+}
+
 export interface TechLeadsResponse {
   tech_leads: User[];
 }

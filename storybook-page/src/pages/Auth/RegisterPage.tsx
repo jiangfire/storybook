@@ -97,7 +97,7 @@ export default function RegisterPage() {
         <div className="bg-white rounded-2xl shadow-lg p-8 animate-slideUp">
           <h2 className="text-2xl font-semibold text-text mb-6">注册</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {/* 邮箱输入 */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-text mb-2">

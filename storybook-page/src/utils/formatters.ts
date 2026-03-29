@@ -92,6 +92,7 @@ export function getStoryTypeColor(type: string): string {
  */
 export function formatStoryStatus(status: string): string {
   const labels: Record<string, string> = {
+    pending: '待审批',
     backlog: '待办',
     ready: '就绪',
     in_progress: '开发中',

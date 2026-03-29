@@ -40,6 +40,15 @@ type addProjectMemberRequest struct {
 	RoleInProject string `json:"role_in_project" binding:"required,oneof=product developer tester"`
 }
 
+var projectStoryStatuses = []string{
+	model.StoryStatusPending,
+	model.StoryStatusBacklog,
+	model.StoryStatusReady,
+	model.StoryStatusInProgress,
+	model.StoryStatusTest,
+	model.StoryStatusDone,
+}
+
 type projectItem struct {
 	ID          uint        `json:"id"`
 	Name        string      `json:"name"`
@@ -272,14 +281,10 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 		return
 	}
 
-	statusBreakdown := map[string]int64{}
-	statuses := []string{model.StoryStatusBacklog, model.StoryStatusReady, model.StoryStatusInProgress, model.StoryStatusTest, model.StoryStatusDone}
-	var totalStories int64
-	for _, status := range statuses {
-		var count int64
-		_ = h.db.Model(&model.UserStory{}).Where("project_id = ? AND status = ?", project.ID, status).Count(&count).Error
-		statusBreakdown[status] = count
-		totalStories += count
+	statusBreakdown, totalStories, err := h.storyStats(project.ID)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
 	}
 
 	doneCount := statusBreakdown[model.StoryStatusDone]
@@ -453,18 +458,10 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 		return
 	}
 
-	var totalStories int64
-	if err := h.db.Model(&model.UserStory{}).Where("project_id = ?", project.ID).Count(&totalStories).Error; err != nil {
+	statusBreakdown, totalStories, err := h.storyStats(project.ID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
-	}
-
-	statusBreakdown := map[string]int64{}
-	statuses := []string{model.StoryStatusBacklog, model.StoryStatusReady, model.StoryStatusInProgress, model.StoryStatusTest, model.StoryStatusDone}
-	for _, status := range statuses {
-		var count int64
-		_ = h.db.Model(&model.UserStory{}).Where("project_id = ? AND status = ?", project.ID, status).Count(&count).Error
-		statusBreakdown[status] = count
 	}
 
 	doneCount := statusBreakdown[model.StoryStatusDone]
@@ -671,6 +668,70 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 	})
 }
 
+func (h *ProjectHandler) ListMemberCandidates(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	projectID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "项目ID无效")
+		return
+	}
+
+	project, _, err := h.getProjectWithAccess(projectID, userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			api.NotFound(c, "项目不存在")
+			return
+		}
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if project.OwnerID != userID {
+		api.Forbidden(c, "仅项目Owner可管理成员")
+		return
+	}
+
+	subQuery := h.db.Model(&model.ProjectMember{}).
+		Select("user_id").
+		Where("project_id = ?", project.ID)
+
+	var users []model.User
+	if err := h.db.
+		Select("id, email, role, avatar_url, created_at").
+		Where("id <> ?", project.OwnerID).
+		Where("id NOT IN (?)", subQuery).
+		Order("email ASC").
+		Find(&users).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	items := make([]gin.H, 0, len(users))
+	for _, user := range users {
+		items = append(items, gin.H{
+			"id":         user.ID,
+			"email":      user.Email,
+			"role":       user.Role,
+			"avatar_url": user.AvatarURL,
+			"created_at": user.CreatedAt,
+		})
+	}
+
+	api.Success(c, "success", gin.H{
+		"project_id": project.ID,
+		"users":      items,
+	})
+}
+
 func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
@@ -743,6 +804,26 @@ func (h *ProjectHandler) getProjectWithAccess(projectID, userID uint) (*model.Pr
 		return nil, false, err
 	}
 	return project, isOwner, nil
+}
+
+func (h *ProjectHandler) storyStats(projectID uint) (map[string]int64, int64, error) {
+	var totalStories int64
+	if err := h.db.Model(&model.UserStory{}).Where("project_id = ?", projectID).Count(&totalStories).Error; err != nil {
+		return nil, 0, err
+	}
+
+	statusBreakdown := make(map[string]int64, len(projectStoryStatuses))
+	for _, status := range projectStoryStatuses {
+		var count int64
+		if err := h.db.Model(&model.UserStory{}).
+			Where("project_id = ? AND status = ?", projectID, status).
+			Count(&count).Error; err != nil {
+			return nil, 0, err
+		}
+		statusBreakdown[status] = count
+	}
+
+	return statusBreakdown, totalStories, nil
 }
 
 func (h *ProjectHandler) recentActivities(projectID uint, limit int) []gin.H {

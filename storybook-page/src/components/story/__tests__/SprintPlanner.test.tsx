@@ -1,13 +1,46 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { SprintPlanner } from '../SprintPlanner';
 import type { SprintSummary } from '../../../types/api';
 
 describe('SprintPlanner', () => {
   const mockSprints: SprintSummary[] = [
-    { id: 1, name: 'Sprint 1', start_date: '2024-01-01', end_date: '2024-01-14' },
-    { id: 2, name: 'Sprint 2', start_date: '2024-01-15', end_date: '2024-01-28' },
-    { id: 3, name: 'Sprint 3', start_date: '2024-01-29', end_date: '2024-02-11' },
+    {
+      id: 1,
+      project_id: 1,
+      name: 'Sprint 1',
+      start_date: '2024-01-01',
+      end_date: '2024-01-14',
+      status: 'planned',
+      total_stories: 0,
+      done_stories: 0,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+    },
+    {
+      id: 2,
+      project_id: 1,
+      name: 'Sprint 2',
+      start_date: '2024-01-15',
+      end_date: '2024-01-28',
+      status: 'active',
+      total_stories: 3,
+      done_stories: 1,
+      created_at: '2024-01-15T00:00:00Z',
+      updated_at: '2024-01-15T00:00:00Z',
+    },
+    {
+      id: 3,
+      project_id: 1,
+      name: 'Sprint 3',
+      start_date: '2024-01-29',
+      end_date: '2024-02-11',
+      status: 'completed',
+      total_stories: 5,
+      done_stories: 5,
+      created_at: '2024-01-29T00:00:00Z',
+      updated_at: '2024-02-11T00:00:00Z',
+    },
   ];
 
   const defaultProps = {

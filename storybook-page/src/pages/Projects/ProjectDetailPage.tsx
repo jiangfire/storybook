@@ -9,6 +9,11 @@ import { useToast } from '../../components/ui/Toast';
 import { PageContainer, PageHero } from '../../components/page/PageLayout';
 import { formatSprintStatus } from '../../utils/formatters';
 import { getErrorMessage } from '../../utils/error';
+import {
+  canCreateStory as canCreateStoryPermission,
+  canManageProjectMembers,
+  canManageTechLeads as canManageTechLeadsPermission,
+} from '../../utils/permissions';
 import type {
   BurndownReport,
   CreateSprintRequest,
@@ -55,6 +60,7 @@ export default function ProjectDetailPage() {
   const [quality, setQuality] = useState<QualityReportData | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
+  const [memberCandidates, setMemberCandidates] = useState<User[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedMemberUserID, setSelectedMemberUserID] = useState('');
   const [selectedMemberRole, setSelectedMemberRole] = useState<ProjectRole>('developer');
@@ -71,9 +77,9 @@ export default function ProjectDetailPage() {
   const [sprintForm, setSprintForm] = useState<CreateSprintRequest>(emptySprintForm);
   const [sprintFormError, setSprintFormError] = useState('');
   const project = currentProject?.id === projectID ? currentProject : null;
-  const canManageMembers = user?.role === 'product' || user?.role === 'admin';
-  const canManageTechLeads = user?.role === 'admin';
-  const canCreateStory = user?.role === 'product' || user?.role === 'admin';
+  const canManageMembers = canManageProjectMembers(project);
+  const canManageTechLeads = canManageTechLeadsPermission(user?.role);
+  const canCreateStory = canCreateStoryPermission(user?.role);
 
   const loadMembers = useCallback(async (pid: number) => {
     try {
@@ -84,6 +90,15 @@ export default function ProjectDetailPage() {
     } catch {
       setMemberError('成员列表加载失败');
       setMembers([]);
+    }
+  }, []);
+
+  const loadMemberCandidates = useCallback(async (pid: number) => {
+    try {
+      const data = await projectService.getProjectMemberCandidates(pid);
+      setMemberCandidates(data.users || []);
+    } catch {
+      setMemberCandidates([]);
     }
   }, []);
 
@@ -193,12 +208,23 @@ export default function ProjectDetailPage() {
     if (Number.isNaN(projectID) || projectID <= 0) {
       return;
     }
-    if (canManageMembers || canManageTechLeads) {
+    if (canManageMembers) {
+      void loadMemberCandidates(projectID);
+    } else {
+      setMemberCandidates([]);
+    }
+  }, [projectID, canManageMembers, loadMemberCandidates]);
+
+  useEffect(() => {
+    if (Number.isNaN(projectID) || projectID <= 0) {
+      return;
+    }
+    if (canManageTechLeads) {
       void loadAllUsers();
     } else {
       setAllUsers([]);
     }
-  }, [projectID, canManageMembers, canManageTechLeads, loadAllUsers]);
+  }, [projectID, canManageTechLeads, loadAllUsers]);
 
   useEffect(() => {
     if (!Number.isNaN(projectID) && projectID > 0 && selectedSprintID) {
@@ -221,6 +247,7 @@ export default function ProjectDetailPage() {
       showSuccess('项目成员添加成功');
       setSelectedMemberUserID('');
       await loadMembers(projectID);
+      await loadMemberCandidates(projectID);
     } catch (error: unknown) {
       showError(getErrorMessage(error, '成员添加失败'));
     } finally {
@@ -280,6 +307,7 @@ export default function ProjectDetailPage() {
         await projectService.removeProjectMember(projectID, confirmAction.userID);
         showSuccess('成员移除成功');
         await loadMembers(projectID);
+        await loadMemberCandidates(projectID);
       } else {
         setRemovingTechLeadID(confirmAction.userID);
         await techLeadService.removeTechLead(projectID, confirmAction.userID);
@@ -388,6 +416,7 @@ export default function ProjectDetailPage() {
   }
 
   const statusBreakdown = projectOverview?.statistics?.status_breakdown || {
+    pending: 0,
     backlog: 0,
     ready: 0,
     in_progress: 0,
@@ -400,7 +429,7 @@ export default function ProjectDetailPage() {
   const activeMembers = projectOverview?.statistics?.active_members || members.length || 0;
   const inProgressStories = statusBreakdown.in_progress || 0;
   const projectModeLabel = project?.agile_mode === 'scrum' ? '冲刺模式' : '看板模式';
-  const availableMemberUsers = allUsers.filter(
+  const availableMemberUsers = memberCandidates.filter(
     (candidate) => !members.some((member) => member.user_id === candidate.id)
   );
   const availableTechLeadUsers = allUsers.filter(

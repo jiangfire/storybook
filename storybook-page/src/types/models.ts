@@ -105,6 +105,7 @@ export interface Project {
 
 // 状态分布
 export interface StatusBreakdown {
+  pending: number;
   backlog: number;
   ready: number;
   in_progress: number;

@@ -4,10 +4,8 @@ import { storyService } from '../../services/storyService';
 import { projectService } from '../../services/projectService';
 import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../ui/Toast';
-import { aiService } from '../../services/aiService';
 import { useStoryFormValidation } from '../../hooks/useStoryFormValidation';
 import type {
-  AIGeneratedStoryResponse,
   AIFormDraft,
   CreateStoryRequest,
   SprintSummary,
@@ -17,10 +15,8 @@ import type { StoryType } from '../../types/models';
 import { getErrorMessage } from '../../utils/error';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-import { ArchiveIcon, BugIcon, SparklesIcon, XIcon } from '../ui/AppIcon';
 import { AICreator } from './AICreator';
 import { AcceptanceCriteriaManager } from './AcceptanceCriteriaManager';
-import type { AcceptanceCriterion } from './AcceptanceCriteriaManager';
 import { TagManager } from './TagManager';
 import { PrioritySelector } from './PrioritySelector';
 import { StoryPointsSelector } from './StoryPointsSelector';

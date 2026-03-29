@@ -16,6 +16,12 @@ import { aiService } from '../../services/aiService';
 import type { AISplitStoryData, INVESTCheckData, SprintSummary } from '../../types/api';
 import { getErrorMessage } from '../../utils/error';
 import {
+  canClaimStory as canClaimStoryPermission,
+  canManageStoryAssignee,
+  canReleaseStory as canReleaseStoryPermission,
+  canUseStoryAI,
+} from '../../utils/permissions';
+import {
   formatStoryType,
   getStoryTypeColor,
   formatPriority,
@@ -112,8 +118,7 @@ export default function StoryDetailPage() {
     setSelectedAssigneeID(currentStory?.assigned_to?.id ? String(currentStory.assigned_to.id) : '');
   }, [currentStory?.assigned_to?.id]);
 
-  const canManageAssignee =
-    user?.role === 'product' || user?.role === 'tech_lead' || user?.role === 'admin';
+  const canManageAssignee = canManageStoryAssignee(user?.role);
 
   useEffect(() => {
     if (!currentStory?.project_id || !canManageAssignee) {
@@ -162,8 +167,9 @@ export default function StoryDetailPage() {
   };
 
   const canPlanSprint = user?.role === 'product' || user?.role === 'admin';
-  const canUseAI = user?.role === 'product' || user?.role === 'admin';
-  const canClaimStory = user?.role === 'developer';
+  const canUseAIInStory = canUseStoryAI(user?.role);
+  const canClaimCurrentStory = canClaimStoryPermission(user?.role);
+  const canReleaseCurrentStory = canReleaseStoryPermission(user, currentStory.assigned_to);
   const canEditStory =
     user?.role === 'product' || user?.role === 'admin' || user?.id === currentStory.created_by.id;
   const developerMembers = members.filter((m) => m.role_in_project === 'developer');
@@ -199,6 +205,13 @@ export default function StoryDetailPage() {
   const handleAssignStory = async () => {
     if (!canManageAssignee) {
       showError('仅产品经理、技术负责人或管理员可分配故事');
+      return;
+    }
+    if (!selectedAssigneeID && currentStory.assigned_to) {
+      await handleRelease();
+      return;
+    }
+    if (!selectedAssigneeID && !currentStory.assigned_to) {
       return;
     }
     try {
@@ -337,34 +350,25 @@ export default function StoryDetailPage() {
                   保存分配
                 </Button>
               </div>
+            ) : null}
+
+            {currentStory.assigned_to ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary-100 text-primary flex items-center justify-center text-sm font-medium">
+                  {getUserInitials(currentStory.assigned_to.email)}
+                </div>
+                <span className="text-sm text-text-light">{currentStory.assigned_to.email}</span>
+                {canReleaseCurrentStory && (
+                  <Button variant="ghost" size="sm" onClick={handleRelease} disabled={isUpdating}>
+                    释放
+                  </Button>
+                )}
+              </div>
             ) : (
-              canClaimStory && (
-                <>
-                  {currentStory.assigned_to ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-primary-100 text-primary flex items-center justify-center text-sm font-medium">
-                        {getUserInitials(currentStory.assigned_to.email)}
-                      </div>
-                      <span className="text-sm text-text-light">
-                        {currentStory.assigned_to.email}
-                      </span>
-                      {currentStory.assigned_to.id === user?.id && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleRelease}
-                          disabled={isUpdating}
-                        >
-                          释放
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <Button onClick={handleClaim} disabled={isUpdating}>
-                      领取故事
-                    </Button>
-                  )}
-                </>
+              canClaimCurrentStory && (
+                <Button onClick={handleClaim} disabled={isUpdating}>
+                  领取故事
+                </Button>
               )
             )}
           </div>
@@ -454,13 +458,13 @@ export default function StoryDetailPage() {
                   <div className="text-text-light">项目中暂无开发成员可分配</div>
                 )}
                 <div className="text-text-light">
-                  说明：产品经理、技术负责人和管理员可分配负责人；开发人员可在未分配时自行领取。
+                  说明：产品经理、技术负责人和管理员可分配负责人；开发人员和管理员可在未分配时自行领取。
                 </div>
               </div>
             </div>
           )}
 
-          {canUseAI && (
+          {canUseAIInStory && (
             <>
               <div className="bg-white rounded-xl border border-primary-100 p-6">
                 <div className="space-y-1">

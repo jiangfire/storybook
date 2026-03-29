@@ -63,7 +63,7 @@ export default function LoginPage() {
         >
           <h2 className="text-2xl font-semibold text-text mb-6">登录</h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {/* 邮箱输入 */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-text mb-2">

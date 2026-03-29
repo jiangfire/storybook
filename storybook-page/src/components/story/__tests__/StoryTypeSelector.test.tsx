@@ -1,11 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { StoryTypeSelector } from '../StoryTypeSelector';
-import type { StoryType } from '../../../types/models';
 
 describe('StoryTypeSelector', () => {
   const defaultProps = {
-    value: 'feature' as StoryType,
+    value: 'feature' as const,
     onChange: vi.fn(),
   };
 
@@ -25,7 +24,7 @@ describe('StoryTypeSelector', () => {
     });
 
     it('应该高亮当前选中的类型', () => {
-      render(<StoryTypeSelector {...defaultProps} value="bug" as StoryType />);
+      render(<StoryTypeSelector {...defaultProps} value="bug" />);
 
       const bugOption = screen.getByText('Bug').closest('button');
       expect(bugOption).toHaveClass('border-red-500');
@@ -35,7 +34,7 @@ describe('StoryTypeSelector', () => {
   describe('交互', () => {
     it('应该能够选择功能类型', () => {
       const onChange = vi.fn();
-      render(<StoryTypeSelector {...defaultProps} onChange={onChange} value="bug" as StoryType />);
+      render(<StoryTypeSelector {...defaultProps} onChange={onChange} value="bug" />);
 
       const featureButton = screen.getByText('功能');
       fireEvent.click(featureButton);
@@ -66,7 +65,7 @@ describe('StoryTypeSelector', () => {
 
   describe('样式', () => {
     it('功能类型应该有蓝色样式', () => {
-      render(<StoryTypeSelector {...defaultProps} value="feature" as StoryType />);
+      render(<StoryTypeSelector {...defaultProps} value="feature" />);
 
       const featureOption = screen.getByText('功能').closest('button');
       expect(featureOption).toHaveClass('border-blue-500');
@@ -75,7 +74,7 @@ describe('StoryTypeSelector', () => {
     });
 
     it('Bug类型应该有红色样式', () => {
-      render(<StoryTypeSelector {...defaultProps} value="bug" as StoryType />);
+      render(<StoryTypeSelector {...defaultProps} value="bug" />);
 
       const bugOption = screen.getByText('Bug').closest('button');
       expect(bugOption).toHaveClass('border-red-500');
@@ -84,7 +83,7 @@ describe('StoryTypeSelector', () => {
     });
 
     it('杂项类型应该有默认样式', () => {
-      render(<StoryTypeSelector {...defaultProps} value="chore" as StoryType />);
+      render(<StoryTypeSelector {...defaultProps} value="chore" />);
 
       const choreOption = screen.getByText('杂项').closest('button');
       expect(choreOption).toHaveClass('border-primary-500');
@@ -92,7 +91,7 @@ describe('StoryTypeSelector', () => {
     });
 
     it('未选中的类型应该有hover效果', () => {
-      render(<StoryTypeSelector {...defaultProps} value="feature" as StoryType />);
+      render(<StoryTypeSelector {...defaultProps} value="feature" />);
 
       const bugOption = screen.getByText('Bug').closest('button');
       expect(bugOption).toHaveClass('hover:border-primary-300');

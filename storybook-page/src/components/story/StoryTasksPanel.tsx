@@ -6,6 +6,17 @@ import { getErrorMessage } from '../../utils/error';
 import { useToast } from '../ui/Toast';
 import { useAuthStore } from '../../stores/authStore';
 import type { TaskItem } from '../../types/api';
+import {
+  canAddTaskCodeReference,
+  canClaimTask,
+  canCreateTask,
+  canDeleteTask,
+  canEditTask,
+  canReleaseTask,
+  canSplitStoryTasks,
+  canUpdateTaskWorkflow,
+  resolveOptionalUserID,
+} from '../../utils/permissions';
 
 interface StoryTasksPanelProps {
   storyId: number;
@@ -19,24 +30,26 @@ const taskStatusOptions: Array<{ value: TaskItem['status']; label: string }> = [
 ];
 
 function resolveAssignedID(task: TaskItem): number | null {
-  if (!task.assigned_to) {
-    return null;
-  }
-  if (typeof task.assigned_to === 'number') {
-    return task.assigned_to;
-  }
-  return task.assigned_to.id;
+  return resolveOptionalUserID(task.assigned_to);
+}
+
+function getTaskStatusLabel(status: TaskItem['status']): string {
+  return taskStatusOptions.find((option) => option.value === status)?.label || status;
 }
 
 export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
   const { user } = useAuthStore();
   const { showError, showSuccess } = useToast();
+  const canCreateTaskInStory = canCreateTask(user?.role);
+  const canSplitTasksInStory = canSplitStoryTasks(user?.role);
+  const canAddCodeReference = canAddTaskCodeReference(user?.role);
 
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [splitting, setSplitting] = useState(false);
+  const [progressDrafts, setProgressDrafts] = useState<Record<number, string>>({});
   const [taskForm, setTaskForm] = useState({
     title: '',
     description: '',
@@ -57,8 +70,10 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
       setError('');
       const data = await taskService.getStoryTasks(storyId);
       setTasks(data.tasks || []);
+      setProgressDrafts({});
     } catch (err: unknown) {
       setTasks([]);
+      setProgressDrafts({});
       setError(getErrorMessage(err, '任务列表加载失败'));
     } finally {
       setLoading(false);
@@ -70,6 +85,10 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
   }, [loadTasks]);
 
   const handleCreateTask = async () => {
+    if (!canCreateTaskInStory) {
+      showError('仅产品经理、开发或管理员可创建任务');
+      return;
+    }
     const title = taskForm.title.trim();
     if (!title) {
       showError('请输入任务标题');
@@ -94,6 +113,10 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
   };
 
   const handleSplitFromAC = async () => {
+    if (!canSplitTasksInStory) {
+      showError('仅产品经理或管理员可拆分任务');
+      return;
+    }
     try {
       setSplitting(true);
       const data = await taskService.splitFromAC(storyId);
@@ -109,6 +132,7 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
   const updateLocalTask = (next: TaskItem) => {
     setTasks((prev) => prev.map((item) => (item.id === next.id ? { ...item, ...next } : item)));
     setSelectedTask((prev) => (prev && prev.id === next.id ? { ...prev, ...next } : prev));
+    setProgressDrafts((prev) => ({ ...prev, [next.id]: String(next.progress ?? 0) }));
   };
 
   const handleStatusChange = async (task: TaskItem, status: TaskItem['status']) => {
@@ -121,11 +145,24 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
     }
   };
 
-  const handleProgressChange = async (task: TaskItem, progress: number) => {
+  const commitTaskProgress = async (task: TaskItem) => {
+    const rawValue = progressDrafts[task.id] ?? String(task.progress ?? 0);
+    const nextProgress = Number(rawValue === '' ? 0 : rawValue);
+    if (!Number.isFinite(nextProgress)) {
+      setProgressDrafts((prev) => ({ ...prev, [task.id]: String(task.progress ?? 0) }));
+      showError('请输入有效进度');
+      return;
+    }
+    const normalizedProgress = Math.max(0, Math.min(100, Math.round(nextProgress)));
+    if (normalizedProgress === (task.progress ?? 0)) {
+      setProgressDrafts((prev) => ({ ...prev, [task.id]: String(normalizedProgress) }));
+      return;
+    }
     try {
-      const updated = await taskService.updateTaskProgress(task.id, { progress });
+      const updated = await taskService.updateTaskProgress(task.id, { progress: normalizedProgress });
       updateLocalTask(updated);
     } catch (err: unknown) {
+      setProgressDrafts((prev) => ({ ...prev, [task.id]: String(task.progress ?? 0) }));
       showError(getErrorMessage(err, '更新任务进度失败'));
     }
   };
@@ -186,6 +223,10 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
     if (!selectedTask) {
       return;
     }
+    if (!canEditTask(user, selectedTask)) {
+      showError('无权编辑该任务');
+      return;
+    }
     try {
       setDetailSaving(true);
       const updated = await taskService.updateTask(selectedTask.id, {
@@ -205,6 +246,10 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
 
   const handleAddCodeRef = async () => {
     if (!selectedTask) {
+      return;
+    }
+    if (!canAddCodeReference) {
+      showError('仅开发或管理员可关联代码');
       return;
     }
     const ref = codeRef.trim();
@@ -235,52 +280,58 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
           <Button size="sm" variant="secondary" onClick={() => void loadTasks()} disabled={loading}>
             刷新
           </Button>
-          <Button size="sm" onClick={handleSplitFromAC} isLoading={splitting}>
-            AC自动拆分
-          </Button>
+          {canSplitTasksInStory && (
+            <Button size="sm" onClick={handleSplitFromAC} isLoading={splitting}>
+              AC自动拆分
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-        <input
-          value={taskForm.title}
-          onChange={(e) => setTaskForm((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="任务标题"
-          className="md:col-span-2 px-3 py-2 border border-border rounded-lg"
-        />
-        <select
-          value={taskForm.priority}
-          onChange={(e) => setTaskForm((prev) => ({ ...prev, priority: Number(e.target.value) }))}
-          className="px-3 py-2 border border-border rounded-lg"
-        >
-          <option value={0}>优先级0</option>
-          <option value={1}>优先级1</option>
-          <option value={2}>优先级2</option>
-          <option value={3}>优先级3</option>
-          <option value={4}>优先级4</option>
-        </select>
-        <input
-          type="number"
-          min={0}
-          max={500}
-          value={taskForm.estimated_hours}
-          onChange={(e) => setTaskForm((prev) => ({ ...prev, estimated_hours: e.target.value }))}
-          placeholder="预估工时"
-          className="px-3 py-2 border border-border rounded-lg"
-        />
-      </div>
-      <textarea
-        value={taskForm.description}
-        onChange={(e) => setTaskForm((prev) => ({ ...prev, description: e.target.value }))}
-        placeholder="任务描述（可选）"
-        rows={2}
-        className="w-full px-3 py-2 border border-border rounded-lg resize-none"
-      />
-      <div className="flex justify-end">
-        <Button size="sm" onClick={handleCreateTask} isLoading={creating}>
-          新建任务
-        </Button>
-      </div>
+      {canCreateTaskInStory && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <input
+              value={taskForm.title}
+              onChange={(e) => setTaskForm((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="任务标题"
+              className="md:col-span-2 px-3 py-2 border border-border rounded-lg"
+            />
+            <select
+              value={taskForm.priority}
+              onChange={(e) => setTaskForm((prev) => ({ ...prev, priority: Number(e.target.value) }))}
+              className="px-3 py-2 border border-border rounded-lg"
+            >
+              <option value={0}>优先级0</option>
+              <option value={1}>优先级1</option>
+              <option value={2}>优先级2</option>
+              <option value={3}>优先级3</option>
+              <option value={4}>优先级4</option>
+            </select>
+            <input
+              type="number"
+              min={0}
+              max={500}
+              value={taskForm.estimated_hours}
+              onChange={(e) => setTaskForm((prev) => ({ ...prev, estimated_hours: e.target.value }))}
+              placeholder="预估工时"
+              className="px-3 py-2 border border-border rounded-lg"
+            />
+          </div>
+          <textarea
+            value={taskForm.description}
+            onChange={(e) => setTaskForm((prev) => ({ ...prev, description: e.target.value }))}
+            placeholder="任务描述（可选）"
+            rows={2}
+            className="w-full px-3 py-2 border border-border rounded-lg resize-none"
+          />
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleCreateTask} isLoading={creating}>
+              新建任务
+            </Button>
+          </div>
+        </>
+      )}
 
       {error && <div className="text-sm text-danger">{error}</div>}
       {loading ? (
@@ -291,8 +342,10 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
         <div className="space-y-2">
           {tasks.map((task) => {
             const assignedTo = resolveAssignedID(task);
-            const canRelease =
-              assignedTo === user?.id || user?.role === 'product' || user?.role === 'admin';
+            const canUpdateWorkflowForTask = canUpdateTaskWorkflow(user, task.assigned_to);
+            const canClaimCurrentTask = canClaimTask(user, task.assigned_to);
+            const canReleaseCurrentTask = canReleaseTask(user, task.assigned_to);
+            const canDeleteCurrentTask = canDeleteTask(user, task);
             return (
               <div
                 key={task.id}
@@ -305,41 +358,64 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                     %
                   </div>
                 </div>
-                <select
-                  value={task.status}
-                  onChange={(e) =>
-                    void handleStatusChange(task, e.target.value as TaskItem['status'])
-                  }
-                  className="px-2 py-1 border border-border rounded text-sm"
-                >
-                  {taskStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={task.progress || 0}
-                  onChange={(e) => void handleProgressChange(task, Number(e.target.value))}
-                  className="w-20 px-2 py-1 border border-border rounded text-sm"
-                />
+                {canUpdateWorkflowForTask ? (
+                  <select
+                    value={task.status}
+                    onChange={(e) =>
+                      void handleStatusChange(task, e.target.value as TaskItem['status'])
+                    }
+                    className="px-2 py-1 border border-border rounded text-sm"
+                  >
+                    {taskStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded border border-border bg-secondary-50 px-2 py-1 text-sm text-text">
+                    {getTaskStatusLabel(task.status)}
+                  </div>
+                )}
+                {canUpdateWorkflowForTask ? (
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={progressDrafts[task.id] ?? String(task.progress ?? 0)}
+                    onChange={(e) =>
+                      setProgressDrafts((prev) => ({ ...prev, [task.id]: e.target.value }))
+                    }
+                    onBlur={() => void commitTaskProgress(task)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    className="w-20 px-2 py-1 border border-border rounded text-sm"
+                  />
+                ) : (
+                  <div className="w-20 rounded border border-border bg-secondary-50 px-2 py-1 text-sm text-text">
+                    {task.progress || 0}%
+                  </div>
+                )}
                 <Button size="sm" variant="secondary" onClick={() => void openTaskDetail(task.id)}>
                   详情
                 </Button>
-                <Button
-                  size="sm"
-                  variant={assignedTo ? 'secondary' : 'primary'}
-                  disabled={assignedTo !== null && !canRelease}
-                  onClick={() => void handleClaimOrRelease(task)}
-                >
-                  {assignedTo ? '释放' : '领取'}
-                </Button>
-                <Button size="sm" variant="danger" onClick={() => setDeleteTarget(task)}>
-                  删除
-                </Button>
+                {(canClaimCurrentTask || canReleaseCurrentTask) && (
+                  <Button
+                    size="sm"
+                    variant={assignedTo ? 'secondary' : 'primary'}
+                    onClick={() => void handleClaimOrRelease(task)}
+                  >
+                    {assignedTo ? '释放' : '领取'}
+                  </Button>
+                )}
+                {canDeleteCurrentTask && (
+                  <Button size="sm" variant="danger" onClick={() => setDeleteTarget(task)}>
+                    删除
+                  </Button>
+                )}
               </div>
             );
           })}
@@ -385,7 +461,8 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
               onChange={(e) =>
                 setSelectedTask((prev) => (prev ? { ...prev, title: e.target.value } : prev))
               }
-              className="w-full px-3 py-2 border border-border rounded-lg"
+              disabled={!canEditTask(user, selectedTask)}
+              className="w-full px-3 py-2 border border-border rounded-lg disabled:bg-secondary-50"
               placeholder="任务标题"
             />
             <textarea
@@ -394,7 +471,8 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                 setSelectedTask((prev) => (prev ? { ...prev, description: e.target.value } : prev))
               }
               rows={3}
-              className="w-full px-3 py-2 border border-border rounded-lg resize-none"
+              disabled={!canEditTask(user, selectedTask)}
+              className="w-full px-3 py-2 border border-border rounded-lg resize-none disabled:bg-secondary-50"
               placeholder="任务描述"
             />
             <div className="grid grid-cols-2 gap-2">
@@ -408,7 +486,8 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                     prev ? { ...prev, priority: Number(e.target.value) } : prev
                   )
                 }
-                className="px-3 py-2 border border-border rounded-lg"
+                disabled={!canEditTask(user, selectedTask)}
+                className="px-3 py-2 border border-border rounded-lg disabled:bg-secondary-50"
                 placeholder="优先级"
               />
               <input
@@ -421,7 +500,8 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                     prev ? { ...prev, estimated_hours: Number(e.target.value) } : prev
                   )
                 }
-                className="px-3 py-2 border border-border rounded-lg"
+                disabled={!canEditTask(user, selectedTask)}
+                className="px-3 py-2 border border-border rounded-lg disabled:bg-secondary-50"
                 placeholder="预估工时"
               />
             </div>
@@ -432,17 +512,19 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
                   ? selectedTask.code_references.join(' | ')
                   : '暂无代码引用'}
               </div>
-              <div className="flex gap-2">
-                <input
-                  value={codeRef}
-                  onChange={(e) => setCodeRef(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-border rounded-lg"
-                  placeholder="例如 src/components/Task.tsx:42"
-                />
-                <Button size="sm" onClick={handleAddCodeRef}>
-                  添加
-                </Button>
-              </div>
+              {canAddCodeReference && (
+                <div className="flex gap-2">
+                  <input
+                    value={codeRef}
+                    onChange={(e) => setCodeRef(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-border rounded-lg"
+                    placeholder="例如 src/components/Task.tsx:42"
+                  />
+                  <Button size="sm" onClick={handleAddCodeRef}>
+                    添加
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button
@@ -452,9 +534,11 @@ export default function StoryTasksPanel({ storyId }: StoryTasksPanelProps) {
               >
                 关闭
               </Button>
-              <Button onClick={handleSaveTaskDetail} isLoading={detailSaving}>
-                保存
-              </Button>
+              {canEditTask(user, selectedTask) && (
+                <Button onClick={handleSaveTaskDetail} isLoading={detailSaving}>
+                  保存
+                </Button>
+              )}
             </div>
           </div>
         )}

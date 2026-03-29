@@ -6,9 +6,16 @@ import { PageContainer, PageHero } from '../../components/page/PageLayout';
 import { bugService } from '../../services/bugService';
 import { projectService } from '../../services/projectService';
 import { storyService } from '../../services/storyService';
+import { useAuthStore } from '../../stores/authStore';
 import { getErrorMessage } from '../../utils/error';
 import { useToast } from '../../components/ui/Toast';
 import { formatBugSeverity, formatBugStatus, formatDate } from '../../utils/formatters';
+import {
+  canAssignBug,
+  canCreateBug,
+  canReceiveBugAssignments,
+  canUpdateBugStatus,
+} from '../../utils/permissions';
 import {
   ArchiveIcon,
   BugIcon,
@@ -87,7 +94,11 @@ export default function ProjectBugsPage() {
   const { id } = useParams<{ id: string }>();
   const projectID = Number(id);
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuthStore();
   const { showError, showSuccess } = useToast();
+  const canCreateBugEntry = canCreateBug(user?.role);
+  const canUpdateBugStatusEntry = canUpdateBugStatus(user?.role);
+  const canAssignBugEntry = canAssignBug(user?.role);
 
   const [bugs, setBugs] = useState<BugItem[]>([]);
   const [stories, setStories] = useState<StoryOption[]>([]);
@@ -123,6 +134,10 @@ export default function ProjectBugsPage() {
           role_in_project: member.role_in_project,
         })),
     [members]
+  );
+  const assignableOptions = useMemo(
+    () => assigneeOptions.filter((member) => canReceiveBugAssignments(member.role_in_project)),
+    [assigneeOptions]
   );
 
   const storyTitleMap = useMemo(
@@ -233,6 +248,10 @@ export default function ProjectBugsPage() {
   }, [bugQueryParam, searchParams, setSearchParams]);
 
   const handleCreate = async () => {
+    if (!canCreateBugEntry) {
+      showError('仅测试或管理员可创建缺陷');
+      return;
+    }
     const title = form.title.trim();
     if (!title) {
       showError('请输入缺陷标题');
@@ -267,6 +286,10 @@ export default function ProjectBugsPage() {
     bugID: number,
     status: 'open' | 'in_progress' | 'resolved' | 'closed'
   ) => {
+    if (!canUpdateBugStatusEntry) {
+      showError('仅开发、测试或管理员可更新缺陷状态');
+      return;
+    }
     try {
       await bugService.updateBugStatus(bugID, { status });
       setBugs((prev) => prev.map((item) => (item.id === bugID ? { ...item, status } : item)));
@@ -279,6 +302,10 @@ export default function ProjectBugsPage() {
   };
 
   const handleAssign = async (bugID: number, assignedTo: string) => {
+    if (!canAssignBugEntry) {
+      showError('仅产品经理或管理员可指派缺陷');
+      return;
+    }
     try {
       const payload = assignedTo ? Number(assignedTo) : undefined;
       const updated = await bugService.assignBug(bugID, {
@@ -412,85 +439,95 @@ export default function ProjectBugsPage() {
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-text">新建缺陷</h2>
-              <p className="mt-1 text-sm text-text-light">先把问题记清楚，再决定归属。</p>
+              <p className="mt-1 text-sm text-text-light">
+                {canCreateBugEntry
+                  ? '先把问题记清楚，再决定归属。'
+                  : '仅测试和管理员可创建缺陷，其他成员可查看与跟进。'}
+              </p>
             </div>
             <span className="inline-flex items-center gap-1 rounded-full bg-danger-light px-2.5 py-1 text-xs font-medium text-danger">
               <BugIcon size={12} />
               严重 {bugSummary.critical}
             </span>
           </div>
-          <div className="space-y-2.5">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-text">标题</label>
-              <input
-                value={form.title}
-                onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="一句话说清问题"
-                className="field-control"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-text">描述</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder="补充复现方式、影响范围或截图说明"
-                rows={4}
-                className="field-control"
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-text">严重级别</label>
-                <select
-                  value={form.severity}
-                  onChange={(e) => setForm((prev) => ({ ...prev, severity: e.target.value }))}
-                  className="field-control"
-                >
-                  {BUG_SEVERITY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+          {canCreateBugEntry ? (
+            <>
+              <div className="space-y-2.5">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-text">标题</label>
+                  <input
+                    value={form.title}
+                    onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="一句话说清问题"
+                    className="field-control"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-text">描述</label>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                    placeholder="补充复现方式、影响范围或截图说明"
+                    rows={4}
+                    className="field-control"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">严重级别</label>
+                    <select
+                      value={form.severity}
+                      onChange={(e) => setForm((prev) => ({ ...prev, severity: e.target.value }))}
+                      className="field-control"
+                    >
+                      {BUG_SEVERITY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">关联故事</label>
+                    <select
+                      value={form.story_id}
+                      onChange={(e) => setForm((prev) => ({ ...prev, story_id: e.target.value }))}
+                      className="field-control"
+                    >
+                      <option value="">暂不关联</option>
+                      {stories.map((story) => (
+                        <option key={story.id} value={story.id}>
+                          #{story.id} {story.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text">初始负责人</label>
+                    <select
+                      value={form.assigned_to}
+                      onChange={(e) => setForm((prev) => ({ ...prev, assigned_to: e.target.value }))}
+                      className="field-control"
+                    >
+                      <option value="">暂不指派</option>
+                      {assignableOptions.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.email}（{member.role_in_project}）
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-text">关联故事</label>
-                <select
-                  value={form.story_id}
-                  onChange={(e) => setForm((prev) => ({ ...prev, story_id: e.target.value }))}
-                  className="field-control"
-                >
-                  <option value="">暂不关联</option>
-                  {stories.map((story) => (
-                    <option key={story.id} value={story.id}>
-                      #{story.id} {story.title}
-                    </option>
-                  ))}
-                </select>
+              <div className="mt-4 flex justify-end">
+                <Button size="sm" onClick={handleCreate} isLoading={creating}>
+                  创建缺陷
+                </Button>
               </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-text">初始负责人</label>
-                <select
-                  value={form.assigned_to}
-                  onChange={(e) => setForm((prev) => ({ ...prev, assigned_to: e.target.value }))}
-                  className="field-control"
-                >
-                  <option value="">暂不指派</option>
-                  {assigneeOptions.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.email}（{member.role_in_project}）
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 flex justify-end">
-            <Button size="sm" onClick={handleCreate} isLoading={creating}>
-              创建缺陷
-            </Button>
-          </div>
+            </>
+          ) : (
+            <div className="state-panel state-panel-empty">当前角色没有新建缺陷权限。</div>
+          )}
         </div>
 
         <div className="section-card rounded-[1.8rem] p-3.5 sm:p-4">
@@ -654,40 +691,52 @@ export default function ProjectBugsPage() {
                         )}
                       </div>
                       <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-[220px]">
-                        <select
-                          value={bug.status}
-                          onChange={(e) =>
-                            void handleStatusChange(
-                              bug.id,
-                              e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed'
-                            )
-                          }
-                          className="field-control"
-                        >
-                          {BUG_STATUS_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={
-                            bug.assigned_to
-                              ? typeof bug.assigned_to === 'number'
-                                ? String(bug.assigned_to)
-                                : String(bug.assigned_to.id)
-                              : ''
-                          }
-                          onChange={(e) => void handleAssign(bug.id, e.target.value)}
-                          className="field-control"
-                        >
-                          <option value="">未指派</option>
-                          {assigneeOptions.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {member.email}
-                            </option>
-                          ))}
-                        </select>
+                        {canUpdateBugStatusEntry ? (
+                          <select
+                            value={bug.status}
+                            onChange={(e) =>
+                              void handleStatusChange(
+                                bug.id,
+                                e.target.value as 'open' | 'in_progress' | 'resolved' | 'closed'
+                              )
+                            }
+                            className="field-control"
+                          >
+                            {BUG_STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="field-control bg-secondary-50 text-text">
+                            {formatBugStatus(bug.status)}
+                          </div>
+                        )}
+                        {canAssignBugEntry ? (
+                          <select
+                            value={
+                              bug.assigned_to
+                                ? typeof bug.assigned_to === 'number'
+                                  ? String(bug.assigned_to)
+                                  : String(bug.assigned_to.id)
+                                : ''
+                            }
+                            onChange={(e) => void handleAssign(bug.id, e.target.value)}
+                            className="field-control"
+                          >
+                            <option value="">未指派</option>
+                            {assignableOptions.map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.email}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="field-control bg-secondary-50 text-text">
+                            {renderAssignedTo(bug)}
+                          </div>
+                        )}
                         <Button
                           size="sm"
                           variant="secondary"

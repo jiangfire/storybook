@@ -13,6 +13,7 @@ import type {
   VelocityReportData,
   QualityReportData,
   ProjectMembersResponse,
+  ProjectMemberCandidatesResponse,
 } from '../types/api';
 import type { Project, ProjectOverview } from '../types/models';
 
@@ -74,6 +75,16 @@ export const projectService = {
   async getProjectMembers(id: number) {
     const response = await apiClient.get<ApiResponse<ProjectMembersResponse>>(
       `/api/projects/${id}/members`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 获取可添加的项目成员候选人
+   */
+  async getProjectMemberCandidates(id: number) {
+    const response = await apiClient.get<ApiResponse<ProjectMemberCandidatesResponse>>(
+      `/api/projects/${id}/member-candidates`
     );
     return response.data.data;
   },

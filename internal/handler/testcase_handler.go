@@ -247,27 +247,8 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 }
 
 func (h *TestCaseHandler) loadStoryWithAccess(storyID, userID uint) (*model.UserStory, error) {
-	var story model.UserStory
-	if err := h.db.First(&story, storyID).Error; err != nil {
-		return nil, err
-	}
-
-	var project model.Project
-	if err := h.db.First(&project, story.ProjectID).Error; err != nil {
-		return nil, err
-	}
-	if project.OwnerID == userID {
-		return &story, nil
-	}
-
-	var count int64
-	if err := h.db.Model(&model.ProjectMember{}).Where("project_id = ? AND user_id = ?", project.ID, userID).Count(&count).Error; err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, errForbidden
-	}
-	return &story, nil
+	story, _, _, err := ensureStoryAccess(h.db, storyID, userID)
+	return story, err
 }
 
 func jsonUnmarshalSteps(raw []byte, out *[]string) error {

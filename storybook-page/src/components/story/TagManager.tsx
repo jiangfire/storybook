@@ -1,4 +1,5 @@
-import { useState, ChangeEvent } from 'react';
+import { useState } from 'react';
+import type { ChangeEvent, KeyboardEvent } from 'react';
 import { XIcon } from '../ui/AppIcon';
 
 interface TagManagerProps {
@@ -21,7 +22,7 @@ export const TagManager = ({ tags, onChange }: TagManagerProps) => {
     setNewTag('');
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAdd();

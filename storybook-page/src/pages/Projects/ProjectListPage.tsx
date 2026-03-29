@@ -204,10 +204,11 @@ export default function ProjectListPage() {
         <div className="space-y-4">
           {/* 项目名称 */}
           <div>
-            <label className="block text-sm font-medium text-text mb-2">
+            <label htmlFor="new-project-name" className="block text-sm font-medium text-text mb-2">
               项目名称 <span className="text-danger">*</span>
             </label>
             <input
+              id="new-project-name"
               type="text"
               value={newProject.name}
               onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
@@ -219,8 +220,11 @@ export default function ProjectListPage() {
 
           {/* 项目描述 */}
           <div>
-            <label className="block text-sm font-medium text-text mb-2">项目描述</label>
+            <label htmlFor="new-project-description" className="block text-sm font-medium text-text mb-2">
+              项目描述
+            </label>
             <textarea
+              id="new-project-description"
               value={newProject.description}
               onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
               placeholder="简要描述项目的目标和范围..."

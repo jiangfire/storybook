@@ -184,8 +184,14 @@
   "hotPaths": [
     {
       "path": "src\\components\\story\\StoryForm.tsx",
-      "accessCount": 43,
-      "lastAccessed": 1774535498307,
+      "accessCount": 116,
+      "lastAccessed": 1774617813839,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\__tests__\\useSearch.test.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774617768508,
       "type": "file"
     },
     {
@@ -193,6 +199,18 @@
       "accessCount": 11,
       "lastAccessed": 1774535437477,
       "type": "file"
+    },
+    {
+      "path": "src\\hooks\\__tests__\\useStoryFormValidation.test.ts",
+      "accessCount": 10,
+      "lastAccessed": 1774617518384,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 6,
+      "lastAccessed": 1774617811198,
+      "type": "directory"
     },
     {
       "path": "src\\components\\story\\__tests__\\AICreator.test.tsx",
@@ -207,39 +225,147 @@
       "type": "file"
     },
     {
+      "path": "src\\hooks\\useStoryFormValidation.ts",
+      "accessCount": 5,
+      "lastAccessed": 1774617811114,
+      "type": "file"
+    },
+    {
+      "path": "src/components/story/StoryForm.tsx",
+      "accessCount": 4,
+      "lastAccessed": 1774617813947,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\story\\__tests__\\SprintPlanner.test.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1774607990229,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useSearch.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774608189442,
+      "type": "file"
+    },
+    {
+      "path": "src\\types\\api.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774617354894,
+      "type": "directory"
+    },
+    {
       "path": "src\\services\\aiService.ts",
       "accessCount": 2,
       "lastAccessed": 1774535095453,
       "type": "directory"
     },
     {
-      "path": "src\\types\\api.ts",
+      "path": "src\\utils\\validators.ts",
       "accessCount": 2,
-      "lastAccessed": 1774535102822,
+      "lastAccessed": 1774607533759,
       "type": "directory"
     },
     {
-      "path": "src\\components\\story\\AICreator.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1774535032151,
+      "path": "src\\components\\story\\__tests__\\TagManager.test.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774607634446,
       "type": "file"
     },
     {
-      "path": "src",
-      "accessCount": 1,
-      "lastAccessed": 1774535062945,
-      "type": "directory"
+      "path": "src\\components\\story\\__tests__\\StoryTypeSelector.test.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774607885136,
+      "type": "file"
     },
     {
-      "path": "src\\utils\\validators.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774535394893,
-      "type": "directory"
+      "path": "src\\components\\story\\AICreator.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617319711,
+      "type": "file"
     },
     {
       "path": "src\\components\\story\\AcceptanceCriteriaManager.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617319721,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\TagManager.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617319772,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\PrioritySelector.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617323645,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\StoryPointsSelector.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617323655,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\StoryTypeSelector.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617323706,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\SprintPlanner.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617323773,
+      "type": "file"
+    },
+    {
+      "path": "src/pages/Projects/ProjectBugsPage.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1774617702938,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\story\\__tests__\\PrioritySelector.test.tsx",
       "accessCount": 1,
-      "lastAccessed": 1774535511221,
+      "lastAccessed": 1774607767535,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\story\\__tests__\\StoryPointsSelector.test.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774607815859,
+      "type": "file"
+    },
+    {
+      "path": "src\\hooks\\useDebounce.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774608153080,
+      "type": "file"
+    },
+    {
+      "path": "src/components/story",
+      "accessCount": 1,
+      "lastAccessed": 1774617336276,
+      "type": "directory"
+    },
+    {
+      "path": "src\\types\\models.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774617342187,
+      "type": "file"
+    },
+    {
+      "path": "src/types",
+      "accessCount": 1,
+      "lastAccessed": 1774617342315,
+      "type": "directory"
+    },
+    {
+      "path": "src\\pages\\Projects\\ProjectBugsPage.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1774617693612,
       "type": "file"
     }
   ],

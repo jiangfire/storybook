@@ -1,6 +1,15 @@
 import { formatStoryStatus } from '../../../utils/formatters';
 import type { StatusBreakdown } from '../../../types/models';
 
+const orderedStatuses: Array<keyof StatusBreakdown> = [
+  'pending',
+  'backlog',
+  'ready',
+  'in_progress',
+  'test',
+  'done',
+];
+
 export function ProjectStatusSection({ statusBreakdown }: { statusBreakdown: StatusBreakdown }) {
   return (
     <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
@@ -9,13 +18,13 @@ export function ProjectStatusSection({ statusBreakdown }: { statusBreakdown: Sta
         <p className="mt-1 text-sm text-text-light">快速看当前故事主要积压在哪个阶段。</p>
       </div>
       <div className="space-y-2">
-        {Object.entries(statusBreakdown).map(([status, count]) => (
+        {orderedStatuses.map((status) => (
           <div
             key={status}
             className="section-block flex items-center justify-between rounded-[1.1rem] px-3 py-2.5"
           >
             <span className="text-text-light">{formatStoryStatus(status)}</span>
-            <span className="font-medium text-text">{count}</span>
+            <span className="font-medium text-text">{statusBreakdown[status] || 0}</span>
           </div>
         ))}
       </div>

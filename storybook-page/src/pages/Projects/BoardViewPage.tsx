@@ -13,14 +13,19 @@ export default function BoardViewPage() {
   const { user } = useAuthStore();
   const [isStoryFormOpen, setIsStoryFormOpen] = useState(false);
   const projectID = Number(id);
+  const isValidProjectID = !Number.isNaN(projectID) && projectID > 0;
   const project = currentProject?.id === projectID ? currentProject : null;
   const canCreateStory = user?.role === 'product' || user?.role === 'admin';
 
   useEffect(() => {
-    if (!Number.isNaN(projectID) && projectID > 0) {
+    if (isValidProjectID) {
       fetchProject(projectID);
     }
-  }, [projectID, fetchProject]);
+  }, [fetchProject, isValidProjectID, projectID]);
+
+  if (!isValidProjectID) {
+    return <div className="p-8 text-danger">项目ID无效</div>;
+  }
 
   if (!project) {
     return (

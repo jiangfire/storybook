@@ -37,6 +37,8 @@ type assignBugRequest struct {
 	AssignedToID *uint `json:"assigned_to"`
 }
 
+var errBugAssigneeRole = errors.New("bug_assignee_role")
+
 func (h *BugHandler) Create(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
@@ -92,8 +94,8 @@ func (h *BugHandler) Create(c *gin.Context) {
 	}
 
 	if req.AssignedToID != nil {
-		if !h.isProjectMember(projectID, *req.AssignedToID) {
-			api.BadRequest(c, "指派用户不是项目成员")
+		if err := h.ensureAssignableUser(projectID, *req.AssignedToID); err != nil {
+			h.handleAssignUserErr(c, err)
 			return
 		}
 	}
@@ -362,21 +364,8 @@ func (h *BugHandler) Assign(c *gin.Context) {
 	}
 
 	if req.AssignedToID != nil {
-		if !h.isProjectMember(bug.ProjectID, *req.AssignedToID) {
-			api.BadRequest(c, "指派用户不是项目成员")
-			return
-		}
-		var user model.User
-		if err := h.db.First(&user, *req.AssignedToID).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				api.NotFound(c, "指派用户不存在")
-				return
-			}
-			api.Internal(c, "服务器内部错误")
-			return
-		}
-		if user.Role != model.RoleDeveloper && user.Role != model.RoleAdmin {
-			api.BadRequest(c, "缺陷仅可指派给开发角色")
+		if err := h.ensureAssignableUser(bug.ProjectID, *req.AssignedToID); err != nil {
+			h.handleAssignUserErr(c, err)
 			return
 		}
 	}
@@ -432,4 +421,32 @@ func (h *BugHandler) isProjectMember(projectID, userID uint) bool {
 		return false
 	}
 	return count > 0
+}
+
+func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
+	if !h.isProjectMember(projectID, userID) {
+		return errForbidden
+	}
+
+	var user model.User
+	if err := h.db.Select("id, role").First(&user, userID).Error; err != nil {
+		return err
+	}
+	if user.Role != model.RoleDeveloper && user.Role != model.RoleAdmin {
+		return errBugAssigneeRole
+	}
+	return nil
+}
+
+func (h *BugHandler) handleAssignUserErr(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, errForbidden):
+		api.BadRequest(c, "指派用户不是项目成员")
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		api.NotFound(c, "指派用户不存在")
+	case errors.Is(err, errBugAssigneeRole):
+		api.BadRequest(c, "缺陷仅可指派给开发角色")
+	default:
+		api.Internal(c, "服务器内部错误")
+	}
 }

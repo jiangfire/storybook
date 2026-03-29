@@ -1,0 +1,7 @@
+{
+  "tool_name": "Read",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\yimo\\\\Codes\\\\storybook\\\\storybook-page\\\\src\\\\components\\\\Header.tsx\",\"limit\":100}",
+  "error": "File does not exist. Note: your current working directory is C:\\Users\\yimo\\Codes\\storybook\\storybook-page.",
+  "timestamp": "2026-03-27T13:15:47.679Z",
+  "retry_count": 1
+}

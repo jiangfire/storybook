@@ -34,6 +34,7 @@ interface StoryState {
 }
 
 const emptyBoardData: Record<string, StoryBoardItem[]> = {
+  pending: [],
   backlog: [],
   ready: [],
   in_progress: [],

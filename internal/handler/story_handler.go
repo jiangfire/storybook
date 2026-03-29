@@ -330,6 +330,7 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 	}
 
 	byStatus := map[string][]gin.H{
+		model.StoryStatusPending:    {},
 		model.StoryStatusBacklog:    {},
 		model.StoryStatusReady:      {},
 		model.StoryStatusInProgress: {},
@@ -395,6 +396,7 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 		Status string
 	}
 	mapping := []statusMapping{
+		{Pos: 0, Status: model.StoryStatusPending},
 		{Pos: 1, Status: model.StoryStatusBacklog},
 		{Pos: 2, Status: model.StoryStatusReady},
 		{Pos: 3, Status: model.StoryStatusInProgress},
@@ -1382,6 +1384,8 @@ func parseStringArrayJSON(raw []byte) []string {
 
 func defaultColumnName(position int) string {
 	switch position {
+	case 0:
+		return "待审批"
 	case 1:
 		return "待办"
 	case 2:

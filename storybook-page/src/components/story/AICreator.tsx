@@ -1,4 +1,5 @@
-import { useState, ChangeEvent } from 'react';
+import { useState } from 'react';
+import type { ChangeEvent } from 'react';
 import { aiService } from '../../services/aiService';
 
 interface AICreatorProps {
@@ -46,10 +47,20 @@ export const AICreator = ({ onGenerated, strategy = 'replace' }: AICreatorProps)
 			description: aiRequirement.trim() || '',
 			story_type: 'feature',
 			priority: 2,
+			story_points: 3 as const,
 			acceptance_criteria: [
-				' Given 用户未登录',
-				' When 用户输入有效的邮箱和密码',
-				' Then 用户成功登录并跳转到首页',
+				{
+					description: 'Given 用户未登录',
+					order: 1,
+				},
+				{
+					description: 'When 用户输入有效的邮箱和密码',
+					order: 2,
+				},
+				{
+					description: 'Then 用户成功登录并跳转到首页',
+					order: 3,
+				},
 			],
 			tags: [],
 		};

@@ -19,12 +19,14 @@ import { useToast } from '../ui/Toast';
 import {
   CheckCircleIcon,
   ClipboardIcon,
+  CompassIcon,
   InboxIcon,
   SearchIcon,
   WrenchIcon,
 } from '../ui/AppIcon';
 
 const COLUMNS = [
+  { id: 'pending', title: '待审批', icon: CompassIcon },
   { id: 'backlog', title: '待办', icon: InboxIcon },
   { id: 'ready', title: '就绪', icon: ClipboardIcon },
   { id: 'in_progress', title: '开发中', icon: WrenchIcon },
@@ -130,6 +132,11 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
 
     const newStatus = resolveDropStatus(overId, localBoardData);
     if (!newStatus) {
+      return;
+    }
+
+    if (activeStatus === 'pending' || newStatus === 'pending') {
+      showError('待审批故事需通过评审流程流转');
       return;
     }
 

@@ -73,6 +73,7 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.GET("/projects/:id/overview", projectHandler.GetOverview)
 		protected.DELETE("/projects/:id", projectHandler.DeleteProject)
 		protected.GET("/projects/:id/members", projectHandler.ListMembers)
+		protected.GET("/projects/:id/member-candidates", projectHandler.ListMemberCandidates)
 		protected.POST("/projects/:id/members", projectHandler.AddMember)
 		protected.DELETE("/projects/:id/members/:userID", projectHandler.RemoveMember)
 

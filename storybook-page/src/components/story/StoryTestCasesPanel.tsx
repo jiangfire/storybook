@@ -4,13 +4,17 @@ import { testCaseService } from '../../services/testCaseService';
 import type { TestCaseItem } from '../../types/api';
 import { getErrorMessage } from '../../utils/error';
 import { useToast } from '../ui/Toast';
+import { useAuthStore } from '../../stores/authStore';
+import { canManageTestCases } from '../../utils/permissions';
 
 interface StoryTestCasesPanelProps {
   storyId: number;
 }
 
 export default function StoryTestCasesPanel({ storyId }: StoryTestCasesPanelProps) {
+  const { user } = useAuthStore();
   const { showError, showSuccess } = useToast();
+  const canManageCases = canManageTestCases(user?.role);
   const [cases, setCases] = useState<TestCaseItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +45,10 @@ export default function StoryTestCasesPanel({ storyId }: StoryTestCasesPanelProp
   }, [loadCases]);
 
   const handleCreate = async () => {
+    if (!canManageCases) {
+      showError('仅测试或管理员可创建测试用例');
+      return;
+    }
     const title = form.title.trim();
     if (!title) {
       showError('请输入测试用例标题');
@@ -74,6 +82,10 @@ export default function StoryTestCasesPanel({ storyId }: StoryTestCasesPanelProp
   };
 
   const handleStatusChange = async (id: number, status: TestCaseItem['status']) => {
+    if (!canManageCases) {
+      showError('仅测试或管理员可更新测试用例状态');
+      return;
+    }
     try {
       await testCaseService.updateTestCaseStatus(id, { status });
       setCases((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
@@ -91,39 +103,41 @@ export default function StoryTestCasesPanel({ storyId }: StoryTestCasesPanelProp
         </Button>
       </div>
 
-      <div className="space-y-2">
-        <input
-          value={form.title}
-          onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="测试用例标题"
-          className="w-full px-3 py-2 border border-border rounded-lg"
-        />
-        <textarea
-          value={form.description}
-          onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-          placeholder="描述（可选）"
-          rows={2}
-          className="w-full px-3 py-2 border border-border rounded-lg resize-none"
-        />
-        <textarea
-          value={form.stepsText}
-          onChange={(e) => setForm((prev) => ({ ...prev, stepsText: e.target.value }))}
-          placeholder="测试步骤（每行一条）"
-          rows={3}
-          className="w-full px-3 py-2 border border-border rounded-lg resize-none"
-        />
-        <input
-          value={form.expected_result}
-          onChange={(e) => setForm((prev) => ({ ...prev, expected_result: e.target.value }))}
-          placeholder="预期结果（可选）"
-          className="w-full px-3 py-2 border border-border rounded-lg"
-        />
-        <div className="flex justify-end">
-          <Button size="sm" onClick={handleCreate} isLoading={creating}>
-            新建测试用例
-          </Button>
+      {canManageCases && (
+        <div className="space-y-2">
+          <input
+            value={form.title}
+            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+            placeholder="测试用例标题"
+            className="w-full px-3 py-2 border border-border rounded-lg"
+          />
+          <textarea
+            value={form.description}
+            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+            placeholder="描述（可选）"
+            rows={2}
+            className="w-full px-3 py-2 border border-border rounded-lg resize-none"
+          />
+          <textarea
+            value={form.stepsText}
+            onChange={(e) => setForm((prev) => ({ ...prev, stepsText: e.target.value }))}
+            placeholder="测试步骤（每行一条）"
+            rows={3}
+            className="w-full px-3 py-2 border border-border rounded-lg resize-none"
+          />
+          <input
+            value={form.expected_result}
+            onChange={(e) => setForm((prev) => ({ ...prev, expected_result: e.target.value }))}
+            placeholder="预期结果（可选）"
+            className="w-full px-3 py-2 border border-border rounded-lg"
+          />
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleCreate} isLoading={creating}>
+              新建测试用例
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {error && <div className="text-sm text-danger">{error}</div>}
       {loading ? (
@@ -142,20 +156,30 @@ export default function StoryTestCasesPanel({ storyId }: StoryTestCasesPanelProp
                     {new Date(item.created_at).toLocaleString()}
                   </div>
                 </div>
-                <select
-                  value={item.status}
-                  onChange={(e) =>
-                    void handleStatusChange(
-                      item.id,
-                      e.target.value as 'pending' | 'passed' | 'failed'
-                    )
-                  }
-                  className="px-2 py-1 border border-border rounded text-sm"
-                >
-                  <option value="pending">待验证</option>
-                  <option value="passed">通过</option>
-                  <option value="failed">失败</option>
-                </select>
+                {canManageCases ? (
+                  <select
+                    value={item.status}
+                    onChange={(e) =>
+                      void handleStatusChange(
+                        item.id,
+                        e.target.value as 'pending' | 'passed' | 'failed'
+                      )
+                    }
+                    className="px-2 py-1 border border-border rounded text-sm"
+                  >
+                    <option value="pending">待验证</option>
+                    <option value="passed">通过</option>
+                    <option value="failed">失败</option>
+                  </select>
+                ) : (
+                  <div className="rounded border border-border bg-secondary-50 px-2 py-1 text-sm text-text">
+                    {item.status === 'pending'
+                      ? '待验证'
+                      : item.status === 'passed'
+                        ? '通过'
+                        : '失败'}
+                  </div>
+                )}
               </div>
               {item.description && <div className="text-sm text-text mt-2">{item.description}</div>}
               {item.expected_result && (

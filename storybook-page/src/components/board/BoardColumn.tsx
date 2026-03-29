@@ -14,6 +14,7 @@ interface BoardColumnProps {
 }
 
 const columnColors: Record<string, string> = {
+  pending: 'bg-amber-50 border-amber-200',
   backlog: 'bg-secondary-50 border-border',
   ready: 'bg-primary-50 border-primary-200',
   in_progress: 'bg-warning-light border-warning',
@@ -22,6 +23,7 @@ const columnColors: Record<string, string> = {
 };
 
 const iconColors: Record<string, string> = {
+  pending: 'bg-amber-200 text-amber-800',
   backlog: 'bg-secondary-200 text-text-light',
   ready: 'bg-primary-200 text-primary-700',
   in_progress: 'bg-warning text-text',
