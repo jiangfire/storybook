@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: https://github.com/actions/checkout@v4
+
+      - name: Setup Go
+        uses: https://github.com/actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify native build toolchain
+        run: gcc --version
+
+      - name: Run Go tests
+        run: go test ./...
+
+  frontend:
+    name: Frontend Verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: https://github.com/actions/checkout@v4
+
+      - name: Setup Go
+        uses: https://github.com/actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Setup Node.js
+        uses: https://github.com/actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify native build toolchain
+        run: gcc --version
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install frontend dependencies
+        working-directory: storybook-page
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        working-directory: storybook-page
+        run: pnpm run lint
+
+      - name: Run frontend tests
+        working-directory: storybook-page
+        run: pnpm run test
+
+      - name: Verify embedded frontend build
+        working-directory: storybook-page
+        run: pnpm run build:embed
+
+      - name: Verify monolith build
+        run: go build -o storybook-server ./cmd/server
