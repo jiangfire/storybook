@@ -248,7 +248,7 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
         {/* 拖拽预览 */}
         <DragOverlay>
           {activeStory && (
-            <div className="w-[280px] opacity-50">
+            <div className="w-70 opacity-50">
               <div className="bg-white rounded-lg shadow-lg border-2 border-primary p-4">
                 <div className="font-medium text-text mb-2">{activeStory.title}</div>
                 <div className="text-sm text-text-light">拖拽到新列...</div>

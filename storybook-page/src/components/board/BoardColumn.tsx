@@ -40,7 +40,7 @@ export default function BoardColumn({ id, stories, title, icon: Icon, count }: B
     <div
       ref={setNodeRef}
       className={cn(
-        'flex-1 min-w-[280px] max-w-[320px] rounded-xl border-2 p-4 transition-colors snap-start',
+        'flex-1 min-w-70 max-w-[320px] rounded-xl border-2 p-4 transition-colors snap-start',
         columnColors[id] || 'bg-secondary-50 border-border'
       )}
     >
@@ -64,7 +64,7 @@ export default function BoardColumn({ id, stories, title, icon: Icon, count }: B
 
       {/* 故事卡片列表 */}
       <SortableContext items={stories.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-3 min-h-[200px]">
+        <div className="space-y-3 min-h-50">
           {stories.length === 0 ? (
             <div className="text-center py-8">
               <div className="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white text-text-light">
