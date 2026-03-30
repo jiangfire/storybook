@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { aiService } from '../../services/aiService';
+import type { AIFormDraft } from '../../types/api';
 
 interface AICreatorProps {
-	onGenerated: (draft: any, strategy: 'replace' | 'fill_empty') => void;
+	onGenerated: (draft: AIFormDraft, strategy: 'replace' | 'fill_empty') => void;
 	strategy?: 'replace' | 'fill_empty';
 }
 

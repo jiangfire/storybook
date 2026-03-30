@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { AICreator } from '../AICreator';
+import type { AIGeneratedStoryResponse } from '../../../types/api';
 
 // Mock AI service
 vi.mock('../../../services/aiService', () => ({
@@ -11,6 +12,37 @@ vi.mock('../../../services/aiService', () => ({
 }));
 
 const { aiService } = await import('../../../services/aiService');
+
+const mockGenerateStory = vi.mocked(aiService.generateStory);
+
+const buildGeneratedStoryResponse = (): AIGeneratedStoryResponse => ({
+  title: '用户登录',
+  user_story: '实现登录功能',
+  actor: '用户',
+  action: '登录',
+  value: '安全访问数据',
+  story_type: 'feature',
+  priority: 2,
+  suggested_ac: ['Given用户未登录', 'When输入账号密码', 'Then登录成功'],
+  story_points: 3,
+  tags: ['auth'],
+  warnings: [],
+  source: 'openai',
+  is_configured: true,
+  form_draft: {
+    title: '用户登录',
+    description: '实现登录功能',
+    story_type: 'feature',
+    priority: 2,
+    story_points: 3,
+    acceptance_criteria: [
+      { description: 'Given用户未登录', order: 0 },
+      { description: 'When输入账号密码', order: 1 },
+      { description: 'Then登录成功', order: 2 },
+    ],
+    tags: ['auth'],
+  },
+});
 
 describe('AICreator', () => {
   beforeEach(() => {
@@ -37,34 +69,7 @@ describe('AICreator', () => {
   describe('AI生成功能', () => {
     it('应该调用generateStory并传递正确参数', async () => {
       const onGenerated = vi.fn();
-      (aiService.generateStory as any).mockResolvedValue({
-        title: '用户登录',
-        user_story: '实现登录功能',
-        actor: '用户',
-        action: '登录',
-        value: '安全访问数据',
-        story_type: 'feature',
-        priority: 2,
-        suggested_ac: ['Given用户未登录', 'When输入账号密码', 'Then登录成功'],
-        story_points: 3,
-        tags: ['auth'],
-        warnings: [],
-        source: 'openai',
-        is_configured: true,
-        form_draft: {
-          title: '用户登录',
-          description: '实现登录功能',
-          story_type: 'feature',
-          priority: 2,
-          story_points: 3,
-          acceptance_criteria: [
-            { description: 'Given用户未登录', order: 0 },
-            { description: 'When输入账号密码', order: 1 },
-            { description: 'Then登录成功', order: 2 },
-          ],
-          tags: ['auth'],
-        },
-      });
+      mockGenerateStory.mockResolvedValue(buildGeneratedStoryResponse());
 
       render(<AICreator onGenerated={onGenerated} />);
 
@@ -81,34 +86,7 @@ describe('AICreator', () => {
 
     it('应该支持replace策略', async () => {
       const onGenerated = vi.fn();
-      (aiService.generateStory as any).mockResolvedValue({
-        title: '用户登录',
-        user_story: '实现登录功能',
-        actor: '用户',
-        action: '登录',
-        value: '安全访问数据',
-        story_type: 'feature',
-        priority: 2,
-        suggested_ac: ['Given用户未登录', 'When输入账号密码', 'Then登录成功'],
-        story_points: 3,
-        tags: ['auth'],
-        warnings: [],
-        source: 'openai',
-        is_configured: true,
-        form_draft: {
-          title: '用户登录',
-          description: '实现登录功能',
-          story_type: 'feature',
-          priority: 2,
-          story_points: 3,
-          acceptance_criteria: [
-            { description: 'Given用户未登录', order: 0 },
-            { description: 'When输入账号密码', order: 1 },
-            { description: 'Then登录成功', order: 2 },
-          ],
-          tags: ['auth'],
-        },
-      });
+      mockGenerateStory.mockResolvedValue(buildGeneratedStoryResponse());
 
       render(<AICreator onGenerated={onGenerated} strategy="replace" />);
 
@@ -134,34 +112,7 @@ describe('AICreator', () => {
 
     it('应该支持fill_empty策略', async () => {
       const onGenerated = vi.fn();
-      (aiService.generateStory as any).mockResolvedValue({
-        title: '用户登录',
-        user_story: '实现登录功能',
-        actor: '用户',
-        action: '登录',
-        value: '安全访问数据',
-        story_type: 'feature',
-        priority: 2,
-        suggested_ac: ['Given用户未登录', 'When输入账号密码', 'Then登录成功'],
-        story_points: 3,
-        tags: ['auth'],
-        warnings: [],
-        source: 'openai',
-        is_configured: true,
-        form_draft: {
-          title: '用户登录',
-          description: '实现登录功能',
-          story_type: 'feature',
-          priority: 2,
-          story_points: 3,
-          acceptance_criteria: [
-            { description: 'Given用户未登录', order: 0 },
-            { description: 'When输入账号密码', order: 1 },
-            { description: 'Then登录成功', order: 2 },
-          ],
-          tags: ['auth'],
-        },
-      });
+      mockGenerateStory.mockResolvedValue(buildGeneratedStoryResponse());
 
       render(<AICreator onGenerated={onGenerated} strategy="fill_empty" />);
 
@@ -183,10 +134,9 @@ describe('AICreator', () => {
 
     it('应该显示生成中的加载状态', async () => {
       const onGenerated = vi.fn();
-      (aiService.generateStory as any).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({
-          title: '用户登录',
-        }), 100))
+      mockGenerateStory.mockImplementation(
+        () =>
+          new Promise((resolve) => setTimeout(() => resolve(buildGeneratedStoryResponse()), 100))
       );
 
       render(<AICreator onGenerated={onGenerated} />);
@@ -202,9 +152,7 @@ describe('AICreator', () => {
 
     it('应该在AI生成失败时显示错误', async () => {
       const onGenerated = vi.fn();
-      (aiService.generateStory as any).mockRejectedValue(
-        new Error('AI服务不可用')
-      );
+      mockGenerateStory.mockRejectedValue(new Error('AI服务不可用'));
 
       render(<AICreator onGenerated={onGenerated} />);
 
