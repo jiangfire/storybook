@@ -23,7 +23,7 @@
 
 已完成：
 
-- `cmd/index-vector`
+- 历史上存在独立 CLI `cmd/index-vector`，当前仓库已删除该入口
   - 支持 `-provider`
   - 支持 `-batch`
   - 支持 `-force`
@@ -58,7 +58,7 @@
 1. 先执行数据库迁移
 2. 选定 provider
 3. 校验维度是否一致
-4. 跑一次 `cmd/index-vector`
+4. 如需全量重建向量，需通过主应用内任务或自定义脚本执行；`cmd/index-vector` 已删除
 5. 启动服务并检查 `/api/search/capabilities`
 
 ## 参考

@@ -8,17 +8,16 @@ jobs:
   backend:
     name: Backend Test
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+      GOPROXY: "https://goproxy.cn,direct"
+      GOSUMDB: "sum.golang.google.cn"
     steps:
       - name: Checkout code
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: https://github.com/actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Verify native build toolchain
-        run: gcc --version
+      - name: Verify runner toolchain
+        run: bash .gitea/scripts/verify-runner-env.sh
 
       - name: Run Go tests
         run: go test ./...
@@ -26,25 +25,18 @@ jobs:
   frontend:
     name: Frontend Verify
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+      GOPROXY: "https://goproxy.cn,direct"
+      GOSUMDB: "sum.golang.google.cn"
+      NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+      npm_config_registry: "https://registry.npmmirror.com"
     steps:
       - name: Checkout code
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: https://github.com/actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Setup Node.js
-        uses: https://github.com/actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Verify native build toolchain
-        run: gcc --version
-
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Verify runner toolchain
+        run: bash .gitea/scripts/verify-runner-env.sh
 
       - name: Install frontend dependencies
         working-directory: storybook-page

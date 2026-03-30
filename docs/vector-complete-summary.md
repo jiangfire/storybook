@@ -8,7 +8,7 @@
 
 - PostgreSQL + `pgvector` schema 迁移
 - Embedding provider 抽象：`mock` / `openai` / `ollama`
-- 批量索引 CLI：`cmd/index-vector`
+- 批量索引能力已保留在领域逻辑中，但独立 CLI `cmd/index-vector` 已删除
 - 语义搜索接口与前端能力探测
 - 故事创建/编辑时的增量索引
 - 启动阶段的 schema 与 provider 维度校验
@@ -72,7 +72,7 @@
 | `internal/service/story_service.go` | 故事写入后的增量索引 |
 | `internal/handler/search_handler.go` | 语义搜索 API |
 | `internal/router/router.go` | 运行时能力接入 |
-| `cmd/index-vector/main.go` | 批量索引 CLI |
+| 历史上的 `cmd/index-vector/main.go` | 旧的批量索引 CLI，当前已删除 |
 
 ## API 能力
 

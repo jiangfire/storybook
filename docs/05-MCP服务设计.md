@@ -2,7 +2,7 @@
 
 > Model Context Protocol (MCP) 服务，让Claude Code深度参与开发过程，确保AC（验收标准）被系统化验证。
 
-> 注意：本文中的 `cmd/mcp` 是独立的标准 MCP HTTP 服务；主应用进程里现有的 `/mcp/...` 业务 REST 路由不等同于标准 MCP transport。
+> 更新说明：仓库中的独立入口 `cmd/mcp` 已删除，当前 MCP 相关能力统一由主应用 `cmd/server` 承载。下文若出现 `cmd/mcp`，均属于历史设计记录，不再是当前启动方式。
 
 ---
 
@@ -499,7 +499,7 @@ type ACMapItem struct {
 
 当前行为摘要：
 
-- 独立入口为 `cmd/mcp`
+- 历史上存在独立入口 `cmd/mcp`，当前已删除
 - HTTP endpoint 固定挂载在 `/mcp`
 - 默认只监听 `127.0.0.1:8081`
 - 新会话通过 `initialize` 创建，服务端返回 `Mcp-Session-Id`
@@ -790,7 +790,7 @@ func TestLoginWithWrongCredentials(t *testing.T) {
 
 ## 六、MCP服务配置
 
-> 当前仓库已实现 `cmd/mcp` 启动入口以及文中列出的核心工具；`config/mcp.yaml` 在本文中是示例配置，仓库默认未提交该文件，需要按环境自行创建。
+> 当前仓库保留了文中涉及的主应用内 MCP 相关能力，但独立启动入口 `cmd/mcp` 已删除；`config/mcp.yaml` 相关内容仅作为历史设计记录保留。
 
 ### 6.1 配置文件
 

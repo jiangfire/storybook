@@ -5,9 +5,10 @@
 本文对应当前仓库中的语义搜索实现，包括：
 
 - `scripts/migrate_vector.sql`
-- `cmd/index-vector/main.go`
 - `internal/service/vector_service.go`
 - `internal/router/router.go`
+
+> 更新说明：独立入口 `cmd/index-vector` 已删除，当前仓库不再提供单独的批量索引 CLI。下文涉及该命令的内容属于历史说明，执行时不要再直接使用。
 
 ## 启用条件
 
@@ -63,43 +64,31 @@ WITH (m = 16, ef_construction = 64);
 
 如果你也要给 `projects.embedding` 建同维度向量列，需要同步修改 `projects` 表。
 
-## 批量索引命令
+## 批量索引说明
 
-### Mock
+当前仓库已删除独立 CLI `cmd/index-vector`，因此这里不再提供可直接执行的批量索引命令。
 
-```bash
-go run ./cmd/index-vector -provider mock
-```
+如果你仍需要全量重建向量数据，当前可选方案只有两种：
 
-### OpenAI
-
-```bash
-$env:OPENAI_API_KEY="YOUR_API_KEY"
-go run ./cmd/index-vector -provider openai -batch 50
-```
-
-### Ollama
-
-```bash
-go run ./cmd/index-vector -provider ollama -ollama-model nomic-embed-text -ollama-dimension 768
-```
+- 在主应用内补一个受控的管理任务入口
+- 依据 `internal/service/vector_service.go` 自行编写一次性脚本
 
 ## 命令行参数
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
-| `-provider` | `mock` | `mock` / `openai` / `ollama` |
-| `-api-key` | 空 | OpenAI API Key；也可用 `OPENAI_API_KEY` |
-| `-ollama-url` | `http://localhost:11434` | Ollama 服务地址 |
-| `-ollama-model` | `nomic-embed-text` | Ollama 模型名 |
-| `-ollama-dimension` | `0` | Ollama 模型维度；未设置时按已知模型推断 |
-| `-batch` | `10` | 批处理大小 |
-| `-force` | `false` | 是否强制重建所有故事向量 |
+| `provider` | `mock` | 逻辑层支持 `mock` / `openai` / `ollama` |
+| `apiKey` | 空 | OpenAI API Key；也可用 `OPENAI_API_KEY` |
+| `ollamaURL` | `http://localhost:11434` | Ollama 服务地址 |
+| `ollamaModel` | `nomic-embed-text` | Ollama 模型名 |
+| `ollamaDimension` | `0` | Ollama 模型维度；未设置时按已知模型推断 |
+| `batchSize` | `10` | 批处理大小 |
+| `force` | `false` | 是否强制重建所有故事向量 |
 
 补充说明：
 
-- `-batch` 现在会真实传入 `VectorService`，不再是无效参数。
-- 索引命令启动前会先做数据库列维度校验，维度不匹配会直接失败。
+- 批处理大小会真实传入 `VectorService`，不再是无效参数。
+- 批量索引启动前应先做数据库列维度校验，维度不匹配时需要先修正 schema。
 
 ## 运行时行为
 
@@ -187,7 +176,7 @@ WHERE archived = false AND embedding IS NOT NULL;
 
 ### 2. 切换 provider 后搜索失效
 
-通常是维度不匹配。`-force` 只能重建数据，不能自动修改数据库列类型；需要先调整 schema，再运行全量重建。
+通常是维度不匹配。强制重建只能重建数据，不能自动修改数据库列类型；需要先调整 schema，再运行全量重建。
 
 ### 3. SQLite 下为什么没有语义搜索
 

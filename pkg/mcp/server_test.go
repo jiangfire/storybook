@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/model"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -284,9 +284,10 @@ func TestMCPServerRateLimit_ConcurrentRequests(t *testing.T) {
 	rejectedCount := 0
 	for i := 0; i < 10; i++ {
 		code := <-results
-		if code == http.StatusOK {
+		switch code {
+		case http.StatusOK:
 			successCount++
-		} else if code == http.StatusTooManyRequests {
+		case http.StatusTooManyRequests:
 			rejectedCount++
 		}
 	}

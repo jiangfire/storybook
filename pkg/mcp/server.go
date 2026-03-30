@@ -52,7 +52,7 @@ type Server struct {
 
 type sessionState struct {
 	initialized bool
-	createdAt   time.Time // session创建时间
+	createdAt   time.Time   // session创建时间
 	requests    []time.Time // 请求时间戳队列
 }
 
@@ -98,8 +98,8 @@ func NewServer(db *gorm.DB) *Server {
 		service:         service.NewMCPService(db, root),
 		tools:           map[string]ToolDefinition{},
 		sessions:        map[string]*sessionState{},
-		rateLimit:       nil, // 默认无限制
-		sessionTTL:       -1 * time.Hour, // 默认永不过期（-1表示禁用）
+		rateLimit:       nil,            // 默认无限制
+		sessionTTL:      -1 * time.Hour, // 默认永不过期（-1表示禁用）
 	}
 	s.registerTools()
 	return s

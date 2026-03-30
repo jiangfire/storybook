@@ -19,6 +19,14 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	return load(true)
+}
+
+func LoadForBootstrap() (*Config, error) {
+	return load(false)
+}
+
+func load(requireJWT bool) (*Config, error) {
 	cfg := &Config{
 		ServerAddr:      getEnv("SERVER_ADDR", ":8080"),
 		DBDriver:        getEnv("DB_DRIVER", "sqlite"),
@@ -30,7 +38,7 @@ func Load() (*Config, error) {
 		RefreshTokenTTL: 24 * 7,
 	}
 
-	if cfg.JWTSecret == "" {
+	if requireJWT && cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET must be set")
 	}
 

@@ -9,27 +9,20 @@ jobs:
   package:
     name: Build Release Tarball
     runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "0"
+      GOPROXY: "https://goproxy.cn,direct"
+      GOSUMDB: "sum.golang.google.cn"
+      NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+      npm_config_registry: "https://registry.npmmirror.com"
     steps:
       - name: Checkout code
-        uses: https://github.com/actions/checkout@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Go
-        uses: https://github.com/actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Setup Node.js
-        uses: https://github.com/actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Verify native build toolchain
-        run: gcc --version
-
-      - name: Enable Corepack
-        run: corepack enable
+      - name: Verify runner toolchain
+        run: bash .gitea/scripts/verify-runner-env.sh
 
       - name: Install frontend dependencies
         working-directory: storybook-page
@@ -60,7 +53,7 @@ jobs:
           tar -czf "release/storybook-${VERSION}-linux-amd64.tar.gz" -C release "storybook-${VERSION}-linux-amd64"
 
       - name: Upload release artifact
-        uses: https://github.com/actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: storybook-release-linux-amd64
           path: release/*.tar.gz

@@ -60,16 +60,27 @@ pnpm run dev
 首次启动没有 `admin` 账号时，可直接执行：
 
 ```bash
-go run ./cmd/bootstrap-admin --email admin@example.com --password Admin1234
+go run ./cmd/server -- bootstrap-admin --email admin@example.com --password Admin1234
 ```
 
 可选指定用户名：
 
 ```bash
-go run ./cmd/bootstrap-admin --email admin@example.com --username admin --password Admin1234
+go run ./cmd/server -- bootstrap-admin --email admin@example.com --username admin --password Admin1234
 ```
 
 如果该邮箱已存在，命令会把该用户提升为 `admin`；如果同时传入 `--password`，还会重置密码。
+
+构建成单体二进制后，也可以直接执行：
+
+```bash
+./storybook-server bootstrap-admin --email admin@example.com --password Admin1234
+```
+
+补充说明：
+
+- `bootstrap-admin` 只依赖数据库配置，不要求预先设置 `JWT_SECRET`
+- 正常启动 `storybook-server` 服务时仍然要求设置 `JWT_SECRET`
 
 ## 单体部署（前端嵌入后端）
 
@@ -123,36 +134,16 @@ go run ./cmd/embedui
 - 语义搜索状态通过 `/api/search/capabilities` 获取。
 - 如果没有配置向量搜索，界面会自动隐藏语义结果分区，不会影响普通关键词搜索。
 
-## MCP HTTP 服务
+## 部署形态说明
 
-`cmd/mcp` 现在只提供 **HTTP 版 MCP（Model Context Protocol，模型上下文协议）**，不再提供 stdio/CLI transport。
+当前默认部署形态只有一个后端单体进程：
 
-默认启动：
+- 启动入口：`cmd/server`
+- 发布产物：`storybook-server`
+- 管理员初始化：`storybook-server bootstrap-admin ...`
+- MCP、搜索、AI、权限等能力都按主应用内路由提供，不要求额外启动独立辅助进程
 
-```bash
-go run ./cmd/mcp
-```
-
-默认地址：
-
-- MCP endpoint: `http://127.0.0.1:8081/mcp`
-- health: `http://127.0.0.1:8081/health`
-
-补充说明：
-
-- 默认只监听 `127.0.0.1`，避免把本地 MCP 直接暴露到局域网。
-- 主应用进程中的 `/mcp/...` 路由仍是仓库内部的业务 REST API，不是标准 MCP transport。
-- 给 Claude Code / Codex 之类客户端接入时，应指向 `cmd/mcp` 进程的独立 HTTP endpoint。
-
-示例：
-
-```bash
-# Claude Code
-claude mcp add --transport http storybook http://127.0.0.1:8081/mcp
-
-# Codex CLI
-codex mcp add storybook --url http://127.0.0.1:8081/mcp
-```
+因此在 CI/CD 与交付层面，可以只围绕 `cmd/server` 做构建、测试和发布。
 
 ## 质量检查与安全扫描
 

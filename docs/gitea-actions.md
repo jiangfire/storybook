@@ -6,6 +6,7 @@
 |---|---|---|
 | `.gitea/workflows/ci.yml` | 任意 `push`、`pull_request` | 后端测试、前端 `lint`、前端单测、嵌入式构建校验、单体构建校验 |
 | `.gitea/workflows/release.yml` | 推送 `v*` tag | 在通过测试后打包嵌入式单体发布包，并上传为 workflow artifact |
+| `.gitea/scripts/verify-runner-env.sh` | 被工作流调用 | 校验 runner 已预装 `git`、`go`、`node`、`pnpm`，避免运行时才发现缺工具 |
 
 ## 当前 CI 门禁
 
@@ -24,13 +25,57 @@
 `act_runner` 侧至少要满足这些条件：
 
 1. `ubuntu-latest` 标签能调度到可执行 Linux job 的环境。
-2. job 环境里要有 `gcc`，因为仓库依赖了 `github.com/mattn/go-sqlite3`，Go 测试和构建会走 CGO。
+2. runner 机器上需要预装这些工具：
+   - `git`
+   - `go`（版本以 `go.mod` 为准）
+   - `node`
+   - `pnpm`
 3. job 环境需要能访问：
-   - `github.com`：下载 `checkout`、`setup-go`、`setup-node`、`upload-artifact` 等 action
-   - Go module 源
-   - npm / pnpm 包源
+   - 你的 Gitea 实例
+   - Go module 源（默认已配置 `https://goproxy.cn,direct`）
+   - npm / pnpm 包源（默认已配置 `https://registry.npmmirror.com`）
 
 如果你的 `act_runner` 还是默认标签映射，建议先检查 `ubuntu-latest` 指向的镜像是否满足上面这些要求。
+
+## CGO 说明
+
+仓库当前默认在 `CGO_ENABLED=0` 模式下执行后端测试与构建：
+
+- SQLite 驱动已切换为 `github.com/glebarez/sqlite`
+- CI / Release 工作流已显式设置 `CGO_ENABLED=0`
+- `act_runner` 不再需要为本仓库额外准备 `gcc` 仅用于 Go 构建
+
+如果后续需要启用 `go test -race`，那是单独的可选检查，必须在支持 CGO 的环境下以 `CGO_ENABLED=1` 运行。
+
+## 单体交付约定
+
+当前系统以 `cmd/server` 作为唯一对外交付的后端进程：
+
+- CI / Release 只校验和打包 `storybook-server`
+- 管理员初始化通过 `storybook-server bootstrap-admin ...` 完成
+- 已删除独立入口 `cmd/mcp`、`cmd/index-vector`
+- 后端测试直接覆盖当前仓库内全部 Go 包
+
+## 中国网络环境建议
+
+当前工作流已针对中国网络做了两类收敛：
+
+- 不再使用 `setup-go`、`setup-node`、`corepack` 这类运行期下载工具链的 action
+- 默认注入国内更稳定的镜像：
+  - `GOPROXY=https://goproxy.cn,direct`
+  - `GOSUMDB=sum.golang.google.cn`
+  - `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com`
+
+另外，工作流里的 `uses:` 已改成简写形式，例如 `actions/checkout@v4`，不再把地址硬编码到 `https://github.com/...`。这样你可以在 Gitea 服务器侧配置 action 拉取来源，避免每次都强制连 GitHub。
+
+如果你的 Gitea 是自建，建议再做两件事：
+
+1. 在 Gitea 侧把 Actions 默认源改为 `self` 或你自己的镜像源。
+2. 在同一 Gitea 实例里提前镜像这些 action 仓库：
+   - `actions/checkout`
+   - `actions/upload-artifact`
+
+这样 runner 在执行工作流时，action 代码就能直接从你的 Gitea 实例获取，而不是临时去 GitHub 拉取。
 
 ## 发布包内容
 

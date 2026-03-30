@@ -14,7 +14,6 @@ $env:GOCACHE = Join-Path $repoRoot '.gocache_local'
 
 $excludeRules = @(
   'internal/fileutil/workspace\.go:G304'
-  'cmd/mcp/run_config\.go:G304,G117'
   'cmd/embedui/main\.go:G304'
   'internal/handler/auth_handler\.go:G117'
   'internal/handler/user_management_handler\.go:G117'

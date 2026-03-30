@@ -12,7 +12,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
