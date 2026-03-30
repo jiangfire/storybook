@@ -72,9 +72,12 @@ type AIService interface {
 // NewAIService queries ai_configs and returns the appropriate implementation.
 func NewAIService(db *gorm.DB) AIService {
 	var cfg model.AIConfig
-	err := db.Where("enabled = ?", true).Order("id DESC").First(&cfg).Error
+	err := db.Where("enabled = ?", true).Order("id DESC").Limit(1).Find(&cfg).Error
 	if err != nil {
 		// No config or DB error → fallback to heuristic
+		return &heuristicAIService{}
+	}
+	if cfg.ID == 0 {
 		return &heuristicAIService{}
 	}
 
@@ -706,7 +709,10 @@ func SanitizeRequirement(raw string) string {
 
 func IsOpenAIConfigured(db *gorm.DB) bool {
 	var cfg model.AIConfig
-	if err := db.Where("enabled = ?", true).Order("id DESC").First(&cfg).Error; err != nil {
+	if err := db.Where("enabled = ?", true).Order("id DESC").Limit(1).Find(&cfg).Error; err != nil {
+		return false
+	}
+	if cfg.ID == 0 {
 		return false
 	}
 	return cfg.Enabled && strings.TrimSpace(cfg.APIKeyEncrypted) != ""

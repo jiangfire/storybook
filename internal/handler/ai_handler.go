@@ -396,8 +396,14 @@ func (h *AIHandler) INVESTCheck(c *gin.Context) {
 
 func (h *AIHandler) loadLatestConfig() (model.AIConfig, error) {
 	var cfg model.AIConfig
-	err := h.db.Order("id DESC").First(&cfg).Error
-	return cfg, err
+	err := h.db.Order("id DESC").Limit(1).Find(&cfg).Error
+	if err != nil {
+		return cfg, err
+	}
+	if cfg.ID == 0 {
+		return cfg, gorm.ErrRecordNotFound
+	}
+	return cfg, nil
 }
 
 func (h *AIHandler) serializeConfig(cfg model.AIConfig) gin.H {

@@ -30,6 +30,7 @@ func ResolveWorkspacePath(workspaceRoot, inputPath string) (string, error) {
 	if path == "" {
 		return "", ErrPathEmpty
 	}
+	path = strings.ReplaceAll(path, "\\", string(filepath.Separator))
 
 	root := strings.TrimSpace(workspaceRoot)
 	if root == "" {
