@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify runner toolchain
+      - name: Prepare runner toolchain
         run: bash .gitea/scripts/verify-runner-env.sh
 
       - name: Run Go tests
@@ -35,7 +35,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify runner toolchain
+      - name: Prepare runner toolchain
         run: bash .gitea/scripts/verify-runner-env.sh
 
       - name: Install frontend dependencies

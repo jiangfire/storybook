@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify runner toolchain
+      - name: Prepare runner toolchain
         run: bash .gitea/scripts/verify-runner-env.sh
 
       - name: Install frontend dependencies

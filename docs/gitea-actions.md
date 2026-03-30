@@ -6,7 +6,7 @@
 |---|---|---|
 | `.gitea/workflows/ci.yml` | 任意 `push`、`pull_request` | 后端测试、前端 `lint`、前端单测、嵌入式构建校验、单体构建校验 |
 | `.gitea/workflows/release.yml` | 推送 `v*` tag | 在通过测试后打包嵌入式单体发布包，并上传为 workflow artifact |
-| `.gitea/scripts/verify-runner-env.sh` | 被工作流调用 | 校验 runner 已预装 `git`、`go`、`node`、`pnpm`，避免运行时才发现缺工具 |
+| `.gitea/scripts/verify-runner-env.sh` | 被工作流调用 | 预检并补齐 runner 的 `go`、`node`、`pnpm`，优先复用已有工具，缺失时走国内镜像安装 |
 
 ## 当前 CI 门禁
 
@@ -25,13 +25,13 @@
 `act_runner` 侧至少要满足这些条件：
 
 1. `ubuntu-latest` 标签能调度到可执行 Linux job 的环境。
-2. runner 机器上需要预装这些工具：
+2. runner 机器上至少需要：
    - `git`
-   - `go`（版本以 `go.mod` 为准）
-   - `node`
-   - `pnpm`
+   - `bash`
+   - `curl` 或 `wget`
 3. job 环境需要能访问：
    - 你的 Gitea 实例
+   - Go 下载源 `https://golang.google.cn`
    - Go module 源（默认已配置 `https://goproxy.cn,direct`）
    - npm / pnpm 包源（默认已配置 `https://registry.npmmirror.com`）
 
@@ -61,7 +61,9 @@
 当前工作流已针对中国网络做了两类收敛：
 
 - 不再使用 `setup-go`、`setup-node`、`corepack` 这类运行期下载工具链的 action
+- 如果 runner 镜像里缺少 `go` / `node` / `pnpm`，会自动从国内更稳的下载源安装到用户目录
 - 默认注入国内更稳定的镜像：
+  - `GO download=https://golang.google.cn`
   - `GOPROXY=https://goproxy.cn,direct`
   - `GOSUMDB=sum.golang.google.cn`
   - `NPM_CONFIG_REGISTRY=https://registry.npmmirror.com`
