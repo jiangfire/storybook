@@ -79,6 +79,16 @@
 
 这样 runner 在执行工作流时，action 代码就能直接从你的 Gitea 实例获取，而不是临时去 GitHub 拉取。
 
+## Artifact 兼容性说明
+
+当前 `release.yml` 固定使用 `actions/upload-artifact@v3`，不使用 `v4`，原因是：
+
+- `upload-artifact@v4` 依赖的 `@actions/artifact v2+` 在 GHES / Gitea 兼容链路下会直接报 `GHESNotSupportedError`
+- 失败日志里常见的 `(node) [DEP0040] The 'punycode' module is deprecated` 通常会和这一步同时出现；在当前报错场景下，优先先处理 `v4` 的兼容性问题
+- 对当前仓库来说，`v3` 已足够满足“上传单个 tarball 作为 workflow artifact”的需求，兼容性风险更低
+
+如果后续运行环境切换到 GitHub.com 原生 Actions，再评估是否升级到 `v4`。
+
 ## 发布包内容
 
 当你推送类似 `v1.0.0` 的 tag 时，`release.yml` 会生成一个 tarball，内容包括：
