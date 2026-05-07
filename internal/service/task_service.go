@@ -3,6 +3,7 @@ package service
 import (
 	"strings"
 
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"gorm.io/gorm"
@@ -87,11 +88,11 @@ func (s *TaskService) Create(input CreateTaskInput) (*model.Task, error) {
 		return nil, err
 	}
 
-	_ = createActivityLog(s.db, task.ProjectID, input.CreatedBy, "task", task.ID, "created", nil, map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, task.ProjectID, input.CreatedBy, "task", task.ID, "created", nil, map[string]any{
 		"title":    task.Title,
 		"status":   task.Status,
 		"priority": task.Priority,
-	})
+	}), "write task activity log", "task_id", task.ID, "action", "created")
 	return &task, nil
 }
 
@@ -157,7 +158,7 @@ func (s *TaskService) Update(task *model.Task, projectID, userID uint, input Upd
 		return false, err
 	}
 
-	_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "updated", oldValue, newValue)
+	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "updated", oldValue, newValue), "write task activity log", "task_id", task.ID, "action", "updated")
 	return true, nil
 }
 
@@ -182,13 +183,13 @@ func (s *TaskService) UpdateStatus(task *model.Task, projectID, userID uint, rol
 		return err
 	}
 
-	_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "status_changed", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "status_changed", map[string]any{
 		"status":   oldStatus,
 		"progress": oldProgress,
 	}, map[string]any{
 		"status":   task.Status,
 		"progress": task.Progress,
-	})
+	}), "write task activity log", "task_id", task.ID, "action", "status_changed")
 
 	if s.events != nil {
 		s.events.BroadcastProject(task.ProjectID, "task.status_changed", map[string]any{
@@ -221,7 +222,7 @@ func (s *TaskService) AddCodeReference(task *model.Task, projectID, userID uint,
 	if err := s.db.Save(task).Error; err != nil {
 		return nil, err
 	}
-	_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "code_ref_added", nil, map[string]any{"reference": ref})
+	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "code_ref_added", nil, map[string]any{"reference": ref}), "write task activity log", "task_id", task.ID, "action", "code_ref_added")
 	return refs, nil
 }
 
@@ -244,13 +245,13 @@ func (s *TaskService) UpdateProgress(task *model.Task, projectID, userID uint, r
 		return err
 	}
 
-	_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "progress_changed", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "progress_changed", map[string]any{
 		"progress": oldProgress,
 		"status":   oldStatus,
 	}, map[string]any{
 		"progress": task.Progress,
 		"status":   task.Status,
-	})
+	}), "write task activity log", "task_id", task.ID, "action", "progress_changed")
 
 	if s.events != nil {
 		s.events.BroadcastProject(task.ProjectID, "task.progress_changed", map[string]any{
@@ -281,13 +282,13 @@ func (s *TaskService) Claim(task *model.Task, projectID, userID uint) error {
 		return err
 	}
 
-	_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "claimed", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "claimed", map[string]any{
 		"assigned_to": oldAssigned,
 		"status":      oldStatus,
 	}, map[string]any{
 		"assigned_to": userID,
 		"status":      task.Status,
-	})
+	}), "write task activity log", "task_id", task.ID, "action", "claimed")
 
 	return nil
 }
@@ -313,13 +314,13 @@ func (s *TaskService) Release(task *model.Task, projectID, userID uint, role str
 		return err
 	}
 
-	_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "released", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "released", map[string]any{
 		"assigned_to": oldAssigned,
 		"status":      oldStatus,
 	}, map[string]any{
 		"assigned_to": nil,
 		"status":      task.Status,
-	})
+	}), "write task activity log", "task_id", task.ID, "action", "released")
 
 	return nil
 }
@@ -328,7 +329,7 @@ func (s *TaskService) Delete(task *model.Task, projectID, userID uint) error {
 	if err := s.db.Delete(&model.Task{}, task.ID).Error; err != nil {
 		return err
 	}
-	_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "deleted", map[string]any{"title": task.Title}, nil)
+	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "deleted", map[string]any{"title": task.Title}, nil), "write task activity log", "task_id", task.ID, "action", "deleted")
 	return nil
 }
 
@@ -367,10 +368,10 @@ func (s *TaskService) SplitFromAC(story *model.UserStory, projectID, userID uint
 
 		if err := s.db.Create(&task).Error; err == nil {
 			created = append(created, task)
-			_ = createActivityLog(s.db, projectID, userID, "task", task.ID, "created_from_ac", nil, map[string]any{
+			logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "created_from_ac", nil, map[string]any{
 				"title": task.Title,
 				"ac_id": ac.ID,
-			})
+			}), "write task activity log", "task_id", task.ID, "action", "created_from_ac")
 		}
 	}
 

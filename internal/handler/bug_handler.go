@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/service"
@@ -116,14 +117,14 @@ func (h *BugHandler) Create(c *gin.Context) {
 	}
 
 	pid := project.ID
-	_ = h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "created",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"title": bug.Title, "severity": bug.Severity, "status": bug.Status}),
-	}).Error
+	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "created")
 
 	api.Success(c, "缺陷创建成功", bug)
 }
@@ -307,7 +308,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	pid := bug.ProjectID
-	_ = h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "status_changed",
@@ -315,7 +316,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
 		NewValue:   model.MarshalJSON(gin.H{"status": bug.Status}),
-	}).Error
+	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "status_changed")
 
 	api.Success(c, "缺陷状态更新成功", gin.H{
 		"id":          bug.ID,
@@ -378,7 +379,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 	}
 
 	pid := bug.ProjectID
-	_ = h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "assigned",
@@ -386,7 +387,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"assigned_to": oldAssigned}),
 		NewValue:   model.MarshalJSON(gin.H{"assigned_to": bug.AssignedTo}),
-	}).Error
+	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "assigned")
 
 	api.Success(c, "缺陷指派成功", gin.H{
 		"id":          bug.ID,

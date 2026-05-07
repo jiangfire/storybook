@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"git.neolidy.top/neo/storybook/internal/model"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/glebarez/sqlite"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 

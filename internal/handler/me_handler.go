@@ -2,6 +2,7 @@ package handler
 
 import (
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
@@ -62,13 +63,13 @@ func (h *MeHandler) Dashboard(c *gin.Context) {
 	}
 
 	var totalAssigned int64
-	_ = h.db.Model(&model.UserStory{}).Where("assigned_to = ?", userID).Count(&totalAssigned).Error
+	logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("assigned_to = ?", userID).Count(&totalAssigned).Error, "count assigned stories failed", "user_id", userID)
 
 	var inProgress int64
-	_ = h.db.Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, model.StoryStatusInProgress).Count(&inProgress).Error
+	logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, model.StoryStatusInProgress).Count(&inProgress).Error, "count in-progress stories failed", "user_id", userID)
 
 	var completed int64
-	_ = h.db.Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, model.StoryStatusDone).Count(&completed).Error
+	logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, model.StoryStatusDone).Count(&completed).Error, "count completed stories failed", "user_id", userID)
 
 	api.Success(c, "success", gin.H{
 		"user": gin.H{

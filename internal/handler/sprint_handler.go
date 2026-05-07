@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/service"
@@ -103,14 +104,14 @@ func (h *SprintHandler) Create(c *gin.Context) {
 	}
 
 	pid := projectID
-	_ = h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
 		EntityType: "sprint",
 		EntityID:   sprint.ID,
 		Action:     "created",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"name": sprint.Name, "status": sprint.Status}),
-	}).Error
+	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "created")
 
 	api.Success(c, "冲刺创建成功", sprint)
 }
@@ -150,9 +151,9 @@ func (h *SprintHandler) List(c *gin.Context) {
 	items := make([]gin.H, 0, len(sprints))
 	for _, s := range sprints {
 		var totalStories int64
-		_ = h.db.Model(&model.UserStory{}).Where("sprint_id = ?", s.ID).Count(&totalStories).Error
+		logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("sprint_id = ?", s.ID).Count(&totalStories).Error, "count sprint stories failed", "sprint_id", s.ID)
 		var doneStories int64
-		_ = h.db.Model(&model.UserStory{}).Where("sprint_id = ? AND status = ?", s.ID, model.StoryStatusDone).Count(&doneStories).Error
+		logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("sprint_id = ? AND status = ?", s.ID, model.StoryStatusDone).Count(&doneStories).Error, "count done stories in sprint failed", "sprint_id", s.ID)
 
 		items = append(items, gin.H{
 			"id":            s.ID,
@@ -228,7 +229,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	pid := sprint.ProjectID
-	_ = h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
 		EntityType: "sprint",
 		EntityID:   sprint.ID,
 		Action:     "status_changed",
@@ -236,7 +237,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
 		NewValue:   model.MarshalJSON(gin.H{"status": sprint.Status}),
-	}).Error
+	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "status_changed")
 
 	api.Success(c, "冲刺状态更新成功", gin.H{
 		"id":         sprint.ID,
@@ -310,7 +311,7 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 	}
 
 	pid := project.ID
-	_ = h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
 		EntityType: "story",
 		EntityID:   story.ID,
 		Action:     "sprint_assigned",
@@ -318,7 +319,7 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"sprint_id": oldSprintID}),
 		NewValue:   model.MarshalJSON(gin.H{"sprint_id": story.SprintID}),
-	}).Error
+	}).Error, "write story sprint-assignment log", "story_id", story.ID, "sprint_id", story.SprintID)
 
 	api.Success(c, "故事冲刺规划成功", gin.H{
 		"story_id":   story.ID,

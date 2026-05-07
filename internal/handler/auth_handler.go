@@ -9,6 +9,7 @@ import (
 
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/auth"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
@@ -148,7 +149,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			updates["locked_until"] = now.Add(lockDuration)
 		}
 
-		_ = h.db.Model(&model.User{}).Where("id = ?", user.ID).Updates(updates).Error
+		logging.LogIfErr(h.db.Model(&model.User{}).Where("id = ?", user.ID).Updates(updates).Error, "update user login state failed", "user_id", user.ID)
 		api.Unauthorized(c, "邮箱或密码错误")
 		return
 	}

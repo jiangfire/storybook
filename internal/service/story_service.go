@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"gorm.io/gorm"
@@ -124,11 +125,11 @@ func (s *StoryService) Create(input CreateStoryInput) (*model.UserStory, error) 
 	}
 	s.indexStoryIfEnabled(&story)
 
-	_ = createActivityLog(s.db, story.ProjectID, input.UserID, "story", story.ID, "created", nil, map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, input.UserID, "story", story.ID, "created", nil, map[string]any{
 		"title":      story.Title,
 		"status":     story.Status,
 		"story_type": story.StoryType,
-	})
+	}), "write story activity log", "story_id", story.ID, "action", "created")
 
 	return &story, nil
 }
@@ -237,7 +238,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 	if contentChanged {
 		s.indexStoryIfEnabled(story)
 	}
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "updated", oldFields, newFields)
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "updated", oldFields, newFields), "write story activity log", "story_id", story.ID, "action", "updated")
 	return true, nil
 }
 
@@ -258,13 +259,13 @@ func (s *StoryService) UpdateStatus(story *model.UserStory, userID uint, newStat
 		return err
 	}
 
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "status_changed", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "status_changed", map[string]any{
 		"status":   oldStatus,
 		"position": oldPosition,
 	}, map[string]any{
 		"status":   story.Status,
 		"position": story.Position,
-	})
+	}), "write story activity log", "story_id", story.ID, "action", "status_changed")
 
 	if s.events != nil {
 		s.events.BroadcastProject(story.ProjectID, "story.status_changed", map[string]any{
@@ -313,12 +314,12 @@ func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID,
 		return time.Time{}, err
 	}
 
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "ac_updated", oldValue, map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "ac_updated", oldValue, map[string]any{
 		"ac_id":    acID,
 		"status":   status,
 		"evidence": evidence,
 		"notes":    notes,
-	})
+	}), "write story activity log", "story_id", story.ID, "action", "ac_updated", "ac_id", acID)
 
 	if s.events != nil {
 		s.events.BroadcastProject(story.ProjectID, "story.ac_updated", map[string]any{
@@ -349,13 +350,13 @@ func (s *StoryService) Claim(story *model.UserStory, userID uint) error {
 		return err
 	}
 
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "claimed", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "claimed", map[string]any{
 		"status":      oldStatus,
 		"assigned_to": oldAssigned,
 	}, map[string]any{
 		"status":      story.Status,
 		"assigned_to": userID,
-	})
+	}), "write story activity log", "story_id", story.ID, "action", "claimed")
 
 	return nil
 }
@@ -378,7 +379,7 @@ func (s *StoryService) AddCodeReference(story *model.UserStory, userID uint, ref
 	if err := s.db.Save(story).Error; err != nil {
 		return nil, err
 	}
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "code_ref_added", nil, map[string]any{"reference": ref})
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "code_ref_added", nil, map[string]any{"reference": ref}), "write story activity log", "story_id", story.ID, "action", "code_ref_added")
 	return refs, nil
 }
 
@@ -399,13 +400,13 @@ func (s *StoryService) Release(story *model.UserStory, userID uint, role string)
 		return err
 	}
 
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "released", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "released", map[string]any{
 		"status":      oldStatus,
 		"assigned_to": oldAssigned,
 	}, map[string]any{
 		"status":      story.Status,
 		"assigned_to": nil,
-	})
+	}), "write story activity log", "story_id", story.ID, "action", "released")
 
 	return nil
 }
@@ -414,10 +415,10 @@ func (s *StoryService) Delete(story *model.UserStory, userID uint) error {
 	if err := s.db.Delete(&model.UserStory{}, story.ID).Error; err != nil {
 		return err
 	}
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "deleted", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "deleted", map[string]any{
 		"title":  story.Title,
 		"status": story.Status,
-	}, nil)
+	}, nil), "write story activity log", "story_id", story.ID, "action", "deleted")
 	return nil
 }
 
@@ -429,7 +430,7 @@ func (s *StoryService) Archive(story *model.UserStory, userID uint) (bool, error
 	if err := s.db.Save(story).Error; err != nil {
 		return false, err
 	}
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "archived", map[string]any{"archived": false}, map[string]any{"archived": true})
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "archived", map[string]any{"archived": false}, map[string]any{"archived": true}), "write story activity log", "story_id", story.ID, "action", "archived")
 	return true, nil
 }
 
@@ -441,7 +442,7 @@ func (s *StoryService) Restore(story *model.UserStory, userID uint) (bool, error
 	if err := s.db.Save(story).Error; err != nil {
 		return false, err
 	}
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "restored", map[string]any{"archived": true}, map[string]any{"archived": false})
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "restored", map[string]any{"archived": true}, map[string]any{"archived": false}), "write story activity log", "story_id", story.ID, "action", "restored")
 	return true, nil
 }
 
@@ -478,7 +479,7 @@ func (s *StoryService) Review(story *model.UserStory, userID uint, approved bool
 		return err
 	}
 
-	_ = createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "reviewed", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "reviewed", map[string]any{
 		"status":         oldStatus,
 		"review_status":  oldReviewStatus,
 		"review_comment": oldReviewComment,
@@ -487,7 +488,7 @@ func (s *StoryService) Review(story *model.UserStory, userID uint, approved bool
 		"review_status":  story.ReviewStatus,
 		"review_comment": story.ReviewComment,
 		"approved":       approved,
-	})
+	}), "write story activity log", "story_id", story.ID, "action", "reviewed", "approved", approved)
 
 	return nil
 }
@@ -501,11 +502,11 @@ func (s *StoryService) Assign(story *model.UserStory, assignerID uint, assigneeI
 		return err
 	}
 
-	_ = createActivityLog(s.db, story.ProjectID, assignerID, "story", story.ID, "assigned", map[string]any{
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, assignerID, "story", story.ID, "assigned", map[string]any{
 		"assigned_to": oldAssigned,
 	}, map[string]any{
 		"assigned_to": assigneeID,
-	})
+	}), "write story activity log", "story_id", story.ID, "action", "assigned")
 
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
@@ -127,19 +128,19 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 	statusBreakdown := map[string]int64{}
 	for _, st := range []string{model.BugStatusOpen, model.BugStatusInProgress, model.BugStatusResolved, model.BugStatusClosed} {
 		var n int64
-		_ = h.db.Model(&model.BugReport{}).Where("project_id = ? AND status = ?", projectID, st).Count(&n).Error
+		logging.LogIfErr(h.db.Model(&model.BugReport{}).Where("project_id = ? AND status = ?", projectID, st).Count(&n).Error, "count bugs by status failed", "project_id", projectID, "status", st)
 		statusBreakdown[st] = n
 	}
 
 	severityBreakdown := map[string]int64{}
 	for _, sv := range []string{model.BugSeverityLow, model.BugSeverityMedium, model.BugSeverityHigh, model.BugSeverityCritical} {
 		var n int64
-		_ = h.db.Model(&model.BugReport{}).Where("project_id = ? AND severity = ?", projectID, sv).Count(&n).Error
+		logging.LogIfErr(h.db.Model(&model.BugReport{}).Where("project_id = ? AND severity = ?", projectID, sv).Count(&n).Error, "count bugs by severity failed", "project_id", projectID, "severity", sv)
 		severityBreakdown[sv] = n
 	}
 
 	var stories []model.UserStory
-	_ = h.db.Where("project_id = ?", projectID).Find(&stories).Error
+	logging.LogIfErr(h.db.Where("project_id = ?", projectID).Find(&stories).Error, "load project stories failed", "project_id", projectID)
 	acTotal := 0
 	acPassed := 0
 	acFailed := 0
@@ -165,7 +166,7 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 	}
 
 	var totalBugs int64
-	_ = h.db.Model(&model.BugReport{}).Where("project_id = ?", projectID).Count(&totalBugs).Error
+	logging.LogIfErr(h.db.Model(&model.BugReport{}).Where("project_id = ?", projectID).Count(&totalBugs).Error, "count project bugs failed", "project_id", projectID)
 
 	api.Success(c, "success", gin.H{
 		"project_id": projectID,

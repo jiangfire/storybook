@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
@@ -173,11 +174,11 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	_ = createActivityLog(h.db, nil, userID, "user", user.ID, "created", nil, map[string]any{
+	logging.LogIfErr(createActivityLog(h.db, nil, userID, "user", user.ID, "created", nil, map[string]any{
 		"email":    user.Email,
 		"username": user.Username,
 		"role":     user.Role,
-	})
+	}), "write user activity log", "user_id", user.ID, "action", "created")
 
 	api.Success(c, "用户创建成功", gin.H{
 		"id":       user.ID,
@@ -311,7 +312,7 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	_ = createActivityLog(h.db, nil, userID, "user", targetUser.ID, "updated", oldValues, newValues)
+	logging.LogIfErr(createActivityLog(h.db, nil, userID, "user", targetUser.ID, "updated", oldValues, newValues), "write user activity log", "user_id", targetUser.ID, "action", "updated")
 
 	api.Success(c, "用户更新成功", gin.H{
 		"id":         targetUser.ID,
@@ -509,10 +510,10 @@ func (h *UserManagementHandler) DeleteUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	_ = createActivityLog(h.db, nil, userID, "user", targetUserID, "deleted", map[string]any{
+	logging.LogIfErr(createActivityLog(h.db, nil, userID, "user", targetUserID, "deleted", map[string]any{
 		"email": targetUser.Email,
 		"role":  targetUser.Role,
-	}, nil)
+	}, nil), "write user activity log", "user_id", targetUserID, "action", "deleted")
 
 	api.Success(c, "用户删除成功", gin.H{"id": targetUserID})
 }

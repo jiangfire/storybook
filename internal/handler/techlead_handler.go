@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/service"
@@ -404,9 +405,9 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	}
 
 	// 记录活动日志
-	_ = createActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_added", nil, map[string]any{
+	logging.LogIfErr(createActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_added", nil, map[string]any{
 		"user_id": req.UserID,
-	})
+	}), "write project activity log", "project_id", projectID, "action", "techlead_added")
 
 	api.Success(c, "技术负责人添加成功", gin.H{
 		"project_id": projectID,
@@ -451,9 +452,9 @@ func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 	}
 
 	// 记录活动日志
-	_ = createActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_removed", map[string]any{
+	logging.LogIfErr(createActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_removed", map[string]any{
 		"user_id": targetUserID,
-	}, nil)
+	}, nil), "write project activity log", "project_id", projectID, "action", "techlead_removed")
 
 	api.Success(c, "技术负责人移除成功", gin.H{
 		"project_id": projectID,

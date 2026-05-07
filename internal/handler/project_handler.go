@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/service"
@@ -216,13 +217,13 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 	items := make([]projectItem, 0, len(projects))
 	for _, p := range projects {
 		var memberCount int64
-		_ = h.db.Model(&model.ProjectMember{}).Where("project_id = ?", p.ID).Count(&memberCount).Error
+		logging.LogIfErr(h.db.Model(&model.ProjectMember{}).Where("project_id = ?", p.ID).Count(&memberCount).Error, "count project members failed", "project_id", p.ID)
 
 		var storyCount int64
-		_ = h.db.Model(&model.UserStory{}).Where("project_id = ?", p.ID).Count(&storyCount).Error
+		logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("project_id = ?", p.ID).Count(&storyCount).Error, "count project stories failed", "project_id", p.ID)
 
 		var owner model.User
-		_ = h.db.Select("id, email").First(&owner, p.OwnerID).Error
+		logging.LogIfErr(h.db.Select("id, email").First(&owner, p.OwnerID).Error, "load project owner failed", "project_id", p.ID, "owner_id", p.OwnerID)
 
 		items = append(items, projectItem{
 			ID:          p.ID,
@@ -416,7 +417,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	}
 
 	var owner model.User
-	_ = h.db.Select("id, email").First(&owner, project.OwnerID).Error
+	logging.LogIfErr(h.db.Select("id, email").First(&owner, project.OwnerID).Error, "load project owner failed", "project_id", project.ID, "owner_id", project.OwnerID)
 
 	api.Success(c, "项目更新成功", gin.H{
 		"id":          project.ID,
@@ -471,13 +472,13 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 	}
 
 	var activeMembers int64
-	_ = h.db.Model(&model.ProjectMember{}).Where("project_id = ?", project.ID).Count(&activeMembers).Error
+	logging.LogIfErr(h.db.Model(&model.ProjectMember{}).Where("project_id = ?", project.ID).Count(&activeMembers).Error, "count active members failed", "project_id", project.ID)
 
 	var avgPoints float64
-	_ = h.db.Model(&model.UserStory{}).
+	logging.LogIfErr(h.db.Model(&model.UserStory{}).
 		Where("project_id = ? AND points IS NOT NULL", project.ID).
 		Select("COALESCE(AVG(points), 0)").
-		Scan(&avgPoints).Error
+		Scan(&avgPoints).Error, "compute avg story points failed", "project_id", project.ID)
 
 	api.Success(c, "success", gin.H{
 		"project": gin.H{
