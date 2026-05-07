@@ -1,9 +1,12 @@
 package router
 
 import (
+	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"git.neolidy.top/neo/storybook/internal/auth"
 	"git.neolidy.top/neo/storybook/internal/handler"
@@ -27,7 +30,26 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	r.Use(middleware.RequestLogger(logger), middleware.Recovery(logger), middleware.CORS())
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	// /readyz performs a real DB ping with a short timeout. Returns 503 when the
+	// underlying connection cannot answer in time so orchestrators (k8s,
+	// load balancers) can route traffic away from a degraded instance.
+	r.GET("/readyz", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+
+		sqlDB, err := db.DB()
+		if err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "error": "db handle: " + err.Error()})
+			return
+		}
+		if err := sqlDB.PingContext(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "error": "db ping: " + err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 
 	authHandler := handler.NewAuthHandler(db, tokenManager)
