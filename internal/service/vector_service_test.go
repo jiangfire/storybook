@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"git.neolidy.top/neo/storybook/internal/model"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -52,10 +52,10 @@ func TestVectorService_SearchSimilarStories_WithArchived(t *testing.T) {
 
 	// 创建测试数据（归档的故事不应出现在结果中）
 	archivedStory := &model.UserStory{
-		ID:         1,
-		ProjectID:  1,
-		Title:      "已归档的功能",
-		Archived:   true,
+		ID:        1,
+		ProjectID: 1,
+		Title:     "已归档的功能",
+		Archived:  true,
 	}
 	db.Create(archivedStory)
 
@@ -134,11 +134,11 @@ func TestVectorService_ToSimilarStories(t *testing.T) {
 		Similarity float64
 	}{
 		{
-			UserStory: model.UserStory{ID: 1, Title: "故事1"},
+			UserStory:  model.UserStory{ID: 1, Title: "故事1"},
 			Similarity: 0.95,
 		},
 		{
-			UserStory: model.UserStory{ID: 2, Title: "故事2"},
+			UserStory:  model.UserStory{ID: 2, Title: "故事2"},
 			Similarity: 0.87,
 		},
 	}
@@ -164,24 +164,46 @@ func TestCosineSimilarity(t *testing.T) {
 
 	// Act & Assert
 	// 相同向量，相似度为 1
-	assert.InDelta(t, 1.0, cosineSimilarity(v1, v2), 0.001)
+	got, err := cosineSimilarity(v1, v2)
+	require.NoError(t, err)
+	assert.InDelta(t, 1.0, got, 0.001)
 	// 正交向量，相似度为 0
-	assert.InDelta(t, 0.0, cosineSimilarity(v1, v3), 0.001)
+	got, err = cosineSimilarity(v1, v3)
+	require.NoError(t, err)
+	assert.InDelta(t, 0.0, got, 0.001)
 	// 相反向量，相似度为 -1
-	assert.InDelta(t, -1.0, cosineSimilarity(v1, v4), 0.001)
+	got, err = cosineSimilarity(v1, v4)
+	require.NoError(t, err)
+	assert.InDelta(t, -1.0, got, 0.001)
 }
 
-// TestCosineSimilarity_DifferentLength 测试不同长度向量
+// TestCosineSimilarity_ZeroVector 测试零向量返回 0（避免除零）
+func TestCosineSimilarity_ZeroVector(t *testing.T) {
+	zero := []float32{0, 0, 0}
+	v := []float32{1, 2, 3}
+
+	got, err := cosineSimilarity(zero, v)
+	require.NoError(t, err)
+	assert.Equal(t, 0.0, got)
+
+	got, err = cosineSimilarity(v, zero)
+	require.NoError(t, err)
+	assert.Equal(t, 0.0, got)
+}
+
+// TestCosineSimilarity_DifferentLength 测试不同长度向量返回错误而非 panic
 func TestCosineSimilarity_DifferentLength(t *testing.T) {
 	// Arrange
 	v1 := []float32{1, 2, 3}
 	v2 := []float32{1, 2} // 不同长度
 
-	// Act & Assert
-	// 应该返回错误或 panic
-	assert.Panics(t, func() {
-		cosineSimilarity(v1, v2)
-	})
+	// Act
+	got, err := cosineSimilarity(v1, v2)
+
+	// Assert - 应该返回错误，不应该 panic
+	require.Error(t, err)
+	assert.Equal(t, 0.0, got)
+	assert.Contains(t, err.Error(), "dimension mismatch")
 }
 
 // TestBatchIndexStories_ContinuesOnError 测试批量索引时单个失败不应中断整个批次

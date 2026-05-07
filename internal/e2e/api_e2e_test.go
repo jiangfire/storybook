@@ -24,7 +24,7 @@ func TestAPIMainFlowE2E(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	dsn := "file:e2e_api_main_flow?mode=memory&cache=shared"
-	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: dsn})
+	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: dsn, DBAutoMigrate: true})
 	if err != nil {
 		t.Fatalf("connect db: %v", err)
 	}

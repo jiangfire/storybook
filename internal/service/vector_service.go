@@ -258,11 +258,11 @@ func (s *vectorService) toSimilarStories(results []struct {
 	return stories
 }
 
-// cosineSimilarity 计算两个向量的余弦相似度
-func cosineSimilarity(a, b []float32) float64 {
+// cosineSimilarity 计算两个向量的余弦相似度。
+// 维度不匹配时返回错误而非 panic，避免脏数据导致进程崩溃。
+func cosineSimilarity(a, b []float32) (float64, error) {
 	if len(a) != len(b) {
-		// 不同长度的向量，panic（KISS 原则：简单明确）
-		panic(fmt.Sprintf("vector dimension mismatch: %d vs %d", len(a), len(b)))
+		return 0, fmt.Errorf("vector dimension mismatch: %d vs %d", len(a), len(b))
 	}
 
 	var dotProduct float32
@@ -276,10 +276,10 @@ func cosineSimilarity(a, b []float32) float64 {
 	}
 
 	if normA == 0 || normB == 0 {
-		return 0
+		return 0, nil
 	}
 
-	return float64(dotProduct / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB)))))
+	return float64(dotProduct / (float32(math.Sqrt(float64(normA))) * float32(math.Sqrt(float64(normB))))), nil
 }
 
 // float32ArrayToString 将 float32 数组转换为 pgvector 格式字符串

@@ -18,7 +18,7 @@ import (
 func TestTechLeadScopedAccessAssignAndReviewE2E(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: "file:e2e_techlead_global_read?mode=memory&cache=shared"})
+	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: "file:e2e_techlead_global_read?mode=memory&cache=shared", DBAutoMigrate: true})
 	if err != nil {
 		t.Fatalf("connect db: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestTechLeadScopedAccessAssignAndReviewE2E(t *testing.T) {
 func TestTechLeadRejectReviewRulesE2E(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: "file:e2e_techlead_review_rules?mode=memory&cache=shared"})
+	db, err := database.Connect(&config.Config{DBDriver: "sqlite", DBDSN: "file:e2e_techlead_review_rules?mode=memory&cache=shared", DBAutoMigrate: true})
 	if err != nil {
 		t.Fatalf("connect db: %v", err)
 	}

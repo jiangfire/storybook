@@ -6,11 +6,11 @@ import (
 
 // 向量服务相关错误
 var (
-	ErrEmptyText      = errors.New("text cannot be empty")
-	ErrInvalidVector  = errors.New("invalid vector dimension")
-	ErrIndexFailed    = errors.New("indexing failed")
-	ErrSearchFailed   = errors.New("search failed")
-	ErrNoResults      = errors.New("no results found")
+	ErrEmptyText     = errors.New("text cannot be empty")
+	ErrInvalidVector = errors.New("invalid vector dimension")
+	ErrIndexFailed   = errors.New("indexing failed")
+	ErrSearchFailed  = errors.New("search failed")
+	ErrNoResults     = errors.New("no results found")
 )
 
 // SimilarStory 表示相似故事及其相似度分数
