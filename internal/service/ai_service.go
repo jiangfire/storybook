@@ -11,6 +11,7 @@ import (
 
 	"git.neolidy.top/neo/storybook/internal/model"
 	openai "github.com/sashabaranov/go-openai"
+	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 )
 
@@ -70,15 +71,17 @@ type AIService interface {
 // ---------------------------------------------------------------------------
 
 // NewAIService queries ai_configs and returns the appropriate implementation.
+// Caches the constructed service keyed by (config_id, updated_at) so the hot
+// path skips AES-256-GCM decryption and OpenAI client construction when the
+// config has not changed since the last call.
 func NewAIService(db *gorm.DB) AIService {
-	var cfg model.AIConfig
-	err := db.Where("enabled = ?", true).Order("id DESC").Limit(1).Find(&cfg).Error
-	if err != nil {
-		// No config or DB error → fallback to heuristic
+	cfg, err := loadActiveAIConfig(db)
+	if err != nil || cfg == nil {
 		return &heuristicAIService{}
 	}
-	if cfg.ID == 0 {
-		return &heuristicAIService{}
+
+	if svc := cachedAIServiceFor(cfg.ID, cfg.UpdatedAt); svc != nil {
+		return svc
 	}
 
 	apiKey, err := DecryptAPIKey(cfg.APIKeyEncrypted)
@@ -86,13 +89,14 @@ func NewAIService(db *gorm.DB) AIService {
 		return &heuristicAIService{}
 	}
 
-	return NewAIServiceFromConfig(RuntimeAIConfig{
+	svc := NewAIServiceFromConfig(RuntimeAIConfig{
 		APIKey:      apiKey,
 		Model:       cfg.Model,
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,
 		Enabled:     cfg.Enabled,
 	})
+	return storeAIServiceCache(svc, cfg.ID, cfg.UpdatedAt)
 }
 
 func NewAIServiceFromConfig(cfg RuntimeAIConfig) AIService {
@@ -158,14 +162,22 @@ const systemPrompt = `你是一位资深的产品经理和用户故事专家。�
 func (s *openAIService) IsConfigured() bool { return true }
 
 func (s *openAIService) GenerateStory(ctx context.Context, requirement string) (*StoryResult, error) {
-	resp, err := s.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model:       s.model,
-		Temperature: s.temperature,
-		MaxTokens:   s.maxTokens,
-		Messages: []openai.ChatCompletionMessage{
-			{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
-			{Role: openai.ChatMessageRoleUser, Content: requirement},
-		},
+	ctx, cancel := withDefaultAIDeadline(ctx)
+	defer cancel()
+
+	var resp openai.ChatCompletionResponse
+	err := retryAPI(ctx, func() error {
+		var apiErr error
+		resp, apiErr = s.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+			Model:       s.model,
+			Temperature: s.temperature,
+			MaxTokens:   s.maxTokens,
+			Messages: []openai.ChatCompletionMessage{
+				{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+				{Role: openai.ChatMessageRoleUser, Content: requirement},
+			},
+		})
+		return apiErr
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai completion: %w", err)
@@ -234,6 +246,9 @@ func (s *openAIService) StreamGenerateStory(ctx context.Context, requirement str
 }
 
 func (s *openAIService) ChatRefine(ctx context.Context, original *StoryResult, feedback string) (*StoryResult, error) {
+	ctx, cancel := withDefaultAIDeadline(ctx)
+	defer cancel()
+
 	refinePrompt := fmt.Sprintf(`原始用户故事：
 - 角色：%s
 - 动作：%s
@@ -252,14 +267,19 @@ func (s *openAIService) ChatRefine(ctx context.Context, original *StoryResult, f
 		feedback,
 	)
 
-	resp, err := s.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
-		Model:       s.model,
-		Temperature: s.temperature,
-		MaxTokens:   s.maxTokens,
-		Messages: []openai.ChatCompletionMessage{
-			{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
-			{Role: openai.ChatMessageRoleUser, Content: refinePrompt},
-		},
+	var resp openai.ChatCompletionResponse
+	err := retryAPI(ctx, func() error {
+		var apiErr error
+		resp, apiErr = s.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+			Model:       s.model,
+			Temperature: s.temperature,
+			MaxTokens:   s.maxTokens,
+			Messages: []openai.ChatCompletionMessage{
+				{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+				{Role: openai.ChatMessageRoleUser, Content: refinePrompt},
+			},
+		})
+		return apiErr
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai refine: %w", err)
@@ -284,13 +304,21 @@ func (s *openAIService) BatchGenerate(ctx context.Context, requirement string, c
 		count = 5
 	}
 
-	results := make([]*StoryResult, 0, count)
+	results := make([]*StoryResult, count)
+	g, gctx := errgroup.WithContext(ctx)
 	for i := 0; i < count; i++ {
-		result, err := s.GenerateStory(ctx, requirement)
-		if err != nil {
-			return results, fmt.Errorf("batch item %d: %w", i, err)
-		}
-		results = append(results, result)
+		i := i
+		g.Go(func() error {
+			r, err := s.GenerateStory(gctx, requirement)
+			if err != nil {
+				return fmt.Errorf("batch item %d: %w", i, err)
+			}
+			results[i] = r
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }
