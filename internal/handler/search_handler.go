@@ -9,6 +9,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,10 +18,13 @@ import (
 type SearchHandler struct {
 	db        *gorm.DB
 	vectorSvc service.VectorService
+	storyRepo *repository.StoryRepository
+	bugRepo   *repository.BugRepository
+	projectRepo *repository.ProjectRepository
 }
 
 func NewSearchHandler(db *gorm.DB) *SearchHandler {
-	return &SearchHandler{db: db}
+	return NewSearchHandlerWithVector(db, nil)
 }
 
 // NewSearchHandlerWithVector 创建带向量搜索的 SearchHandler
@@ -28,6 +32,9 @@ func NewSearchHandlerWithVector(db *gorm.DB, vectorSvc service.VectorService) *S
 	return &SearchHandler{
 		db:        db,
 		vectorSvc: vectorSvc,
+		storyRepo: repository.NewStoryRepository(db),
+		bugRepo:   repository.NewBugRepository(db),
+		projectRepo: repository.NewProjectRepository(db),
 	}
 }
 

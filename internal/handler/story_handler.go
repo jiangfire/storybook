@@ -9,15 +9,18 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type StoryHandler struct {
-	db       *gorm.DB
-	events   EventPublisher
-	storySvc *service.StoryService
+	db        *gorm.DB
+	events    EventPublisher
+	storySvc  *service.StoryService
+	userRepo  *repository.UserRepository
+	storyRepo *repository.StoryRepository
 }
 
 type EventPublisher interface {
@@ -30,9 +33,11 @@ func NewStoryHandler(db *gorm.DB, events EventPublisher) *StoryHandler {
 
 func NewStoryHandlerWithVector(db *gorm.DB, events EventPublisher, vectorSvc service.VectorService) *StoryHandler {
 	return &StoryHandler{
-		db:       db,
-		events:   events,
-		storySvc: service.NewStoryServiceWithVector(db, events, vectorSvc),
+		db:        db,
+		events:    events,
+		storySvc:  service.NewStoryServiceWithVector(db, events, vectorSvc),
+		userRepo:  repository.NewUserRepository(db),
+		storyRepo: repository.NewStoryRepository(db),
 	}
 }
 
@@ -107,7 +112,7 @@ func (h *StoryHandler) CreateStory(c *gin.Context) {
 	}
 
 	if err := h.ensureProjectMember(projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -146,8 +151,11 @@ func (h *StoryHandler) CreateStory(c *gin.Context) {
 		return
 	}
 
-	var creator model.User
-	logging.LogIfErr(h.db.Select("id, email").First(&creator, userID).Error, "load story creator failed", "user_id", userID)
+	creator, err := h.userRepo.FindByID(userID)
+	if err != nil {
+		logging.LogIfErr(err, "load story creator failed", "user_id", userID)
+		creator = &model.User{}
+	}
 
 	payload := gin.H{
 		"id":                  story.ID,
@@ -183,7 +191,7 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 	}
 
 	if err := h.ensureProjectMember(projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -309,7 +317,7 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 	}
 
 	if err := h.ensureProjectMember(projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -443,7 +451,7 @@ func (h *StoryHandler) GetStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -516,7 +524,7 @@ func (h *StoryHandler) UpdateStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -606,7 +614,7 @@ func (h *StoryHandler) DeleteStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}

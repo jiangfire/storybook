@@ -10,6 +10,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type StoryService struct {
@@ -120,16 +121,21 @@ func (s *StoryService) Create(input CreateStoryInput) (*model.UserStory, error) 
 		CodeReferences:     model.MarshalJSON([]string{}),
 	}
 
-	if err := s.db.Create(&story).Error; err != nil {
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&story).Error; err != nil {
+			return err
+		}
+		logging.LogIfErr(createActivityLog(tx, story.ProjectID, input.UserID, "story", story.ID, "created", nil, map[string]any{
+			"title":      story.Title,
+			"status":     story.Status,
+			"story_type": story.StoryType,
+		}), "write story activity log", "story_id", story.ID, "action", "created")
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	s.indexStoryIfEnabled(&story)
 
-	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, input.UserID, "story", story.ID, "created", nil, map[string]any{
-		"title":      story.Title,
-		"status":     story.Status,
-		"story_type": story.StoryType,
-	}), "write story activity log", "story_id", story.ID, "action", "created")
+	s.indexStoryIfEnabled(&story)
 
 	return &story, nil
 }
@@ -334,31 +340,37 @@ func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID,
 }
 
 func (s *StoryService) Claim(story *model.UserStory, userID uint) error {
-	if story.AssignedTo != nil && *story.AssignedTo != userID {
-		return ErrAlreadyClaimed
-	}
-	if story.AssignedTo == nil && story.Status != model.StoryStatusBacklog && story.Status != model.StoryStatusReady {
-		return ErrClaimNotAllowed
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var current model.UserStory
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, story.ID).Error; err != nil {
+			return err
+		}
+		if current.AssignedTo != nil && *current.AssignedTo != userID {
+			return ErrAlreadyClaimed
+		}
+		if current.AssignedTo == nil && current.Status != model.StoryStatusBacklog && current.Status != model.StoryStatusReady {
+			return ErrClaimNotAllowed
+		}
 
-	oldStatus := story.Status
-	oldAssigned := story.AssignedTo
-	story.AssignedTo = &userID
-	story.Status = model.StoryStatusInProgress
+		oldStatus := current.Status
+		oldAssigned := current.AssignedTo
+		current.AssignedTo = &userID
+		current.Status = model.StoryStatusInProgress
 
-	if err := s.db.Save(story).Error; err != nil {
-		return err
-	}
+		if err := tx.Save(&current).Error; err != nil {
+			return err
+		}
 
-	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "claimed", map[string]any{
-		"status":      oldStatus,
-		"assigned_to": oldAssigned,
-	}, map[string]any{
-		"status":      story.Status,
-		"assigned_to": userID,
-	}), "write story activity log", "story_id", story.ID, "action", "claimed")
+		logging.LogIfErr(createActivityLog(tx, current.ProjectID, userID, "story", current.ID, "claimed", map[string]any{
+			"status":      oldStatus,
+			"assigned_to": oldAssigned,
+		}, map[string]any{
+			"status":      current.Status,
+			"assigned_to": userID,
+		}), "write story activity log", "story_id", current.ID, "action", "claimed")
 
-	return nil
+		return nil
+	})
 }
 
 func (s *StoryService) AddCodeReference(story *model.UserStory, userID uint, reference string) ([]string, error) {
@@ -384,31 +396,37 @@ func (s *StoryService) AddCodeReference(story *model.UserStory, userID uint, ref
 }
 
 func (s *StoryService) Release(story *model.UserStory, userID uint, role string) error {
-	if story.AssignedTo == nil {
-		return ErrNotClaimed
-	}
-	if *story.AssignedTo != userID && role != model.RoleProduct && role != model.RoleAdmin {
-		return ErrNoReleasePermission
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var current model.UserStory
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, story.ID).Error; err != nil {
+			return err
+		}
+		if current.AssignedTo == nil {
+			return ErrNotClaimed
+		}
+		if *current.AssignedTo != userID && role != model.RoleProduct && role != model.RoleAdmin {
+			return ErrNoReleasePermission
+		}
 
-	oldAssigned := *story.AssignedTo
-	oldStatus := story.Status
-	story.AssignedTo = nil
-	story.Status = model.StoryStatusReady
+		oldAssigned := *current.AssignedTo
+		oldStatus := current.Status
+		current.AssignedTo = nil
+		current.Status = model.StoryStatusReady
 
-	if err := s.db.Save(story).Error; err != nil {
-		return err
-	}
+		if err := tx.Save(&current).Error; err != nil {
+			return err
+		}
 
-	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "released", map[string]any{
-		"status":      oldStatus,
-		"assigned_to": oldAssigned,
-	}, map[string]any{
-		"status":      story.Status,
-		"assigned_to": nil,
-	}), "write story activity log", "story_id", story.ID, "action", "released")
+		logging.LogIfErr(createActivityLog(tx, current.ProjectID, userID, "story", current.ID, "released", map[string]any{
+			"status":      oldStatus,
+			"assigned_to": oldAssigned,
+		}, map[string]any{
+			"status":      current.Status,
+			"assigned_to": nil,
+		}), "write story activity log", "story_id", current.ID, "action", "released")
 
-	return nil
+		return nil
+	})
 }
 
 func (s *StoryService) Delete(story *model.UserStory, userID uint) error {

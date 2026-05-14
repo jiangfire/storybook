@@ -7,14 +7,17 @@ import (
 	"git.neolidy.top/neo/storybook/internal/fileutil"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type MCPHandler struct {
-	svc *service.MCPService
-	db  *gorm.DB
+	svc       *service.MCPService
+	db        *gorm.DB
+	storyRepo *repository.StoryRepository
+	projectRepo *repository.ProjectRepository
 }
 
 type mcpValidateReq struct {
@@ -33,8 +36,10 @@ type mcpAnalyzeReq struct {
 
 func NewMCPHandler(db *gorm.DB) *MCPHandler {
 	return &MCPHandler{
-		svc: service.NewMCPService(db, ""),
-		db:  db,
+		svc:       service.NewMCPService(db, ""),
+		db:        db,
+		storyRepo: repository.NewStoryRepository(db),
+		projectRepo: repository.NewProjectRepository(db),
 	}
 }
 
@@ -191,13 +196,24 @@ func (h *MCPHandler) BatchUpdateACStatus(c *gin.Context) {
 }
 
 func (h *MCPHandler) ACCompletionStats(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")
 		return
 	}
 
-	data, err := h.svc.ACCompletionStats()
+	projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	data, err := h.svc.ACCompletionStats(projectIDs)
 	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
@@ -266,7 +282,7 @@ func (h *MCPHandler) requireStoryAccess(c *gin.Context, storyID uint) bool {
 	}
 
 	if _, _, _, err := ensureStoryAccess(h.db, storyID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return false
 		}
@@ -289,7 +305,7 @@ func (h *MCPHandler) requireProjectAccess(c *gin.Context, projectID uint) bool {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return false
 		}

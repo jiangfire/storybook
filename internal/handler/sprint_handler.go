@@ -9,17 +9,22 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type SprintHandler struct {
-	db *gorm.DB
+	db         *gorm.DB
+	sprintRepo *repository.SprintRepository
 }
 
 func NewSprintHandler(db *gorm.DB) *SprintHandler {
-	return &SprintHandler{db: db}
+	return &SprintHandler{
+		db:         db,
+		sprintRepo: repository.NewSprintRepository(db),
+	}
 }
 
 type createSprintRequest struct {
@@ -57,7 +62,7 @@ func (h *SprintHandler) Create(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -98,7 +103,7 @@ func (h *SprintHandler) Create(c *gin.Context) {
 		Status:    model.SprintStatusPlanned,
 		CreatedBy: userID,
 	}
-	if err := h.db.Create(&sprint).Error; err != nil {
+	if err := h.sprintRepo.Create(&sprint); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -130,7 +135,7 @@ func (h *SprintHandler) List(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -142,8 +147,8 @@ func (h *SprintHandler) List(c *gin.Context) {
 		return
 	}
 
-	var sprints []model.Sprint
-	if err := h.db.Where("project_id = ?", projectID).Order("start_date DESC, id DESC").Find(&sprints).Error; err != nil {
+	sprints, err := h.sprintRepo.ListByProjectDesc(projectID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -192,9 +197,9 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	var sprint model.Sprint
-	if err := h.db.First(&sprint, sprintID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	sprint, err := h.sprintRepo.FindByID(sprintID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "冲刺不存在")
 			return
 		}
@@ -223,7 +228,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 
 	oldStatus := sprint.Status
 	sprint.Status = req.Status
-	if err := h.db.Save(&sprint).Error; err != nil {
+	if err := h.sprintRepo.Save(sprint); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -267,7 +272,7 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 
 	story, project, _, err := ensureStoryAccess(h.db, storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -287,9 +292,9 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 	oldSprintID := story.SprintID
 
 	if req.SprintID != nil {
-		var sprint model.Sprint
-		if err := h.db.First(&sprint, *req.SprintID).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
+		sprint, err := h.sprintRepo.FindByID(*req.SprintID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
 				api.NotFound(c, "冲刺不存在")
 				return
 			}

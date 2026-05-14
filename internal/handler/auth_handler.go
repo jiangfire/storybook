@@ -12,6 +12,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -25,10 +26,15 @@ const (
 type AuthHandler struct {
 	db           *gorm.DB
 	tokenManager *auth.TokenManager
+	userRepo     *repository.UserRepository
 }
 
 func NewAuthHandler(db *gorm.DB, tokenManager *auth.TokenManager) *AuthHandler {
-	return &AuthHandler{db: db, tokenManager: tokenManager}
+	return &AuthHandler{
+		db:           db,
+		tokenManager: tokenManager,
+		userRepo:     repository.NewUserRepository(db),
+	}
 }
 
 type registerRequest struct {
@@ -59,12 +65,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 
-	var exists int64
-	if err := h.db.Model(&model.User{}).Where("email = ?", email).Count(&exists).Error; err != nil {
+	exists, err := h.userRepo.ExistsByEmail(email)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
-	if exists > 0 {
+	if exists {
 		api.Conflict(c, "邮箱已被注册")
 		return
 	}
@@ -87,7 +93,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Role:           req.Role,
 	}
 
-	if err := h.db.Create(&user).Error; err != nil {
+	if err := h.userRepo.Create(&user); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -124,9 +130,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 
-	var user model.User
-	if err := h.db.Where("email = ?", email).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	user, err := h.userRepo.FindByEmail(email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.Unauthorized(c, "邮箱或密码错误")
 			return
 		}
@@ -141,25 +147,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.HashedPassword), []byte(req.Password)); err != nil {
-		updates := map[string]any{
-			"failed_login_attempts": user.FailedLoginAttempts + 1,
+		newCount, incrErr := h.userRepo.IncrementFailedLoginAttempts(user.ID)
+		if incrErr != nil {
+			logging.LogIfErr(incrErr, "increment login attempts failed", "user_id", user.ID)
+		} else if newCount >= maxLoginAttempts {
+			lockUntil := now.Add(lockDuration)
+			logging.LogIfErr(h.userRepo.UpdateLockedUntil(user.ID, &lockUntil), "lock account failed", "user_id", user.ID)
 		}
 
-		if user.FailedLoginAttempts+1 >= maxLoginAttempts {
-			updates["locked_until"] = now.Add(lockDuration)
-		}
-
-		logging.LogIfErr(h.db.Model(&model.User{}).Where("id = ?", user.ID).Updates(updates).Error, "update user login state failed", "user_id", user.ID)
 		api.Unauthorized(c, "邮箱或密码错误")
 		return
 	}
 
-	resetUpdates := map[string]any{
+	if err := h.userRepo.UpdateLoginState(user.ID, map[string]any{
 		"failed_login_attempts": 0,
 		"locked_until":          nil,
 		"last_login_at":         now,
-	}
-	if err := h.db.Model(&model.User{}).Where("id = ?", user.ID).Updates(resetUpdates).Error; err != nil {
+	}); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -208,8 +212,8 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := h.db.Select("id, email, role, updated_at").First(&user, claims.UserID).Error; err != nil {
+	user, err := h.userRepo.FindByID(claims.UserID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.Unauthorized(c, "Refresh Token无效")
 			return

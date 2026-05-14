@@ -5,16 +5,23 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type MeHandler struct {
-	db *gorm.DB
+	userRepo  *repository.UserRepository
+	storyRepo *repository.StoryRepository
+	taskRepo  *repository.TaskRepository
 }
 
 func NewMeHandler(db *gorm.DB) *MeHandler {
-	return &MeHandler{db: db}
+	return &MeHandler{
+		userRepo:  repository.NewUserRepository(db),
+		storyRepo: repository.NewStoryRepository(db),
+		taskRepo:  repository.NewTaskRepository(db),
+	}
 }
 
 func (h *MeHandler) Dashboard(c *gin.Context) {
@@ -24,30 +31,20 @@ func (h *MeHandler) Dashboard(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := h.db.Select("id, email, role").First(&user, userID).Error; err != nil {
+	user, err := h.userRepo.FindByID(userID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
-	var assignedStories []model.UserStory
-	if err := h.db.
-		Preload("Project").
-		Where("assigned_to = ?", userID).
-		Order("updated_at DESC").
-		Limit(20).
-		Find(&assignedStories).Error; err != nil {
+	assignedStories, err := h.storyRepo.ListByAssignee(userID, 20)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
-	var createdStories []model.UserStory
-	if err := h.db.
-		Preload("Project").
-		Where("created_by = ?", userID).
-		Order("created_at DESC").
-		Limit(20).
-		Find(&createdStories).Error; err != nil {
+	createdStories, err := h.storyRepo.ListByCreator(userID, 20)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -62,14 +59,14 @@ func (h *MeHandler) Dashboard(c *gin.Context) {
 		createdPayload = append(createdPayload, storySummaryWithProject(s))
 	}
 
-	var totalAssigned int64
-	logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("assigned_to = ?", userID).Count(&totalAssigned).Error, "count assigned stories failed", "user_id", userID)
+	totalAssigned, err := h.storyRepo.CountByAssignee(userID)
+	logging.LogIfErr(err, "count assigned stories failed", "user_id", userID)
 
-	var inProgress int64
-	logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, model.StoryStatusInProgress).Count(&inProgress).Error, "count in-progress stories failed", "user_id", userID)
+	inProgress, err := h.storyRepo.CountByAssigneeAndStatus(userID, model.StoryStatusInProgress)
+	logging.LogIfErr(err, "count in-progress stories failed", "user_id", userID)
 
-	var completed int64
-	logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, model.StoryStatusDone).Count(&completed).Error, "count completed stories failed", "user_id", userID)
+	completed, err := h.storyRepo.CountByAssigneeAndStatus(userID, model.StoryStatusDone)
+	logging.LogIfErr(err, "count completed stories failed", "user_id", userID)
 
 	api.Success(c, "success", gin.H{
 		"user": gin.H{

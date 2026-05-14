@@ -542,7 +542,7 @@ func (h *TaskHandler) taskPayload(task *model.Task) gin.H {
 }
 
 func (h *TaskHandler) handleStoryAccessErr(c *gin.Context, err error) {
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		api.NotFound(c, "用户故事不存在")
 		return
 	}
@@ -554,7 +554,7 @@ func (h *TaskHandler) handleStoryAccessErr(c *gin.Context, err error) {
 }
 
 func (h *TaskHandler) handleTaskAccessErr(c *gin.Context, err error) {
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		api.NotFound(c, "任务不存在")
 		return
 	}

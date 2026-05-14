@@ -9,17 +9,26 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 type UserManagementHandler struct {
-	db *gorm.DB
+	db       *gorm.DB
+	userRepo *repository.UserRepository
+	storyRepo *repository.StoryRepository
+	taskRepo  *repository.TaskRepository
 }
 
 func NewUserManagementHandler(db *gorm.DB) *UserManagementHandler {
-	return &UserManagementHandler{db: db}
+	return &UserManagementHandler{
+		db:       db,
+		userRepo: repository.NewUserRepository(db),
+		storyRepo: repository.NewStoryRepository(db),
+		taskRepo:  repository.NewTaskRepository(db),
+	}
 }
 
 // ListUsers 获取所有用户列表
@@ -139,17 +148,27 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	username := strings.TrimSpace(req.Username)
+
 	// 检查邮箱是否已存在
-	var exists int64
-	h.db.Model(&model.User{}).Where("email = ?", req.Email).Count(&exists)
-	if exists > 0 {
+	exists, err := h.userRepo.ExistsByEmail(email)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+	if exists {
 		api.Conflict(c, "邮箱已被注册")
 		return
 	}
 
 	// 检查用户名是否已存在
-	h.db.Model(&model.User{}).Where("username = ?", req.Username).Count(&exists)
-	if exists > 0 {
+	exists, err = h.userRepo.ExistsByUsername(username, nil)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+	if exists {
 		api.Conflict(c, "用户名已被使用")
 		return
 	}
@@ -162,13 +181,13 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 	}
 
 	user := model.User{
-		Email:          req.Email,
-		Username:       req.Username,
+		Email:          email,
+		Username:       username,
 		HashedPassword: string(hashedPassword),
 		Role:           req.Role,
 	}
 
-	if err := h.db.Create(&user).Error; err != nil {
+	if err := h.userRepo.Create(&user); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -209,8 +228,8 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 	}
 
 	// 不能修改自己以外的admin用户（除非自己是admin）
-	var targetUser model.User
-	if err := h.db.First(&targetUser, targetUserID).Error; err != nil {
+	targetUser, err := h.userRepo.FindByID(targetUserID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户不存在")
 			return
@@ -245,9 +264,12 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 			return
 		}
 		// 检查用户名是否已被使用
-		var exists int64
-		h.db.Model(&model.User{}).Where("username = ? AND id != ?", username, targetUserID).Count(&exists)
-		if exists > 0 {
+		exists, err := h.userRepo.ExistsByUsername(username, &targetUserID)
+		if err != nil {
+			api.Internal(c, "服务器内部错误")
+			return
+		}
+		if exists {
 			api.Conflict(c, "用户名已被使用")
 			return
 		}
@@ -306,7 +328,7 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Save(&targetUser).Error; err != nil {
+	if err := h.userRepo.Save(targetUser); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -342,8 +364,8 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := h.db.First(&user, targetUserID).Error; err != nil {
+	user, err := h.userRepo.FindByID(targetUserID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户不存在")
 			return
@@ -440,11 +462,11 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 
 	// 计算平均完成时间
 	var avgCompletionDays float64
-	h.db.Raw(`
-		SELECT COALESCE(AVG(JULIANDAY(updated_at) - JULIANDAY(created_at)), 0)
-		FROM user_stories
-		WHERE assigned_to = ? AND status = ? AND updated_at >= ?
-	`, targetUserID, model.StoryStatusDone, thirtyDaysAgo).Scan(&avgCompletionDays)
+	dateDiffExpr := "JULIANDAY(updated_at) - JULIANDAY(created_at)"
+	if h.db.Dialector.Name() == "postgres" {
+		dateDiffExpr = "EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400.0"
+	}
+	h.db.Raw("SELECT COALESCE(AVG("+dateDiffExpr+"), 0) FROM user_stories WHERE assigned_to = ? AND status = ? AND updated_at >= ?", targetUserID, model.StoryStatusDone, thirtyDaysAgo).Scan(&avgCompletionDays)
 
 	api.Success(c, "success", gin.H{
 		"user": gin.H{
@@ -493,8 +515,8 @@ func (h *UserManagementHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	var targetUser model.User
-	if err := h.db.First(&targetUser, targetUserID).Error; err != nil {
+	targetUser, err := h.userRepo.FindByID(targetUserID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户不存在")
 			return
@@ -504,7 +526,7 @@ func (h *UserManagementHandler) DeleteUser(c *gin.Context) {
 	}
 
 	// 删除用户（软删除或硬删除，这里使用硬删除）
-	if err := h.db.Delete(&targetUser).Error; err != nil {
+	if err := h.userRepo.HardDelete(targetUser.ID); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

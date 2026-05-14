@@ -3,22 +3,32 @@ package handler
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type TechLeadHandler struct {
-	db *gorm.DB
+	db          *gorm.DB
+	storyRepo   *repository.StoryRepository
+	projectRepo *repository.ProjectRepository
+	userRepo    *repository.UserRepository
 }
 
 func NewTechLeadHandler(db *gorm.DB) *TechLeadHandler {
-	return &TechLeadHandler{db: db}
+	return &TechLeadHandler{
+		db:          db,
+		storyRepo:   repository.NewStoryRepository(db),
+		projectRepo: repository.NewProjectRepository(db),
+		userRepo:    repository.NewUserRepository(db),
+	}
 }
 
 // ListPendingStories 获取待审批故事列表（技术负责人）
@@ -371,8 +381,8 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	}
 
 	// 检查用户是否存在且是tech_lead角色
-	var user model.User
-	if err := h.db.First(&user, req.UserID).Error; err != nil {
+	user, err := h.userRepo.FindByID(req.UserID)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户不存在")
 			return
@@ -386,9 +396,12 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	}
 
 	// 检查是否已存在
-	var exists int64
-	h.db.Model(&model.ProjectTechLead{}).Where("project_id = ? AND user_id = ?", projectID, req.UserID).Count(&exists)
-	if exists > 0 {
+	exists, err := h.projectRepo.HasTechLead(projectID, req.UserID)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+	if exists {
 		api.Conflict(c, "该技术负责人已在项目中")
 		return
 	}
@@ -397,9 +410,9 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	techLead := model.ProjectTechLead{
 		ProjectID:  projectID,
 		UserID:     req.UserID,
-		AssignedAt: h.db.NowFunc(),
+		AssignedAt: time.Now(),
 	}
-	if err := h.db.Create(&techLead).Error; err != nil {
+	if err := h.projectRepo.AddTechLead(&techLead); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -441,12 +454,12 @@ func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 		return
 	}
 
-	result := h.db.Where("project_id = ? AND user_id = ?", projectID, targetUserID).Delete(&model.ProjectTechLead{})
-	if result.Error != nil {
+	affected, err := h.projectRepo.RemoveTechLead(projectID, targetUserID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
-	if result.RowsAffected == 0 {
+	if affected == 0 {
 		api.NotFound(c, "技术负责人不存在")
 		return
 	}
@@ -486,8 +499,8 @@ func (h *TechLeadHandler) ListProjectTechLeads(c *gin.Context) {
 		return
 	}
 
-	var techLeads []model.ProjectTechLead
-	if err := h.db.Preload("User").Where("project_id = ?", projectID).Find(&techLeads).Error; err != nil {
+	techLeads, err := h.projectRepo.ListTechLeads(projectID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

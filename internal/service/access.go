@@ -122,14 +122,6 @@ func AccessibleProjectIDs(db *gorm.DB, userID uint, userRole string) ([]uint, er
 	return projectIDs, nil
 }
 
-// IsTechLeadOrAdmin 检查用户是否是技术负责人或管理员
-func IsTechLeadOrAdmin(db *gorm.DB, userID uint, userRole string) bool {
-	if userRole == model.RoleAdmin {
-		return true
-	}
-	return false
-}
-
 // CanReviewStory 检查用户是否有权限审批故事
 func CanReviewStory(db *gorm.DB, story *model.UserStory, userID uint, userRole string) (bool, error) {
 	if userRole == model.RoleAdmin {

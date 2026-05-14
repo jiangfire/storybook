@@ -34,7 +34,7 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -56,7 +56,7 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 	if req.AssignedTo != nil {
 		var member model.ProjectMember
 		if err := h.db.Where("project_id = ? AND user_id = ?", story.ProjectID, *req.AssignedTo).First(&member).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
 				api.BadRequest(c, "被分配人不是项目成员")
 				return
 			}
@@ -72,7 +72,7 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 		story.AssignedTo = nil
 	}
 
-	if err := h.db.Save(story).Error; err != nil {
+	if err := h.storyRepo.Save(story); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -94,8 +94,8 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 
 	var assignee any
 	if story.AssignedTo != nil {
-		var user model.User
-		if err := h.db.Select("id, email").First(&user, *story.AssignedTo).Error; err == nil {
+		user, err := h.userRepo.FindByID(*story.AssignedTo)
+		if err == nil {
 			assignee = gin.H{"id": user.ID, "email": user.Email}
 		}
 	}
@@ -130,7 +130,7 @@ func (h *StoryHandler) ReviewStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}

@@ -26,6 +26,7 @@ func TestRunBootstrapAdminDoesNotRequireJWTSecret(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 	t.Setenv("DB_DRIVER", "sqlite")
 	t.Setenv("DB_DSN", "file:bootstrap_admin_cli_test?mode=memory&cache=shared")
+	t.Setenv("DB_AUTO_MIGRATE", "true")
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

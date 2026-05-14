@@ -9,16 +9,21 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type TestCaseHandler struct {
-	db *gorm.DB
+	db     *gorm.DB
+	tcRepo *repository.TestCaseRepository
 }
 
 func NewTestCaseHandler(db *gorm.DB) *TestCaseHandler {
-	return &TestCaseHandler{db: db}
+	return &TestCaseHandler{
+		db:     db,
+		tcRepo: repository.NewTestCaseRepository(db),
+	}
 }
 
 type createTestCaseRequest struct {
@@ -52,7 +57,7 @@ func (h *TestCaseHandler) Create(c *gin.Context) {
 
 	story, err := h.loadStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -90,7 +95,7 @@ func (h *TestCaseHandler) Create(c *gin.Context) {
 		Status:         "pending",
 		CreatedBy:      userID,
 	}
-	if err := h.db.Create(&tc).Error; err != nil {
+	if err := h.tcRepo.Create(&tc); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -132,7 +137,7 @@ func (h *TestCaseHandler) ListByStory(c *gin.Context) {
 
 	story, err := h.loadStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -144,8 +149,8 @@ func (h *TestCaseHandler) ListByStory(c *gin.Context) {
 		return
 	}
 
-	var tcs []model.TestCase
-	if err := h.db.Where("story_id = ?", story.ID).Preload("Creator").Order("id DESC").Find(&tcs).Error; err != nil {
+	tcs, err := h.tcRepo.ListByStory(story.ID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -198,9 +203,9 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	var tc model.TestCase
-	if err := h.db.First(&tc, testCaseID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	tc, err := h.tcRepo.FindByID(testCaseID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "测试用例不存在")
 			return
 		}
@@ -210,7 +215,7 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 
 	story, err := h.loadStoryWithAccess(tc.StoryID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -224,7 +229,7 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 
 	oldStatus := tc.Status
 	tc.Status = req.Status
-	if err := h.db.Save(&tc).Error; err != nil {
+	if err := h.tcRepo.Save(tc); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

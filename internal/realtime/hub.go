@@ -15,7 +15,12 @@ import (
 	"gorm.io/gorm"
 )
 
-const maxConnPerUser = 5
+const (
+	maxConnPerUser = 5
+	maxWSSize      = 65536 // 64 KiB max per message
+	wsReadBuf      = 4096
+	wsWriteBuf     = 4096
+)
 
 type Event struct {
 	Type      string    `json:"type"`
@@ -35,6 +40,8 @@ func NewHub(db *gorm.DB) *Hub {
 		db:          db,
 		connections: make(map[uint]map[*websocket.Conn]struct{}),
 		upgrader: websocket.Upgrader{
+			ReadBufferSize:  wsReadBuf,
+			WriteBufferSize: wsWriteBuf,
 			CheckOrigin: func(r *http.Request) bool {
 				return middleware.IsOriginAllowed(r, strings.TrimSpace(r.Header.Get("Origin")))
 			},
@@ -72,9 +79,16 @@ func (h *Hub) HandleWS(c *gin.Context, userID uint, selectedProtocol string) {
 	pingTicker := time.NewTicker(30 * time.Second)
 	defer pingTicker.Stop()
 
+	conn.SetReadLimit(maxWSSize)
+
 	done := make(chan struct{})
 	go func() {
-		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				// prevent a single malformed message from crashing the hub goroutine
+			}
+			close(done)
+		}()
 		for {
 			if _, _, err := conn.ReadMessage(); err != nil {
 				return

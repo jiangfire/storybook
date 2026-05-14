@@ -354,9 +354,13 @@ func (s *MCPService) BatchUpdateACStatus(storyID uint, updates []MCPACUpdateInpu
 	}, nil
 }
 
-func (s *MCPService) ACCompletionStats() (*MCPACCompletionStatsResult, error) {
+func (s *MCPService) ACCompletionStats(projectIDs []uint) (*MCPACCompletionStatsResult, error) {
 	var stories []model.UserStory
-	if err := s.db.Find(&stories).Error; err != nil {
+	query := s.db
+	if len(projectIDs) > 0 {
+		query = query.Where("project_id IN ?", projectIDs)
+	}
+	if err := query.Find(&stories).Error; err != nil {
 		return nil, err
 	}
 

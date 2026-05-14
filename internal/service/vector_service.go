@@ -53,6 +53,9 @@ func NewVectorServiceWithBatchSize(db *gorm.DB, embeddingSvc EmbeddingService, b
 
 // SearchSimilarStories 搜索相似故事
 func (s *vectorService) SearchSimilarStories(ctx context.Context, query string, projectIDs []uint, limit int) ([]SimilarStory, error) {
+	if s.db.Dialector.Name() != "postgres" {
+		return nil, fmt.Errorf("vector search requires postgres with pgvector")
+	}
 	// 安全检查：空 projectIDs
 	if len(projectIDs) == 0 {
 		return []SimilarStory{}, nil
@@ -103,6 +106,9 @@ func (s *vectorService) SearchSimilarStories(ctx context.Context, query string, 
 
 // IndexStory 为单个故事生成并存储向量
 func (s *vectorService) IndexStory(ctx context.Context, story *model.UserStory) error {
+	if s.db.Dialector.Name() != "postgres" {
+		return fmt.Errorf("vector indexing requires postgres with pgvector")
+	}
 	// 1. 准备文本内容
 	content := s.PrepareStoryContent(story)
 

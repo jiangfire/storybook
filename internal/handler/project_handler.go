@@ -11,17 +11,26 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type ProjectHandler struct {
-	db *gorm.DB
+	db          *gorm.DB
+	projectRepo *repository.ProjectRepository
+	userRepo    *repository.UserRepository
+	storyRepo   *repository.StoryRepository
 }
 
 func NewProjectHandler(db *gorm.DB) *ProjectHandler {
-	return &ProjectHandler{db: db}
+	return &ProjectHandler{
+		db:          db,
+		projectRepo: repository.NewProjectRepository(db),
+		userRepo:    repository.NewUserRepository(db),
+		storyRepo:   repository.NewStoryRepository(db),
+	}
 }
 
 type createProjectRequest struct {
@@ -76,15 +85,12 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 
 	req.Name = strings.TrimSpace(req.Name)
 
-	var exists int64
-	if err := h.db.Model(&model.Project{}).
-		Where("owner_id = ? AND name = ?", userID, req.Name).
-		Count(&exists).Error; err != nil {
+	exists, err := h.projectRepo.ExistsByOwnerAndName(userID, req.Name)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
-
-	if exists > 0 {
+	if exists {
 		api.Conflict(c, "同一用户不能创建同名项目")
 		return
 	}
@@ -96,28 +102,13 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		AgileMode:   req.AgileMode,
 	}
 
-	tx := h.db.Begin()
-	if err := tx.Create(&project).Error; err != nil {
-		tx.Rollback()
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	// 创建者自动加入项目成员。
 	member := model.ProjectMember{
 		ProjectID:     project.ID,
 		UserID:        userID,
 		RoleInProject: c.GetString(middleware.CtxRoleKey),
 	}
-
 	if member.RoleInProject == "" {
 		member.RoleInProject = model.RoleDeveloper
-	}
-
-	if err := tx.Create(&member).Error; err != nil {
-		tx.Rollback()
-		api.Internal(c, "服务器内部错误")
-		return
 	}
 
 	defaultColumns := []model.BoardColumn{
@@ -128,19 +119,13 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		{ProjectID: project.ID, Name: "已完成", Position: 5},
 	}
 
-	if err := tx.Create(&defaultColumns).Error; err != nil {
-		tx.Rollback()
+	if err := h.projectRepo.CreateWithTransaction(&project, &member, defaultColumns); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
-	if err := tx.Commit().Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	var owner model.User
-	if err := h.db.First(&owner, userID).Error; err != nil {
+	owner, err := h.userRepo.FindByID(userID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -222,8 +207,10 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 		var storyCount int64
 		logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("project_id = ?", p.ID).Count(&storyCount).Error, "count project stories failed", "project_id", p.ID)
 
-		var owner model.User
-		logging.LogIfErr(h.db.Select("id, email").First(&owner, p.OwnerID).Error, "load project owner failed", "project_id", p.ID, "owner_id", p.OwnerID)
+		owner, err := h.userRepo.FindByID(p.OwnerID)
+		if err != nil {
+			logging.LogIfErr(err, "load project owner failed", "project_id", p.ID, "owner_id", p.OwnerID)
+		}
 
 		items = append(items, projectItem{
 			ID:          p.ID,
@@ -264,7 +251,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 
 	project, isOwner, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -276,8 +263,8 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 		return
 	}
 
-	var members []model.ProjectMember
-	if err := h.db.Preload("User").Where("project_id = ?", project.ID).Find(&members).Error; err != nil {
+	members, err := h.projectRepo.ListMembers(project.ID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -339,9 +326,9 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	var project model.Project
-	if err := h.db.First(&project, projectID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	project, err := h.projectRepo.FindByID(projectID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -367,14 +354,12 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 			return
 		}
 
-		var exists int64
-		if err := h.db.Model(&model.Project{}).
-			Where("owner_id = ? AND name = ? AND id <> ?", userID, name, project.ID).
-			Count(&exists).Error; err != nil {
+		exists, err := h.projectRepo.ExistsByOwnerAndName(userID, name, project.ID)
+		if err != nil {
 			api.Internal(c, "服务器内部错误")
 			return
 		}
-		if exists > 0 {
+		if exists {
 			api.Conflict(c, "同一用户不能创建同名项目")
 			return
 		}
@@ -410,14 +395,16 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	}
 
 	if changed {
-		if err := h.db.Save(&project).Error; err != nil {
+		if err := h.projectRepo.Save(project); err != nil {
 			api.Internal(c, "服务器内部错误")
 			return
 		}
 	}
 
-	var owner model.User
-	logging.LogIfErr(h.db.Select("id, email").First(&owner, project.OwnerID).Error, "load project owner failed", "project_id", project.ID, "owner_id", project.OwnerID)
+	owner, err := h.userRepo.FindByID(project.OwnerID)
+	if err != nil {
+		logging.LogIfErr(err, "load project owner failed", "project_id", project.ID, "owner_id", project.OwnerID)
+	}
 
 	api.Success(c, "项目更新成功", gin.H{
 		"id":          project.ID,
@@ -447,7 +434,7 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -511,9 +498,9 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	var project model.Project
-	if err := h.db.First(&project, projectID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	project, err := h.projectRepo.FindByID(projectID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -526,7 +513,7 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Delete(&project).Error; err != nil {
+	if err := h.projectRepo.Delete(project.ID); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -549,7 +536,7 @@ func (h *ProjectHandler) ListMembers(c *gin.Context) {
 
 	project, isOwner, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -561,8 +548,8 @@ func (h *ProjectHandler) ListMembers(c *gin.Context) {
 		return
 	}
 
-	var members []model.ProjectMember
-	if err := h.db.Preload("User").Where("project_id = ?", project.ID).Order("id ASC").Find(&members).Error; err != nil {
+	members, err := h.projectRepo.ListMembers(project.ID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -608,7 +595,7 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -630,9 +617,9 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 		return
 	}
 
-	var target model.User
-	if err := h.db.First(&target, req.UserID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	target, err := h.userRepo.FindByID(req.UserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户不存在")
 			return
 		}
@@ -640,14 +627,12 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 		return
 	}
 
-	var exists int64
-	if err := h.db.Model(&model.ProjectMember{}).
-		Where("project_id = ? AND user_id = ?", project.ID, target.ID).
-		Count(&exists).Error; err != nil {
+	isMember, err := h.projectRepo.IsMember(project.ID, target.ID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
-	if exists > 0 {
+	if isMember {
 		api.Conflict(c, "该用户已在项目中")
 		return
 	}
@@ -657,7 +642,7 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 		UserID:        target.ID,
 		RoleInProject: req.RoleInProject,
 	}
-	if err := h.db.Create(&member).Error; err != nil {
+	if err := h.projectRepo.AddMember(&member); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -684,7 +669,7 @@ func (h *ProjectHandler) ListMemberCandidates(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -753,7 +738,7 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -775,12 +760,12 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 		return
 	}
 
-	result := h.db.Where("project_id = ? AND user_id = ?", project.ID, targetUserID).Delete(&model.ProjectMember{})
-	if result.Error != nil {
+	rowsAffected, err := h.projectRepo.RemoveMember(project.ID, targetUserID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
-	if result.RowsAffected == 0 {
+	if rowsAffected == 0 {
 		api.NotFound(c, "项目成员不存在")
 		return
 	}

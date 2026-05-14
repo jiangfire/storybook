@@ -7,6 +7,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type TaskService struct {
@@ -267,62 +268,74 @@ func (s *TaskService) UpdateProgress(task *model.Task, projectID, userID uint, r
 }
 
 func (s *TaskService) Claim(task *model.Task, projectID, userID uint) error {
-	if task.AssignedTo != nil && *task.AssignedTo != userID {
-		return ErrAlreadyClaimed
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var current model.Task
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, task.ID).Error; err != nil {
+			return err
+		}
+		if current.AssignedTo != nil && *current.AssignedTo != userID {
+			return ErrAlreadyClaimed
+		}
 
-	oldAssigned := task.AssignedTo
-	oldStatus := task.Status
-	task.AssignedTo = &userID
-	if task.Status == model.TaskStatusTodo {
-		task.Status = model.TaskStatusInProgress
-	}
+		oldAssigned := current.AssignedTo
+		oldStatus := current.Status
+		current.AssignedTo = &userID
+		if current.Status == model.TaskStatusTodo {
+			current.Status = model.TaskStatusInProgress
+		}
 
-	if err := s.db.Save(task).Error; err != nil {
-		return err
-	}
+		if err := tx.Save(&current).Error; err != nil {
+			return err
+		}
 
-	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "claimed", map[string]any{
-		"assigned_to": oldAssigned,
-		"status":      oldStatus,
-	}, map[string]any{
-		"assigned_to": userID,
-		"status":      task.Status,
-	}), "write task activity log", "task_id", task.ID, "action", "claimed")
+		logging.LogIfErr(createActivityLog(tx, projectID, userID, "task", current.ID, "claimed", map[string]any{
+			"assigned_to": oldAssigned,
+			"status":      oldStatus,
+		}, map[string]any{
+			"assigned_to": userID,
+			"status":      current.Status,
+		}), "write task activity log", "task_id", current.ID, "action", "claimed")
 
-	return nil
+		return nil
+	})
 }
 
 func (s *TaskService) Release(task *model.Task, projectID, userID uint, role string) error {
-	if task.AssignedTo == nil {
-		return ErrNotClaimed
-	}
-	if *task.AssignedTo != userID && role != model.RoleProduct && role != model.RoleAdmin {
-		return ErrNoReleasePermission
-	}
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var current model.Task
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, task.ID).Error; err != nil {
+			return err
+		}
+		if current.AssignedTo == nil {
+			return ErrNotClaimed
+		}
+		if *current.AssignedTo != userID && role != model.RoleProduct && role != model.RoleAdmin {
+			return ErrNoReleasePermission
+		}
 
-	oldAssigned := *task.AssignedTo
-	oldStatus := task.Status
-	task.AssignedTo = nil
-	if task.Progress == 0 {
-		task.Status = model.TaskStatusTodo
-	} else if task.Status == model.TaskStatusInProgress {
-		task.Status = model.TaskStatusBlocked
-	}
+		oldAssigned := *current.AssignedTo
+		oldStatus := current.Status
+		current.AssignedTo = nil
+		if current.Progress == 0 {
+			current.Status = model.TaskStatusTodo
+		} else if current.Status == model.TaskStatusInProgress {
+			current.Status = model.TaskStatusBlocked
+		}
 
-	if err := s.db.Save(task).Error; err != nil {
-		return err
-	}
+		if err := tx.Save(&current).Error; err != nil {
+			return err
+		}
 
-	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "released", map[string]any{
-		"assigned_to": oldAssigned,
-		"status":      oldStatus,
-	}, map[string]any{
-		"assigned_to": nil,
-		"status":      task.Status,
-	}), "write task activity log", "task_id", task.ID, "action", "released")
+		logging.LogIfErr(createActivityLog(tx, projectID, userID, "task", current.ID, "released", map[string]any{
+			"assigned_to": oldAssigned,
+			"status":      oldStatus,
+		}, map[string]any{
+			"assigned_to": nil,
+			"status":      current.Status,
+		}), "write task activity log", "task_id", current.ID, "action", "released")
 
-	return nil
+		return nil
+	})
 }
 
 func (s *TaskService) Delete(task *model.Task, projectID, userID uint) error {

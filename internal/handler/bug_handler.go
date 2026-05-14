@@ -9,17 +9,28 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type BugHandler struct {
-	db *gorm.DB
+	db         *gorm.DB
+	bugRepo    *repository.BugRepository
+	storyRepo  *repository.StoryRepository
+	userRepo   *repository.UserRepository
+	projectRepo *repository.ProjectRepository
 }
 
 func NewBugHandler(db *gorm.DB) *BugHandler {
-	return &BugHandler{db: db}
+	return &BugHandler{
+		db:          db,
+		bugRepo:     repository.NewBugRepository(db),
+		storyRepo:   repository.NewStoryRepository(db),
+		userRepo:    repository.NewUserRepository(db),
+		projectRepo: repository.NewProjectRepository(db),
+	}
 }
 
 type createBugRequest struct {
@@ -61,7 +72,7 @@ func (h *BugHandler) Create(c *gin.Context) {
 
 	project, _, err := ensureProjectAccess(h.db, projectID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -79,9 +90,9 @@ func (h *BugHandler) Create(c *gin.Context) {
 	}
 
 	if req.StoryID != nil {
-		var story model.UserStory
-		if err := h.db.First(&story, *req.StoryID).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
+		story, err := h.storyRepo.FindByID(*req.StoryID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
 				api.NotFound(c, "关联故事不存在")
 				return
 			}
@@ -111,7 +122,7 @@ func (h *BugHandler) Create(c *gin.Context) {
 		ReportedBy:  userID,
 		AssignedTo:  req.AssignedToID,
 	}
-	if err := h.db.Create(&bug).Error; err != nil {
+	if err := h.bugRepo.Create(&bug); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -143,7 +154,7 @@ func (h *BugHandler) List(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -216,7 +227,7 @@ func (h *BugHandler) Get(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "缺陷不存在")
 			return
 		}
@@ -271,7 +282,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "缺陷不存在")
 			return
 		}
@@ -302,7 +313,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 		bug.ResolvedAt = nil
 	}
 
-	if err := h.db.Save(bug).Error; err != nil {
+	if err := h.bugRepo.Save(bug); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -347,7 +358,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "缺陷不存在")
 			return
 		}
@@ -373,7 +384,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 
 	oldAssigned := bug.AssignedTo
 	bug.AssignedTo = req.AssignedToID
-	if err := h.db.Save(bug).Error; err != nil {
+	if err := h.bugRepo.Save(bug); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -397,31 +408,31 @@ func (h *BugHandler) Assign(c *gin.Context) {
 }
 
 func (h *BugHandler) loadBugWithAccess(bugID, userID uint) (*model.BugReport, error) {
-	var bug model.BugReport
-	if err := h.db.Preload("Reporter").Preload("Assignee").First(&bug, bugID).Error; err != nil {
+	bug, err := h.bugRepo.FindByIDWithDetails(bugID)
+	if err != nil {
 		return nil, err
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, bug.ProjectID, userID); err != nil {
 		return nil, err
 	}
-	return &bug, nil
+	return bug, nil
 }
 
 func (h *BugHandler) isProjectMember(projectID, userID uint) bool {
-	var project model.Project
-	if err := h.db.First(&project, projectID).Error; err != nil {
+	project, err := h.projectRepo.FindByID(projectID)
+	if err != nil {
 		return false
 	}
 	if project.OwnerID == userID {
 		return true
 	}
 
-	var count int64
-	if err := h.db.Model(&model.ProjectMember{}).Where("project_id = ? AND user_id = ?", projectID, userID).Count(&count).Error; err != nil {
+	isMember, err := h.projectRepo.IsMember(projectID, userID)
+	if err != nil {
 		return false
 	}
-	return count > 0
+	return isMember
 }
 
 func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
@@ -429,8 +440,8 @@ func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
 		return errForbidden
 	}
 
-	var user model.User
-	if err := h.db.Select("id, role").First(&user, userID).Error; err != nil {
+	user, err := h.userRepo.FindByID(userID)
+	if err != nil {
 		return err
 	}
 	if user.Role != model.RoleDeveloper && user.Role != model.RoleAdmin {

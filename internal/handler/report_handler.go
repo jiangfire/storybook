@@ -8,12 +8,16 @@ import (
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type ReportHandler struct {
-	db *gorm.DB
+	db        *gorm.DB
+	storyRepo *repository.StoryRepository
+	sprintRepo *repository.SprintRepository
+	taskRepo   *repository.TaskRepository
 }
 
 type burndownDoneRange struct {
@@ -22,7 +26,12 @@ type burndownDoneRange struct {
 }
 
 func NewReportHandler(db *gorm.DB) *ReportHandler {
-	return &ReportHandler{db: db}
+	return &ReportHandler{
+		db:         db,
+		storyRepo:  repository.NewStoryRepository(db),
+		sprintRepo: repository.NewSprintRepository(db),
+		taskRepo:   repository.NewTaskRepository(db),
+	}
 }
 
 func (h *ReportHandler) Velocity(c *gin.Context) {
@@ -38,7 +47,7 @@ func (h *ReportHandler) Velocity(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -50,16 +59,16 @@ func (h *ReportHandler) Velocity(c *gin.Context) {
 		return
 	}
 
-	var sprints []model.Sprint
-	if err := h.db.Where("project_id = ?", projectID).Order("start_date ASC").Find(&sprints).Error; err != nil {
+	sprints, err := h.sprintRepo.ListByProject(projectID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	items := make([]gin.H, 0, len(sprints))
 	for _, s := range sprints {
-		var stories []model.UserStory
-		if err := h.db.Where("sprint_id = ?", s.ID).Find(&stories).Error; err != nil {
+		stories, err := h.storyRepo.ListBySprint(s.ID)
+		if err != nil {
 			continue
 		}
 
@@ -113,7 +122,7 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -196,7 +205,7 @@ func (h *ReportHandler) Burndown(c *gin.Context) {
 		return
 	}
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "项目不存在")
 			return
 		}
@@ -214,9 +223,9 @@ func (h *ReportHandler) Burndown(c *gin.Context) {
 		return
 	}
 
-	var sprint model.Sprint
-	if err := h.db.First(&sprint, sprintID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	sprint, err := h.sprintRepo.FindByID(sprintID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "冲刺不存在")
 			return
 		}
@@ -228,8 +237,8 @@ func (h *ReportHandler) Burndown(c *gin.Context) {
 		return
 	}
 
-	var stories []model.UserStory
-	if err := h.db.Where("sprint_id = ?", sprint.ID).Find(&stories).Error; err != nil {
+	stories, err := h.storyRepo.ListBySprint(sprint.ID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

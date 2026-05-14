@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const (
@@ -84,9 +85,11 @@ type User struct {
 	AvatarURL           string     `gorm:"size:500" json:"avatar_url,omitempty"`
 	FailedLoginAttempts int        `gorm:"not null;default:0" json:"-"`
 	LockedUntil         *time.Time `json:"-"`
-	LastLoginAt         *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	LastLoginAt         *time.Time      `json:"last_login_at,omitempty"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	DeletedAt           gorm.DeletedAt  `gorm:"index" json:"-"`
+	Version             int             `gorm:"default:0" json:"version"`
 }
 
 // Project 项目。
@@ -97,8 +100,10 @@ type Project struct {
 	OwnerID     uint      `gorm:"not null;index" json:"owner_id"`
 	Owner       *User     `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	AgileMode   string    `gorm:"size:20;not null;default:kanban;index" json:"agile_mode"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	Version     int            `gorm:"default:0" json:"version"`
 }
 
 // ProjectMember 项目成员。
@@ -108,8 +113,10 @@ type ProjectMember struct {
 	Project       *Project  `gorm:"foreignKey:ProjectID" json:"project,omitempty"`
 	UserID        uint      `gorm:"not null;uniqueIndex:idx_project_member" json:"user_id"`
 	User          *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	RoleInProject string    `gorm:"size:20;not null" json:"role_in_project"`
-	JoinedAt      time.Time `json:"joined_at"`
+	RoleInProject string         `gorm:"size:20;not null" json:"role_in_project"`
+	JoinedAt      time.Time      `json:"joined_at"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	Version       int            `gorm:"default:0" json:"version"`
 }
 
 // BoardColumn 看板列。
@@ -119,8 +126,10 @@ type BoardColumn struct {
 	Name      string    `gorm:"size:100;not null" json:"name"`
 	Position  int       `gorm:"not null;uniqueIndex:idx_project_position" json:"position"`
 	Color     string    `gorm:"size:20;default:#6B7280" json:"color"`
-	WIPLimit  int       `gorm:"default:0" json:"wip_limit"`
-	CreatedAt time.Time `json:"created_at"`
+	WIPLimit  int            `gorm:"default:0" json:"wip_limit"`
+	CreatedAt time.Time      `json:"created_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Version   int            `gorm:"default:0" json:"version"`
 }
 
 // Sprint 冲刺。
@@ -133,10 +142,12 @@ type Sprint struct {
 	StartDate time.Time `json:"start_date"`
 	EndDate   time.Time `json:"end_date"`
 	Status    string    `gorm:"size:20;not null;default:planned;index" json:"status"`
-	CreatedBy uint      `gorm:"not null;index" json:"created_by"`
-	Creator   *User     `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	CreatedBy uint           `gorm:"not null;index" json:"created_by"`
+	Creator   *User          `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Version   int            `gorm:"default:0" json:"version"`
 }
 
 // UserStory 用户故事。
@@ -165,9 +176,11 @@ type UserStory struct {
 	CodeReferences     datatypes.JSON `gorm:"type:jsonb;not null" json:"code_references,omitempty"`
 	ReviewedBy         *uint          `gorm:"index" json:"reviewed_by,omitempty"`
 	Reviewer           *User          `gorm:"foreignKey:ReviewedBy" json:"reviewer,omitempty"`
-	ReviewedAt         *time.Time     `json:"reviewed_at,omitempty"`
-	CreatedAt          time.Time      `json:"created_at"`
-	UpdatedAt          time.Time      `json:"updated_at"`
+	ReviewedAt         *time.Time      `json:"reviewed_at,omitempty"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt  `gorm:"index" json:"-"`
+	Version            int             `gorm:"default:0" json:"version"`
 }
 
 // BugReport 缺陷记录。
@@ -185,9 +198,11 @@ type BugReport struct {
 	Reporter    *User      `gorm:"foreignKey:ReportedBy" json:"reporter,omitempty"`
 	AssignedTo  *uint      `gorm:"index" json:"assigned_to,omitempty"`
 	Assignee    *User      `gorm:"foreignKey:AssignedTo" json:"assignee,omitempty"`
-	ResolvedAt  *time.Time `json:"resolved_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ResolvedAt  *time.Time      `json:"resolved_at,omitempty"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	DeletedAt   gorm.DeletedAt  `gorm:"index" json:"-"`
+	Version     int             `gorm:"default:0" json:"version"`
 }
 
 // Task 子任务。
@@ -207,9 +222,11 @@ type Task struct {
 	Assignee       *User          `gorm:"foreignKey:AssignedTo" json:"assignee,omitempty"`
 	CreatedBy      uint           `gorm:"not null;index" json:"created_by"`
 	Creator        *User          `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
-	CodeReferences datatypes.JSON `gorm:"type:jsonb;not null" json:"code_references,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	CodeReferences datatypes.JSON  `gorm:"type:jsonb;not null" json:"code_references,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+	DeletedAt      gorm.DeletedAt  `gorm:"index" json:"-"`
+	Version        int             `gorm:"default:0" json:"version"`
 }
 
 // ActivityLog 活动日志。
@@ -222,8 +239,10 @@ type ActivityLog struct {
 	NewValue   datatypes.JSON `gorm:"type:jsonb" json:"new_value,omitempty"`
 	UserID     uint           `gorm:"not null;index" json:"user_id"`
 	User       *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	ProjectID  *uint          `gorm:"index" json:"project_id,omitempty"`
-	CreatedAt  time.Time      `json:"created_at"`
+	ProjectID  *uint           `gorm:"index" json:"project_id,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+	DeletedAt  gorm.DeletedAt  `gorm:"index" json:"-"`
+	Version    int             `gorm:"default:0" json:"version"`
 }
 
 // TestCase 测试用例。
@@ -240,6 +259,8 @@ type TestCase struct {
 	Creator        *User          `gorm:"foreignKey:CreatedBy" json:"creator,omitempty"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt  `gorm:"index" json:"-"`
+	Version    int             `gorm:"default:0" json:"version"`
 }
 
 // AcceptanceCriterion 验收标准。
@@ -296,6 +317,8 @@ type ProjectTechLead struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
 	ProjectID  uint      `gorm:"not null;uniqueIndex:idx_project_techlead" json:"project_id"`
 	UserID     uint      `gorm:"not null;uniqueIndex:idx_project_techlead" json:"user_id"`
-	User       *User     `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	AssignedAt time.Time `json:"assigned_at"`
+	User       *User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	AssignedAt time.Time       `json:"assigned_at"`
+	DeletedAt  gorm.DeletedAt  `gorm:"index" json:"-"`
+	Version    int             `gorm:"default:0" json:"version"`
 }

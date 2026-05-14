@@ -26,7 +26,7 @@ func (h *StoryHandler) ArchiveStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -74,7 +74,7 @@ func (h *StoryHandler) RestoreStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -122,7 +122,7 @@ func (h *StoryHandler) GetActivities(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}

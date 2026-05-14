@@ -46,7 +46,16 @@ func load(requireJWT bool) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	autoMigrate, err := getEnvBool("DB_AUTO_MIGRATE", true)
+	autoMigrate, err := getEnvBool("DB_AUTO_MIGRATE", false)
+	if err != nil {
+		return nil, err
+	}
+
+	accessTTL, err := getEnvInt("ACCESS_TOKEN_TTL_HOURS", 24)
+	if err != nil {
+		return nil, err
+	}
+	refreshTTL, err := getEnvInt("REFRESH_TOKEN_TTL_HOURS", 24*7)
 	if err != nil {
 		return nil, err
 	}
@@ -58,16 +67,21 @@ func load(requireJWT bool) (*Config, error) {
 		JWTSecret:                strings.TrimSpace(os.Getenv("JWT_SECRET")),
 		LogLevel:                 getEnv("LOG_LEVEL", "info"),
 		LogFormat:                getEnv("LOG_FORMAT", "text"),
-		AccessTokenTTL:           24,
-		RefreshTokenTTL:          24 * 7,
+		AccessTokenTTL:           accessTTL,
+		RefreshTokenTTL:          refreshTTL,
 		DBMaxOpenConns:           maxOpen,
 		DBMaxIdleConns:           maxIdle,
 		DBConnMaxLifetimeMinutes: connLifetime,
 		DBAutoMigrate:            autoMigrate,
 	}
 
-	if requireJWT && cfg.JWTSecret == "" {
-		return nil, fmt.Errorf("JWT_SECRET must be set")
+	if requireJWT {
+		if cfg.JWTSecret == "" {
+			return nil, fmt.Errorf("JWT_SECRET must be set")
+		}
+		if len(cfg.JWTSecret) < 32 {
+			return nil, fmt.Errorf("JWT_SECRET must be at least 32 bytes")
+		}
 	}
 
 	return cfg, nil

@@ -80,7 +80,7 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	{
 		authGroup.POST("/register", authLimiter.Middleware(), authHandler.Register)
 		authGroup.POST("/login", authLimiter.Middleware(), authHandler.Login)
-		authGroup.POST("/refresh", authHandler.Refresh)
+		authGroup.POST("/refresh", authLimiter.Middleware(), authHandler.Refresh)
 	}
 
 	userLimiter := middleware.NewUserRateLimiter(100)

@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"git.neolidy.top/neo/storybook/internal/auth"
 	"git.neolidy.top/neo/storybook/internal/bootstrap"
@@ -51,6 +57,11 @@ func runServer(stderr io.Writer) int {
 	tokenManager := auth.NewTokenManager(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
 	r := router.NewWithLogger(db, tokenManager, logger)
 
+	srv := &http.Server{
+		Addr:    cfg.ServerAddr,
+		Handler: r,
+	}
+
 	logger.Info(
 		"storybook backend is starting",
 		"addr",
@@ -62,10 +73,33 @@ func runServer(stderr io.Writer) int {
 		"log_format",
 		cfg.LogFormat,
 	)
-	if err := r.Run(cfg.ServerAddr); err != nil {
+
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
 		logger.Error("server exited", "error", err)
 		return 1
+	case <-quit:
+		logger.Info("shutting down server...")
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("server forced to shutdown", "error", err)
+		return 1
+	}
+	logger.Info("server exited")
 	return 0
 }
 

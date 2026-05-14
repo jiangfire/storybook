@@ -306,9 +306,12 @@ func (s *openAIService) BatchGenerate(ctx context.Context, requirement string, c
 
 	results := make([]*StoryResult, count)
 	g, gctx := errgroup.WithContext(ctx)
+	sem := make(chan struct{}, 2) // bound concurrency to protect the connection pool
 	for i := 0; i < count; i++ {
 		i := i
 		g.Go(func() error {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			r, err := s.GenerateStory(gctx, requirement)
 			if err != nil {
 				return fmt.Errorf("batch item %d: %w", i, err)

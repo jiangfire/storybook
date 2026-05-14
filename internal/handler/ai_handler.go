@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -11,17 +12,24 @@ import (
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type AIHandler struct {
-	db *gorm.DB
+	db        *gorm.DB
+	userRepo  *repository.UserRepository
+	storyRepo *repository.StoryRepository
 }
 
 func NewAIHandler(db *gorm.DB) *AIHandler {
-	return &AIHandler{db: db}
+	return &AIHandler{
+		db:        db,
+		userRepo:  repository.NewUserRepository(db),
+		storyRepo: repository.NewStoryRepository(db),
+	}
 }
 
 type generateStoryRequest struct {
@@ -145,7 +153,7 @@ func (h *AIHandler) GetConfig(c *gin.Context) {
 
 	config, err := h.loadLatestConfig()
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.Success(c, "success", gin.H{
 				"config": gin.H{
 					"provider":       "openai",
@@ -284,9 +292,9 @@ func (h *AIHandler) SplitStory(c *gin.Context) {
 		req.TargetCount = 3
 	}
 
-	var story model.UserStory
-	if err := h.db.First(&story, storyID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	story, err := h.storyRepo.FindByID(storyID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -344,9 +352,9 @@ func (h *AIHandler) INVESTCheck(c *gin.Context) {
 		return
 	}
 
-	var story model.UserStory
-	if err := h.db.First(&story, storyID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+	story, err := h.storyRepo.FindByID(storyID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}

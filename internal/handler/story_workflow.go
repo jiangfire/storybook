@@ -32,7 +32,7 @@ func (h *StoryHandler) UpdateStatus(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -87,7 +87,7 @@ func (h *StoryHandler) ClaimStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -142,7 +142,7 @@ func (h *StoryHandler) ReleaseStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -200,7 +200,7 @@ func (h *StoryHandler) UpdateACStatus(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
@@ -259,7 +259,7 @@ func (h *StoryHandler) AddCodeReference(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.NotFound(c, "用户故事不存在")
 			return
 		}
