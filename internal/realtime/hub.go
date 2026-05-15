@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
@@ -186,13 +187,17 @@ func (h *Hub) addConn(userID uint, conn *websocket.Conn) {
 		h.connections[userID] = make(map[*websocket.Conn]struct{})
 	}
 	h.connections[userID][conn] = struct{}{}
+	metrics.WSConnections.Inc()
 }
 
 func (h *Hub) removeConn(userID uint, conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if userConns, ok := h.connections[userID]; ok {
-		delete(userConns, conn)
+		if _, present := userConns[conn]; present {
+			delete(userConns, conn)
+			metrics.WSConnections.Dec()
+		}
 		if len(userConns) == 0 {
 			delete(h.connections, userID)
 		}

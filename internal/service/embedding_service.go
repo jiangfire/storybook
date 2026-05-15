@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -50,13 +52,18 @@ func (s *OpenAIEmbedding) EmbedText(ctx context.Context, text string) ([]float32
 		return nil, ErrEmptyText
 	}
 
+	start := time.Now()
 	resp, err := s.client.CreateEmbeddings(ctx, openai.EmbeddingRequest{
 		Input: []string{text},
 		Model: openai.EmbeddingModel(s.model),
 	})
+	metrics.AICallDuration.WithLabelValues("embed_text", s.model).Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.AICallsTotal.WithLabelValues("embed_text", s.model, "error").Inc()
 		return nil, fmt.Errorf("openai embeddings: %w", err)
 	}
+	metrics.AICallsTotal.WithLabelValues("embed_text", s.model, "success").Inc()
+	metrics.AITokensTotal.WithLabelValues("embed_text", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
 
 	if len(resp.Data) == 0 {
 		return nil, fmt.Errorf("openai: empty response")
@@ -71,13 +78,18 @@ func (s *OpenAIEmbedding) EmbedBatch(ctx context.Context, texts []string) ([][]f
 		return nil, ErrEmptyText
 	}
 
+	start := time.Now()
 	resp, err := s.client.CreateEmbeddings(ctx, openai.EmbeddingRequest{
 		Input: texts,
 		Model: openai.EmbeddingModel(s.model),
 	})
+	metrics.AICallDuration.WithLabelValues("embed_batch", s.model).Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.AICallsTotal.WithLabelValues("embed_batch", s.model, "error").Inc()
 		return nil, fmt.Errorf("openai embeddings batch: %w", err)
 	}
+	metrics.AICallsTotal.WithLabelValues("embed_batch", s.model, "success").Inc()
+	metrics.AITokensTotal.WithLabelValues("embed_batch", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
 
 	if len(resp.Data) != len(texts) {
 		return nil, fmt.Errorf("openai: expected %d embeddings, got %d", len(texts), len(resp.Data))

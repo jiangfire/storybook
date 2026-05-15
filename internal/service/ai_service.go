@@ -8,7 +8,9 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"time"
 
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"git.neolidy.top/neo/storybook/internal/model"
 	openai "github.com/sashabaranov/go-openai"
 	"golang.org/x/sync/errgroup"
@@ -165,6 +167,7 @@ func (s *openAIService) GenerateStory(ctx context.Context, requirement string) (
 	ctx, cancel := withDefaultAIDeadline(ctx)
 	defer cancel()
 
+	start := time.Now()
 	var resp openai.ChatCompletionResponse
 	err := retryAPI(ctx, func() error {
 		var apiErr error
@@ -179,9 +182,14 @@ func (s *openAIService) GenerateStory(ctx context.Context, requirement string) (
 		})
 		return apiErr
 	})
+	metrics.AICallDuration.WithLabelValues("generate_story", s.model).Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.AICallsTotal.WithLabelValues("generate_story", s.model, "error").Inc()
 		return nil, fmt.Errorf("openai completion: %w", err)
 	}
+	metrics.AICallsTotal.WithLabelValues("generate_story", s.model, "success").Inc()
+	metrics.AITokensTotal.WithLabelValues("generate_story", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
+	metrics.AITokensTotal.WithLabelValues("generate_story", s.model, "completion").Add(float64(resp.Usage.CompletionTokens))
 
 	if len(resp.Choices) == 0 {
 		return nil, errors.New("openai: empty response")
@@ -195,6 +203,7 @@ func (s *openAIService) GenerateStory(ctx context.Context, requirement string) (
 }
 
 func (s *openAIService) StreamGenerateStory(ctx context.Context, requirement string, cb StreamCallback) (_ *StoryResult, err error) {
+	start := time.Now()
 	stream, err := s.client.CreateChatCompletionStream(ctx, openai.ChatCompletionRequest{
 		Model:       s.model,
 		Temperature: s.temperature,
@@ -206,12 +215,20 @@ func (s *openAIService) StreamGenerateStory(ctx context.Context, requirement str
 		},
 	})
 	if err != nil {
+		metrics.AICallsTotal.WithLabelValues("stream_generate_story", s.model, "error").Inc()
+		metrics.AICallDuration.WithLabelValues("stream_generate_story", s.model).Observe(time.Since(start).Seconds())
 		return nil, fmt.Errorf("openai stream create: %w", err)
 	}
 	defer func() {
 		closeErr := stream.Close()
 		if err == nil && closeErr != nil {
 			err = fmt.Errorf("openai stream close: %w", closeErr)
+		}
+		metrics.AICallDuration.WithLabelValues("stream_generate_story", s.model).Observe(time.Since(start).Seconds())
+		if err == nil {
+			metrics.AICallsTotal.WithLabelValues("stream_generate_story", s.model, "success").Inc()
+		} else {
+			metrics.AICallsTotal.WithLabelValues("stream_generate_story", s.model, "error").Inc()
 		}
 	}()
 
@@ -268,6 +285,7 @@ func (s *openAIService) ChatRefine(ctx context.Context, original *StoryResult, f
 	)
 
 	var resp openai.ChatCompletionResponse
+	start := time.Now()
 	err := retryAPI(ctx, func() error {
 		var apiErr error
 		resp, apiErr = s.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
@@ -281,9 +299,14 @@ func (s *openAIService) ChatRefine(ctx context.Context, original *StoryResult, f
 		})
 		return apiErr
 	})
+	metrics.AICallDuration.WithLabelValues("chat_refine", s.model).Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.AICallsTotal.WithLabelValues("chat_refine", s.model, "error").Inc()
 		return nil, fmt.Errorf("openai refine: %w", err)
 	}
+	metrics.AICallsTotal.WithLabelValues("chat_refine", s.model, "success").Inc()
+	metrics.AITokensTotal.WithLabelValues("chat_refine", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
+	metrics.AITokensTotal.WithLabelValues("chat_refine", s.model, "completion").Add(float64(resp.Usage.CompletionTokens))
 
 	if len(resp.Choices) == 0 {
 		return nil, errors.New("openai: empty refine response")

@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,11 +28,25 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			path = c.Request.URL.Path
 		}
 
+		latency := time.Since(startedAt)
+		status := c.Writer.Status()
+		// Observe HTTP metrics keyed by gin-route (NOT the raw URL) to keep
+		// label cardinality bounded.
+		routeLabel := c.FullPath()
+		if routeLabel == "" {
+			// Unmatched routes (404s, websocket upgrades, etc.) collapse into one
+			// label so an attacker scanning random URLs cannot blow up cardinality.
+			routeLabel = "unmatched"
+		}
+		statusLabel := strconv.Itoa(status)
+		metrics.HTTPRequestDuration.WithLabelValues(c.Request.Method, routeLabel, statusLabel).Observe(latency.Seconds())
+		metrics.HTTPRequestsTotal.WithLabelValues(c.Request.Method, routeLabel, statusLabel).Inc()
+
 		attrs := []any{
 			"method", c.Request.Method,
 			"path", path,
-			"status", c.Writer.Status(),
-			"latency_ms", time.Since(startedAt).Milliseconds(),
+			"status", status,
+			"latency_ms", latency.Milliseconds(),
 			"client_ip", c.ClientIP(),
 		}
 

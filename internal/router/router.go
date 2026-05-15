@@ -10,12 +10,14 @@ import (
 
 	"git.neolidy.top/neo/storybook/internal/auth"
 	"git.neolidy.top/neo/storybook/internal/handler"
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/realtime"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"git.neolidy.top/neo/storybook/internal/webui"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 )
 
@@ -32,6 +34,19 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// /metrics exposes Prometheus collectors. Skipped entirely when credentials
+	// are unset so a misconfigured deployment cannot silently leak histograms
+	// over an unauthenticated endpoint.
+	if metricsUser, metricsPass := strings.TrimSpace(os.Getenv("METRICS_USER")), strings.TrimSpace(os.Getenv("METRICS_PASS")); metricsUser != "" && metricsPass != "" {
+		r.GET("/metrics",
+			middleware.BasicAuth(metricsUser, metricsPass, "metrics"),
+			gin.WrapH(promhttp.HandlerFor(metrics.Registry, promhttp.HandlerOpts{})),
+		)
+		logger.Info("metrics endpoint registered", "path", "/metrics")
+	} else {
+		logger.Info("metrics endpoint disabled: METRICS_USER/METRICS_PASS unset")
+	}
 
 	// /readyz performs a real DB ping with a short timeout. Returns 503 when the
 	// underlying connection cannot answer in time so orchestrators (k8s,
