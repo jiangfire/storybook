@@ -1,5 +1,59 @@
 # Changelog
 
+## 2026-05-15 §5 前端测试 + §8 剩余补全
+
+### §8.1 测试用例 PUT/DELETE
+
+- **`PUT /test-cases/:id`** — 选择性更新 title/description/steps/expected_result/status,走 `UpdateWithVersion` 乐观锁,version 冲突 409。权限:creator / tester / admin。
+- **`DELETE /test-cases/:id`** — 软删除,权限 creator / admin。均写 ActivityLog。
+
+### §8.3 Sprint backlog reorder
+
+- **`POST /sprints/:id/reorder`** — 批量更新 sprint 内 story 的 position。前置校验:所有 story_id 必须属于该 sprint(计数比对),防跨 sprint 写。
+- 事务内逐条 UPDATE,日志 + WS 广播 `sprint.reordered`。
+
+### §8.4 敏捷报表指标
+
+- **`GET /projects/:id/reports/cumulative-flow`** — 按天回放 `status_changed` ActivityLog,生成每个状态在每个 end-of-day 的存量分布。
+- **`GET /projects/:id/reports/cycle-time`** — 平均从首次 `in_progress` 到首次 `done` 的时长,含 per-story 明细。
+- **`GET /projects/:id/reports/lead-time`** — 平均从 `created_at` 到首次 `done` 的时长。
+- **`GET /projects/:id/reports/throughput`** — 每个 interval(week/day) 内首次进入 `done` 的故事数。
+- 统一 `parseReportWindow` 支持 `from`/`to` 日期范围,纯日期自动滚到 end-of-day。
+
+### §8.5 项目归档/导出
+
+- **`Project.Archived` + `ArchivedAt`** 字段新增,`ListProjects` 默认过滤 archived=false,支持 `?include_archived=true` / `?archived_only=true`。
+- **`POST /projects/:id/archive`** + **`POST /projects/:id/unarchive`** — owner/admin 可归档/恢复,幂等。
+- **`GET /projects/:id/export`** — 返回项目快照(JSON),预加载 members/stories/sprints/bugs/tasks/test_cases。
+
+### §8.6 AI 辅助(AC 优化/摘要/翻译/DoR)
+
+- **`AIService.Chat(ctx, systemPrompt, userPrompt)`** 新增,OpenAI 与 heuristic 双实现均落地,带 metrics 埋点。
+- **`POST /ai/stories/:id/refine-ac`** — 传入 feedback,LLM 返回优化后的 AC 列表。
+- **`GET /ai/stories/:id/summary`** — 2-3 句干系人摘要。
+- **`POST /ai/stories/:id/translate`** — 中英互译,返回结构化 title/description/AC。
+- **`GET /ai/stories/:id/dor-check`** — 纯确定性 DoR 打分(title/description/AC/points/assignee/review_status 六维)。
+
+### §8.7 搜索高级筛选
+
+- **`parseSearchFilters`** 支持 `created_from`/`created_to`(RFC3339 或 YYYY-MM-DD,后者自动 inclusive)、`status`(数组或 CSV)、`assignee`(uint)。
+- 应用于 `searchStories` / `searchBugs` / `searchProjects`,`Capabilities` 同步广告新 filter 能力。
+
+### §8.2 Bug 评论
+
+- **`BugComment` 模型** + `bug_comment_repo.go`(ListByBug / CountByBug) + `bug_comment_handler.go`(Create/List/Update/Delete)。
+- 路由 `/bugs/:id/comments` + `/bugs/:id/comments/:commentID`。权限:project member 可创建/查看;author/admin 可编辑/删除。
+- 含 ActivityLog + WS 广播(`bug.comment.created`/`updated`/`deleted`)。
+
+### §5 前端测试体系
+
+- **MSW 集成测试** — 安装 `msw@2.14.6`,新增 `src/test/server.ts` + `handlers.ts`,`setup.ts` 注入 MSW 生命周期。
+  - `AuthFlow.integration.test.tsx` — 注册/登录/邮箱格式验证(3 个,全通过)。
+  - `ProjectFlow.integration.test.tsx` — 创建项目/表单校验(2 个,全通过)。
+- **Playwright E2E** — 安装 `@playwright/test`,新增 `playwright.config.ts` + `e2e/happy-path.spec.ts`(注册→登录→创建项目→创建故事→看板)。浏览器下载因网络限制未完成,测试代码已就绪。
+
+---
+
 ## 2026-05-15 PLAN.md §4 / §6 / §7 / §8 推进
 
 ### §6 Prometheus 指标
