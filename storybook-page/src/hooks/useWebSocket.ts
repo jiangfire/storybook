@@ -1,5 +1,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import type { WSMessage, StoryACUpdatedMessage, StoryStatusChangedMessage } from '../types/api';
+import type {
+  WSMessage,
+  StoryACUpdatedMessage,
+  StoryStatusChangedMessage,
+  NotificationNewMessage,
+} from '../types/api';
 import { authService } from '../services/authService';
 
 interface UseWebSocketOptions {
@@ -7,6 +12,7 @@ interface UseWebSocketOptions {
   onStoryACUpdated?: (message: StoryACUpdatedMessage) => void;
   onStoryCreated?: (message: unknown) => void;
   onStoryUpdated?: (message: unknown) => void;
+  onNotificationNew?: (message: NotificationNewMessage) => void;
 }
 
 const isDev = import.meta.env.DEV;
@@ -148,6 +154,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             break;
           case 'story.updated':
             options.onStoryUpdated?.(message.data);
+            break;
+          case 'notification.new':
+            options.onNotificationNew?.(message.data as NotificationNewMessage);
             break;
           default:
             wsLog('Unknown message type:', message.type);

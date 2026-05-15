@@ -13,17 +13,27 @@ import (
 )
 
 type TaskHandler struct {
-	db      *gorm.DB
-	events  EventPublisher
-	taskSvc *service.TaskService
+	db       *gorm.DB
+	events   EventPublisher
+	taskSvc  *service.TaskService
+	notifier service.Notifier
 }
 
 func NewTaskHandler(db *gorm.DB, events EventPublisher) *TaskHandler {
 	return &TaskHandler{
-		db:      db,
-		events:  events,
-		taskSvc: service.NewTaskService(db, events),
+		db:       db,
+		events:   events,
+		taskSvc:  service.NewTaskService(db, events),
+		notifier: service.NoopNotifier{},
 	}
+}
+
+func (h *TaskHandler) WithNotifier(n service.Notifier) *TaskHandler {
+	if n != nil {
+		h.notifier = n
+		h.taskSvc.WithNotifier(n)
+	}
+	return h
 }
 
 type createTaskRequest struct {

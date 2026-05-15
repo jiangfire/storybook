@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"git.neolidy.top/neo/storybook/internal/logging"
@@ -15,6 +16,7 @@ type TaskService struct {
 	events   EventPublisher
 	workflow *WorkflowService
 	taskRepo *repository.TaskRepository
+	notifier Notifier
 }
 
 type CreateTaskInput struct {
@@ -40,7 +42,15 @@ func NewTaskService(db *gorm.DB, events EventPublisher) *TaskService {
 		events:   events,
 		workflow: Workflow,
 		taskRepo: repository.NewTaskRepository(db),
+		notifier: NoopNotifier{},
 	}
+}
+
+func (s *TaskService) WithNotifier(n Notifier) *TaskService {
+	if n != nil {
+		s.notifier = n
+	}
+	return s
 }
 
 func (s *TaskService) GetWithAccess(taskID, userID uint) (*model.Task, *model.Project, error) {
@@ -268,7 +278,8 @@ func (s *TaskService) UpdateProgress(task *model.Task, projectID, userID uint, r
 }
 
 func (s *TaskService) Claim(task *model.Task, projectID, userID uint) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	var claimedTask model.Task
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var current model.Task
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, task.ID).Error; err != nil {
 			return err
@@ -296,8 +307,35 @@ func (s *TaskService) Claim(task *model.Task, projectID, userID uint) error {
 			"status":      current.Status,
 		}), "write task activity log", "task_id", current.ID, "action", "claimed")
 
+		claimedTask = current
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	// Notify the task creator that someone picked it up. Skip the self-claim
+	// case (creator claims their own task) — the Notifier already filters
+	// self-targeted events, but checking here avoids enqueuing a no-op.
+	if claimedTask.CreatedBy != 0 && claimedTask.CreatedBy != userID {
+		pid := projectID
+		s.notifier.Notify(context.Background(), claimedTask.CreatedBy, NotificationEvent{
+			Type:       model.NotificationTaskAssigned,
+			EntityType: model.NotificationEntityTask,
+			EntityID:   claimedTask.ID,
+			ProjectID:  &pid,
+			ActorID:    &userID,
+			Title:      "任务被领取",
+			Body:       claimedTask.Title,
+			Metadata: map[string]any{
+				"task_id":  claimedTask.ID,
+				"title":    claimedTask.Title,
+				"status":   claimedTask.Status,
+				"story_id": claimedTask.StoryID,
+			},
+		})
+	}
+	return nil
 }
 
 func (s *TaskService) Release(task *model.Task, projectID, userID uint, role string) error {

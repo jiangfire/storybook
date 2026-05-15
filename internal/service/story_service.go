@@ -19,6 +19,7 @@ type StoryService struct {
 	workflow  *WorkflowService
 	storyRepo *repository.StoryRepository
 	vectorSvc VectorService
+	notifier  Notifier
 }
 
 type CreateStoryInput struct {
@@ -55,7 +56,17 @@ func NewStoryServiceWithVector(db *gorm.DB, events EventPublisher, vectorSvc Vec
 		workflow:  Workflow,
 		storyRepo: repository.NewStoryRepository(db),
 		vectorSvc: vectorSvc,
+		notifier:  NoopNotifier{},
 	}
+}
+
+// WithNotifier replaces the default no-op notifier so claim/release/review
+// events can fan out as in-app notifications.
+func (s *StoryService) WithNotifier(n Notifier) *StoryService {
+	if n != nil {
+		s.notifier = n
+	}
+	return s
 }
 
 func (s *StoryService) EnsureProjectMember(projectID, userID uint) error {
@@ -340,7 +351,8 @@ func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID,
 }
 
 func (s *StoryService) Claim(story *model.UserStory, userID uint) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	var claimedStory model.UserStory
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var current model.UserStory
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, story.ID).Error; err != nil {
 			return err
@@ -369,8 +381,30 @@ func (s *StoryService) Claim(story *model.UserStory, userID uint) error {
 			"assigned_to": userID,
 		}), "write story activity log", "story_id", current.ID, "action", "claimed")
 
+		claimedStory = current
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	pid := claimedStory.ProjectID
+	s.notifier.Notify(context.Background(), claimedStory.CreatedBy, NotificationEvent{
+		Type:       model.NotificationStoryClaimed,
+		EntityType: model.NotificationEntityStory,
+		EntityID:   claimedStory.ID,
+		ProjectID:  &pid,
+		ActorID:    &userID,
+		Title:      "故事已被领取",
+		Body:       claimedStory.Title,
+		Metadata: map[string]any{
+			"story_id":   claimedStory.ID,
+			"title":      claimedStory.Title,
+			"status":     claimedStory.Status,
+			"claimed_by": userID,
+		},
+	})
+	return nil
 }
 
 func (s *StoryService) AddCodeReference(story *model.UserStory, userID uint, reference string) ([]string, error) {
@@ -396,7 +430,8 @@ func (s *StoryService) AddCodeReference(story *model.UserStory, userID uint, ref
 }
 
 func (s *StoryService) Release(story *model.UserStory, userID uint, role string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	var releasedStory model.UserStory
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		var current model.UserStory
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, story.ID).Error; err != nil {
 			return err
@@ -425,8 +460,30 @@ func (s *StoryService) Release(story *model.UserStory, userID uint, role string)
 			"assigned_to": nil,
 		}), "write story activity log", "story_id", current.ID, "action", "released")
 
+		releasedStory = current
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	pid := releasedStory.ProjectID
+	s.notifier.Notify(context.Background(), releasedStory.CreatedBy, NotificationEvent{
+		Type:       model.NotificationStoryReleased,
+		EntityType: model.NotificationEntityStory,
+		EntityID:   releasedStory.ID,
+		ProjectID:  &pid,
+		ActorID:    &userID,
+		Title:      "故事已被释放",
+		Body:       releasedStory.Title,
+		Metadata: map[string]any{
+			"story_id":    releasedStory.ID,
+			"title":       releasedStory.Title,
+			"status":      releasedStory.Status,
+			"released_by": userID,
+		},
+	})
+	return nil
 }
 
 func (s *StoryService) Delete(story *model.UserStory, userID uint) error {
@@ -507,6 +564,28 @@ func (s *StoryService) Review(story *model.UserStory, userID uint, approved bool
 		"review_comment": story.ReviewComment,
 		"approved":       approved,
 	}), "write story activity log", "story_id", story.ID, "action", "reviewed", "approved", approved)
+
+	pid := story.ProjectID
+	reviewTitle := "故事审批通过"
+	if !approved {
+		reviewTitle = "故事审批被拒绝"
+	}
+	s.notifier.Notify(context.Background(), story.CreatedBy, NotificationEvent{
+		Type:       model.NotificationStoryReviewed,
+		EntityType: model.NotificationEntityStory,
+		EntityID:   story.ID,
+		ProjectID:  &pid,
+		ActorID:    &userID,
+		Title:      reviewTitle,
+		Body:       story.Title,
+		Metadata: map[string]any{
+			"story_id":       story.ID,
+			"title":          story.Title,
+			"review_status":  story.ReviewStatus,
+			"review_comment": story.ReviewComment,
+			"approved":       approved,
+		},
+	})
 
 	return nil
 }

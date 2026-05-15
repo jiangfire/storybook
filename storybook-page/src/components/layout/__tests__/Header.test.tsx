@@ -24,6 +24,39 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+vi.mock('../../../hooks/useWebSocket', () => ({
+  useWebSocket: () => ({ isConnected: true }),
+}));
+
+vi.mock('../../ui/Toast', () => ({
+  useToast: () => ({
+    showInfo: vi.fn(),
+    showSuccess: vi.fn(),
+    showError: vi.fn(),
+    showWarning: vi.fn(),
+    showToast: vi.fn(),
+  }),
+}));
+
+vi.mock('../../../stores/notificationStore', () => ({
+  useNotificationStore: () => ({
+    items: [],
+    unreadCount: 0,
+    isLoading: false,
+    error: null,
+    fetchList: vi.fn(),
+    fetchUnreadCount: vi.fn(),
+    markRead: vi.fn(),
+    markAllRead: vi.fn(),
+    prepend: vi.fn(),
+    clearError: vi.fn(),
+  }),
+}));
+
+vi.mock('../../notifications/NotificationBell', () => ({
+  default: () => <button type="button" aria-label="通知" />,
+}));
+
 const mockedSearchService = vi.mocked(searchService, { deep: true });
 
 const NOW = '2026-03-29T00:00:00Z';

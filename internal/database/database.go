@@ -76,5 +76,6 @@ func autoMigrate(db *gorm.DB) error {
 		&model.ActivityLog{},
 		&model.TestCase{},
 		&model.AIConfig{},
+		&model.Notification{},
 	)
 }

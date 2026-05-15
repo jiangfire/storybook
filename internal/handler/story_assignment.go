@@ -92,6 +92,23 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 		}),
 	}).Error, "write story activity log", "story_id", story.ID, "action", "assigned")
 
+	if story.AssignedTo != nil && (oldAssigned == nil || *oldAssigned != *story.AssignedTo) {
+		h.notifier.Notify(c.Request.Context(), *story.AssignedTo, service.NotificationEvent{
+			Type:       model.NotificationStoryAssigned,
+			EntityType: model.NotificationEntityStory,
+			EntityID:   story.ID,
+			ProjectID:  &pid,
+			ActorID:    &userID,
+			Title:      "新故事指派给你",
+			Body:       story.Title,
+			Metadata: gin.H{
+				"story_id": story.ID,
+				"title":    story.Title,
+				"status":   story.Status,
+			},
+		})
+	}
+
 	var assignee any
 	if story.AssignedTo != nil {
 		user, err := h.userRepo.FindByID(*story.AssignedTo)

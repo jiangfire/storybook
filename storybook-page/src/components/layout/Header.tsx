@@ -1,11 +1,19 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useNotificationStore } from '../../stores/notificationStore';
 import { getUserInitials } from '../../utils/formatters';
 import { searchService } from '../../services/searchService';
 import { getErrorMessage } from '../../utils/error';
 import { getUserRoleLabel } from '../../utils/roleLabel';
-import type { SearchResponseData, SemanticStorySearchResponse } from '../../types/api';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { useToast } from '../ui/Toast';
+import NotificationBell from '../notifications/NotificationBell';
+import type {
+  NotificationNewMessage,
+  SearchResponseData,
+  SemanticStorySearchResponse,
+} from '../../types/api';
 import { BugIcon, CompassIcon, FolderIcon, SearchIcon, StoryIcon } from '../ui/AppIcon';
 
 type SemanticSearchState = 'idle' | 'available' | 'unavailable' | 'error';
@@ -122,7 +130,9 @@ function SearchSectionPlaceholder({
 
 export default function Header() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isAuthenticated } = useAuthStore();
+  const { prepend, fetchUnreadCount } = useNotificationStore();
+  const { showInfo } = useToast();
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
@@ -173,6 +183,25 @@ export default function Header() {
       cancelled = true;
     };
   }, []);
+
+  // Subscribe to notification.new from the global WS so the bell badge and
+  // toast notifications stay live while the user navigates. Kept in Header
+  // (rather than MainLayout) so it follows the always-mounted top-bar lifecycle.
+  useWebSocket({
+    onNotificationNew: (message: NotificationNewMessage) => {
+      prepend(message);
+      showInfo(message.title);
+    },
+  });
+
+  // Re-sync the unread badge on auth state changes (login / logout) so the
+  // dot vanishes immediately on logout and reappears on a fresh login.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+    void fetchUnreadCount();
+  }, [isAuthenticated, fetchUnreadCount]);
 
   useEffect(() => {
     const q = query.trim();
@@ -508,6 +537,7 @@ export default function Header() {
             </div>
 
             <div className="flex items-center justify-end gap-2 sm:gap-2.5 lg:ml-auto">
+              <NotificationBell />
               <div ref={userMenuRef} className="relative">
                 <button
                   type="button"

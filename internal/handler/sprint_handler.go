@@ -18,13 +18,22 @@ import (
 type SprintHandler struct {
 	db         *gorm.DB
 	sprintRepo *repository.SprintRepository
+	notifier   service.Notifier
 }
 
 func NewSprintHandler(db *gorm.DB) *SprintHandler {
 	return &SprintHandler{
 		db:         db,
 		sprintRepo: repository.NewSprintRepository(db),
+		notifier:   service.NoopNotifier{},
 	}
+}
+
+func (h *SprintHandler) WithNotifier(n service.Notifier) *SprintHandler {
+	if n != nil {
+		h.notifier = n
+	}
+	return h
 }
 
 type createSprintRequest struct {
@@ -243,6 +252,29 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
 		NewValue:   model.MarshalJSON(gin.H{"status": sprint.Status}),
 	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "status_changed")
+
+	if sprint.Status == model.SprintStatusActive || sprint.Status == model.SprintStatusCompleted {
+		notifType := model.NotificationSprintStarted
+		title := "冲刺已启动"
+		if sprint.Status == model.SprintStatusCompleted {
+			notifType = model.NotificationSprintCompleted
+			title = "冲刺已完成"
+		}
+		h.notifier.NotifyProjectMembers(c.Request.Context(), sprint.ProjectID, service.NotificationEvent{
+			Type:       notifType,
+			EntityType: model.NotificationEntitySprint,
+			EntityID:   sprint.ID,
+			ProjectID:  &pid,
+			ActorID:    &userID,
+			Title:      title,
+			Body:       sprint.Name,
+			Metadata: gin.H{
+				"sprint_id":   sprint.ID,
+				"sprint_name": sprint.Name,
+				"status":      sprint.Status,
+			},
+		})
+	}
 
 	api.Success(c, "冲刺状态更新成功", gin.H{
 		"id":         sprint.ID,

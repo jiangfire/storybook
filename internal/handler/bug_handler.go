@@ -16,11 +16,12 @@ import (
 )
 
 type BugHandler struct {
-	db         *gorm.DB
-	bugRepo    *repository.BugRepository
-	storyRepo  *repository.StoryRepository
-	userRepo   *repository.UserRepository
+	db          *gorm.DB
+	bugRepo     *repository.BugRepository
+	storyRepo   *repository.StoryRepository
+	userRepo    *repository.UserRepository
 	projectRepo *repository.ProjectRepository
+	notifier    service.Notifier
 }
 
 func NewBugHandler(db *gorm.DB) *BugHandler {
@@ -30,7 +31,18 @@ func NewBugHandler(db *gorm.DB) *BugHandler {
 		storyRepo:   repository.NewStoryRepository(db),
 		userRepo:    repository.NewUserRepository(db),
 		projectRepo: repository.NewProjectRepository(db),
+		notifier:    service.NoopNotifier{},
 	}
+}
+
+// WithNotifier wires in the notification service after construction so the
+// router can compose handlers + notifier in one place without forcing every
+// caller (tests, scripts) to supply one.
+func (h *BugHandler) WithNotifier(n service.Notifier) *BugHandler {
+	if n != nil {
+		h.notifier = n
+	}
+	return h
 }
 
 type createBugRequest struct {
@@ -136,6 +148,23 @@ func (h *BugHandler) Create(c *gin.Context) {
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"title": bug.Title, "severity": bug.Severity, "status": bug.Status}),
 	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "created")
+
+	if bug.AssignedTo != nil {
+		h.notifier.Notify(c.Request.Context(), *bug.AssignedTo, service.NotificationEvent{
+			Type:       model.NotificationBugAssigned,
+			EntityType: model.NotificationEntityBug,
+			EntityID:   bug.ID,
+			ProjectID:  &pid,
+			ActorID:    &userID,
+			Title:      "新缺陷指派给你",
+			Body:       bug.Title,
+			Metadata: gin.H{
+				"bug_id":   bug.ID,
+				"severity": bug.Severity,
+				"status":   bug.Status,
+			},
+		})
+	}
 
 	api.Success(c, "缺陷创建成功", bug)
 }
@@ -399,6 +428,23 @@ func (h *BugHandler) Assign(c *gin.Context) {
 		OldValue:   model.MarshalJSON(gin.H{"assigned_to": oldAssigned}),
 		NewValue:   model.MarshalJSON(gin.H{"assigned_to": bug.AssignedTo}),
 	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "assigned")
+
+	if bug.AssignedTo != nil && (oldAssigned == nil || *oldAssigned != *bug.AssignedTo) {
+		h.notifier.Notify(c.Request.Context(), *bug.AssignedTo, service.NotificationEvent{
+			Type:       model.NotificationBugAssigned,
+			EntityType: model.NotificationEntityBug,
+			EntityID:   bug.ID,
+			ProjectID:  &pid,
+			ActorID:    &userID,
+			Title:      "新缺陷指派给你",
+			Body:       bug.Title,
+			Metadata: gin.H{
+				"bug_id":   bug.ID,
+				"severity": bug.Severity,
+				"status":   bug.Status,
+			},
+		})
+	}
 
 	api.Success(c, "缺陷指派成功", gin.H{
 		"id":          bug.ID,

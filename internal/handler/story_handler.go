@@ -21,10 +21,12 @@ type StoryHandler struct {
 	storySvc  *service.StoryService
 	userRepo  *repository.UserRepository
 	storyRepo *repository.StoryRepository
+	notifier  service.Notifier
 }
 
 type EventPublisher interface {
 	BroadcastProject(projectID uint, eventType string, data any)
+	BroadcastUser(userID uint, eventType string, data any)
 }
 
 func NewStoryHandler(db *gorm.DB, events EventPublisher) *StoryHandler {
@@ -38,7 +40,16 @@ func NewStoryHandlerWithVector(db *gorm.DB, events EventPublisher, vectorSvc ser
 		storySvc:  service.NewStoryServiceWithVector(db, events, vectorSvc),
 		userRepo:  repository.NewUserRepository(db),
 		storyRepo: repository.NewStoryRepository(db),
+		notifier:  service.NoopNotifier{},
 	}
+}
+
+func (h *StoryHandler) WithNotifier(n service.Notifier) *StoryHandler {
+	if n != nil {
+		h.notifier = n
+		h.storySvc.WithNotifier(n)
+	}
+	return h
 }
 
 type createStoryACItem struct {

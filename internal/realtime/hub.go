@@ -135,6 +135,27 @@ func (h *Hub) BroadcastProject(projectID uint, eventType string, data any) {
 	}
 }
 
+// BroadcastUser pushes an event only to the connections owned by userID. Used
+// for per-recipient signals (notifications, presence) where project-wide fanout
+// would over-deliver.
+func (h *Hub) BroadcastUser(userID uint, eventType string, data any) {
+	event := Event{Type: eventType, Data: data, Timestamp: time.Now()}
+
+	h.mu.RLock()
+	conns := make([]*websocket.Conn, 0, len(h.connections[userID]))
+	for conn := range h.connections[userID] {
+		conns = append(conns, conn)
+	}
+	h.mu.RUnlock()
+
+	for _, conn := range conns {
+		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := conn.WriteJSON(event); err != nil {
+			_ = conn.Close()
+		}
+	}
+}
+
 func (h *Hub) projectRecipientIDs(projectID uint) ([]uint, error) {
 	if h.db == nil {
 		return nil, nil

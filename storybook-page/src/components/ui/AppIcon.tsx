@@ -207,3 +207,12 @@ export function XIcon(props: IconProps) {
     </BaseIcon>
   );
 }
+
+export function BellIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M6 8a6 6 0 0 1 12 0v3l1.6 3.2a1 1 0 0 1-.9 1.4H5.3a1 1 0 0 1-.9-1.4L6 11z" />
+      <path d="M10 19a2 2 0 0 0 4 0" />
+    </BaseIcon>
+  );
+}

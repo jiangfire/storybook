@@ -75,6 +75,22 @@ const (
 	TaskStatusDone       = "done"
 )
 
+const (
+	NotificationStoryAssigned    = "story.assigned"
+	NotificationStoryClaimed     = "story.claimed"
+	NotificationStoryReleased    = "story.released"
+	NotificationStoryReviewed    = "story.reviewed"
+	NotificationTaskAssigned     = "task.assigned"
+	NotificationBugAssigned      = "bug.assigned"
+	NotificationSprintStarted    = "sprint.started"
+	NotificationSprintCompleted  = "sprint.completed"
+
+	NotificationEntityStory  = "story"
+	NotificationEntityTask   = "task"
+	NotificationEntityBug    = "bug"
+	NotificationEntitySprint = "sprint"
+)
+
 // User 系统用户。
 type User struct {
 	ID                  uint       `gorm:"primaryKey" json:"id"`
@@ -321,4 +337,24 @@ type ProjectTechLead struct {
 	AssignedAt time.Time       `json:"assigned_at"`
 	DeletedAt  gorm.DeletedAt  `gorm:"index" json:"-"`
 	Version    int             `gorm:"default:0" json:"version"`
+}
+
+// Notification 站内通知。一条 Notification 表示一个用户应当看到的事件，
+// 实体类型/ID 用于跳转，Type 区分语义（story.assigned 等），Metadata 透传
+// 业务字段，前端可据此渲染不同图标 / 文案。
+type Notification struct {
+	ID         uint           `gorm:"primaryKey" json:"id"`
+	UserID     uint           `gorm:"not null;index:idx_notif_user_read" json:"user_id"`
+	ActorID    *uint          `gorm:"index" json:"actor_id,omitempty"`
+	Actor      *User          `gorm:"foreignKey:ActorID" json:"actor,omitempty"`
+	Type       string         `gorm:"size:64;not null;index" json:"type"`
+	EntityType string         `gorm:"size:50;not null;index:idx_notif_entity" json:"entity_type"`
+	EntityID   uint           `gorm:"not null;index:idx_notif_entity" json:"entity_id"`
+	ProjectID  *uint          `gorm:"index" json:"project_id,omitempty"`
+	Title      string         `gorm:"size:255;not null" json:"title"`
+	Body       string         `gorm:"type:text" json:"body,omitempty"`
+	Metadata   datatypes.JSON `gorm:"type:jsonb" json:"metadata,omitempty"`
+	ReadAt     *time.Time     `gorm:"index:idx_notif_user_read" json:"read_at,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }

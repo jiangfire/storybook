@@ -88,6 +88,17 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	wsHandler := handler.NewWSHandler(tokenManager, hub)
 	techLeadHandler := handler.NewTechLeadHandler(db)
 	userManagementHandler := handler.NewUserManagementHandler(db)
+	notificationHandler := handler.NewNotificationHandler(db)
+
+	// Wire the in-app notifier into every handler that emits user-facing events.
+	// Constructed after the handlers so we can keep their constructor signatures
+	// stable (existing tests pass *gorm.DB + Hub only); WithNotifier mutates the
+	// already-built instances in place.
+	notifier := service.NewNotificationService(db, hub, logger)
+	storyHandler.WithNotifier(notifier)
+	taskHandler.WithNotifier(notifier)
+	sprintHandler.WithNotifier(notifier)
+	bugHandler.WithNotifier(notifier)
 
 	api := r.Group("/api")
 
@@ -128,6 +139,10 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.GET("/projects/:id/reports/burndown", reportHandler.Burndown)
 
 		protected.GET("/me/dashboard", meHandler.Dashboard)
+		protected.GET("/notifications", notificationHandler.List)
+		protected.GET("/notifications/unread-count", notificationHandler.UnreadCount)
+		protected.POST("/notifications/:id/read", notificationHandler.MarkRead)
+		protected.POST("/notifications/mark-all-read", notificationHandler.MarkAllRead)
 		protected.GET("/search", searchHandler.Search)
 		protected.GET("/search/capabilities", searchHandler.Capabilities)
 

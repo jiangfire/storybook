@@ -716,7 +716,8 @@ export type WSMessageType =
   | 'story.updated'
   | 'story.deleted'
   | 'task.updated'
-  | 'bug.created';
+  | 'bug.created'
+  | 'notification.new';
 
 // WebSocket消息基础
 export interface WSMessage<T = unknown> {
@@ -746,4 +747,72 @@ export interface StoryACUpdatedMessage {
     id: number;
     email: string;
   };
+}
+
+// ===== 站内通知 =====
+
+export type NotificationType =
+  | 'story.assigned'
+  | 'story.claimed'
+  | 'story.released'
+  | 'story.reviewed'
+  | 'task.assigned'
+  | 'bug.assigned'
+  | 'sprint.started'
+  | 'sprint.completed'
+  | string;
+
+export type NotificationEntityType = 'story' | 'task' | 'bug' | 'sprint' | string;
+
+export interface NotificationItem {
+  id: number;
+  type: NotificationType;
+  entity_type: NotificationEntityType;
+  entity_id: number;
+  project_id?: number | null;
+  actor_id?: number | null;
+  actor?: {
+    id: number;
+    email: string;
+  } | null;
+  title: string;
+  body?: string;
+  metadata?: Record<string, unknown> | null;
+  read_at?: string | null;
+  created_at: string;
+}
+
+export interface NotificationListParams {
+  unread_only?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+export interface NotificationListResponse {
+  items: NotificationItem[];
+  total: number;
+  page: number;
+  limit: number;
+  unread_only: boolean;
+}
+
+export interface NotificationUnreadCountResponse {
+  count: number;
+}
+
+export interface NotificationMarkAllReadResponse {
+  updated: number;
+}
+
+// notification.new WebSocket 推送负载（与后端 NotificationService 序列化一致）
+export interface NotificationNewMessage {
+  id: number;
+  type: NotificationType;
+  entity_type: NotificationEntityType;
+  entity_id: number;
+  project_id?: number | null;
+  actor_id?: number | null;
+  title: string;
+  body?: string;
+  created_at: string;
 }
