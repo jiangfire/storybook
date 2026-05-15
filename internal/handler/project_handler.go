@@ -68,6 +68,8 @@ type projectItem struct {
 	MemberCount int64       `json:"member_count"`
 	StoryCount  int64       `json:"story_count"`
 	IsOwner     bool        `json:"is_owner"`
+	Archived    bool        `json:"archived"`
+	ArchivedAt  *time.Time  `json:"archived_at,omitempty"`
 	CreatedAt   any         `json:"created_at"`
 }
 
@@ -178,6 +180,18 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 		query = query.Where("projects.id IN ?", projectIDs)
 	}
 
+	// Hide archived projects by default so the dashboard stays clean. Callers
+	// can opt back in via ?include_archived=true (any tabs that show archived
+	// projects explicitly) or ?archived_only=true to enumerate just the archive.
+	includeArchived := strings.EqualFold(strings.TrimSpace(c.Query("include_archived")), "true")
+	archivedOnly := strings.EqualFold(strings.TrimSpace(c.Query("archived_only")), "true")
+	switch {
+	case archivedOnly:
+		query = query.Where("projects.archived = ?", true)
+	case !includeArchived:
+		query = query.Where("projects.archived = ?", false)
+	}
+
 	if search != "" {
 		like := fmt.Sprintf("%%%s%%", search)
 		query = query.Where("projects.name LIKE ?", like)
@@ -224,6 +238,8 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 			MemberCount: memberCount,
 			StoryCount:  storyCount,
 			IsOwner:     p.OwnerID == userID,
+			Archived:    p.Archived,
+			ArchivedAt:  p.ArchivedAt,
 			CreatedAt:   p.CreatedAt,
 		})
 	}
@@ -777,6 +793,258 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 }
 
 var errForbidden = fmt.Errorf("forbidden")
+
+// ArchiveProject hides a project from default listings without deleting it.
+// Owner-only. Stories/sprints/bugs stay intact and accessible via direct ID
+// access; ListProjects filters archived projects out unless include_archived
+// or archived_only is set.
+func (h *ProjectHandler) ArchiveProject(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	projectID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "项目ID无效")
+		return
+	}
+
+	project, err := h.projectRepo.FindByID(projectID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "项目不存在")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if project.OwnerID != userID {
+		role, _ := middleware.CurrentRole(c)
+		if role != model.RoleAdmin {
+			api.Forbidden(c, "仅项目Owner或管理员可归档项目")
+			return
+		}
+	}
+
+	if project.Archived {
+		api.Success(c, "项目已处于归档状态", gin.H{"id": project.ID, "archived": true})
+		return
+	}
+
+	now := time.Now()
+	project.Archived = true
+	project.ArchivedAt = &now
+	if err := h.projectRepo.Save(project); err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	pid := project.ID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "project",
+		EntityID:   project.ID,
+		Action:     "archived",
+		UserID:     userID,
+		ProjectID:  &pid,
+		NewValue:   model.MarshalJSON(gin.H{"archived": true, "archived_at": now}),
+	}).Error, "write project activity log", "project_id", project.ID, "action", "archived")
+
+	api.Success(c, "项目归档成功", gin.H{
+		"id":          project.ID,
+		"archived":    project.Archived,
+		"archived_at": project.ArchivedAt,
+	})
+}
+
+// UnarchiveProject restores an archived project so it appears in default
+// listings again. Owner or admin only.
+func (h *ProjectHandler) UnarchiveProject(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	projectID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "项目ID无效")
+		return
+	}
+
+	project, err := h.projectRepo.FindByID(projectID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "项目不存在")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if project.OwnerID != userID {
+		role, _ := middleware.CurrentRole(c)
+		if role != model.RoleAdmin {
+			api.Forbidden(c, "仅项目Owner或管理员可还原项目")
+			return
+		}
+	}
+
+	if !project.Archived {
+		api.Success(c, "项目未处于归档状态", gin.H{"id": project.ID, "archived": false})
+		return
+	}
+
+	project.Archived = false
+	project.ArchivedAt = nil
+	if err := h.projectRepo.Save(project); err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	pid := project.ID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "project",
+		EntityID:   project.ID,
+		Action:     "unarchived",
+		UserID:     userID,
+		ProjectID:  &pid,
+		NewValue:   model.MarshalJSON(gin.H{"archived": false}),
+	}).Error, "write project activity log", "project_id", project.ID, "action", "unarchived")
+
+	api.Success(c, "项目还原成功", gin.H{
+		"id":       project.ID,
+		"archived": project.Archived,
+	})
+}
+
+// ExportProject returns a JSON snapshot covering project metadata, members,
+// stories, sprints, bugs, and test cases so the owner can back the project up
+// or migrate it elsewhere. Only the project owner / admin can export.
+func (h *ProjectHandler) ExportProject(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	projectID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "项目ID无效")
+		return
+	}
+
+	project, err := h.projectRepo.FindByID(projectID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "项目不存在")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if project.OwnerID != userID {
+		role, _ := middleware.CurrentRole(c)
+		if role != model.RoleAdmin {
+			api.Forbidden(c, "仅项目Owner或管理员可导出项目")
+			return
+		}
+	}
+
+	// Members.
+	members, err := h.projectRepo.ListMembers(project.ID)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	// Stories (include archived so the snapshot is complete).
+	var stories []model.UserStory
+	if err := h.db.Where("project_id = ?", project.ID).Find(&stories).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+	storyIDs := make([]uint, 0, len(stories))
+	for _, s := range stories {
+		storyIDs = append(storyIDs, s.ID)
+	}
+
+	// Sprints.
+	var sprints []model.Sprint
+	if err := h.db.Where("project_id = ?", project.ID).Find(&sprints).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	// Bugs.
+	var bugs []model.BugReport
+	if err := h.db.Where("project_id = ?", project.ID).Find(&bugs).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	// Test cases (scoped via story IDs since TestCase has no project_id).
+	var testCases []model.TestCase
+	if len(storyIDs) > 0 {
+		if err := h.db.Where("story_id IN ?", storyIDs).Find(&testCases).Error; err != nil {
+			api.Internal(c, "服务器内部错误")
+			return
+		}
+	}
+
+	// Tasks.
+	var tasks []model.Task
+	if err := h.db.Where("project_id = ?", project.ID).Find(&tasks).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	memberPayload := make([]gin.H, 0, len(members))
+	for _, m := range members {
+		entry := gin.H{
+			"user_id":         m.UserID,
+			"role_in_project": m.RoleInProject,
+			"joined_at":       m.JoinedAt,
+		}
+		if m.User != nil {
+			entry["email"] = m.User.Email
+		}
+		memberPayload = append(memberPayload, entry)
+	}
+
+	pid := project.ID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "project",
+		EntityID:   project.ID,
+		Action:     "exported",
+		UserID:     userID,
+		ProjectID:  &pid,
+		NewValue:   model.MarshalJSON(gin.H{"stories": len(stories), "sprints": len(sprints), "bugs": len(bugs)}),
+	}).Error, "write project activity log", "project_id", project.ID, "action", "exported")
+
+	api.Success(c, "项目导出成功", gin.H{
+		"format_version": "1.0",
+		"exported_at":    time.Now(),
+		"project": gin.H{
+			"id":          project.ID,
+			"name":        project.Name,
+			"description": project.Description,
+			"agile_mode":  project.AgileMode,
+			"owner_id":    project.OwnerID,
+			"archived":    project.Archived,
+			"created_at":  project.CreatedAt,
+		},
+		"members":    memberPayload,
+		"stories":    stories,
+		"sprints":    sprints,
+		"bugs":       bugs,
+		"tasks":      tasks,
+		"test_cases": testCases,
+	})
+}
 
 func (h *ProjectHandler) getProjectWithAccess(projectID, userID uint) (*model.Project, bool, error) {
 	project, isOwner, err := service.EnsureProjectAccess(h.db, projectID, userID)

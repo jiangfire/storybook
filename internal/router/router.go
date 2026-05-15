@@ -79,6 +79,7 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	taskHandler := handler.NewTaskHandler(db, hub)
 	sprintHandler := handler.NewSprintHandler(db)
 	bugHandler := handler.NewBugHandler(db)
+	bugCommentHandler := handler.NewBugCommentHandler(db)
 	reportHandler := handler.NewReportHandler(db)
 	searchHandler := handler.NewSearchHandlerWithVector(db, vectorSvc)
 	if vectorSvc == nil {
@@ -105,6 +106,7 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	// so the constructors stay db-only for tests.
 	bugHandler.WithEvents(hub)
 	sprintHandler.WithEvents(hub)
+	bugCommentHandler.WithEvents(hub)
 
 	api := r.Group("/api")
 
@@ -128,6 +130,9 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.PUT("/projects/:id", projectHandler.UpdateProject)
 		protected.GET("/projects/:id/overview", projectHandler.GetOverview)
 		protected.DELETE("/projects/:id", projectHandler.DeleteProject)
+		protected.POST("/projects/:id/archive", projectHandler.ArchiveProject)
+		protected.POST("/projects/:id/unarchive", projectHandler.UnarchiveProject)
+		protected.GET("/projects/:id/export", projectHandler.ExportProject)
 		protected.GET("/projects/:id/members", projectHandler.ListMembers)
 		protected.GET("/projects/:id/member-candidates", projectHandler.ListMemberCandidates)
 		protected.POST("/projects/:id/members", projectHandler.AddMember)
@@ -143,6 +148,10 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.GET("/projects/:id/reports/velocity", reportHandler.Velocity)
 		protected.GET("/projects/:id/reports/quality", reportHandler.Quality)
 		protected.GET("/projects/:id/reports/burndown", reportHandler.Burndown)
+		protected.GET("/projects/:id/reports/cumulative-flow", reportHandler.CumulativeFlow)
+		protected.GET("/projects/:id/reports/cycle-time", reportHandler.CycleTime)
+		protected.GET("/projects/:id/reports/lead-time", reportHandler.LeadTime)
+		protected.GET("/projects/:id/reports/throughput", reportHandler.Throughput)
 
 		protected.GET("/me/dashboard", meHandler.Dashboard)
 		protected.GET("/notifications", notificationHandler.List)
@@ -181,6 +190,8 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.POST("/stories/:id/test-cases", testCaseHandler.Create)
 		protected.GET("/stories/:id/test-cases", testCaseHandler.ListByStory)
 		protected.PATCH("/test-cases/:id/status", testCaseHandler.UpdateStatus)
+		protected.PUT("/test-cases/:id", testCaseHandler.Update)
+		protected.DELETE("/test-cases/:id", testCaseHandler.Delete)
 		protected.GET("/tasks/:id", taskHandler.Get)
 		protected.PUT("/tasks/:id", taskHandler.Update)
 		protected.DELETE("/tasks/:id", taskHandler.Delete)
@@ -192,16 +203,25 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.PATCH("/sprints/:id/status", sprintHandler.UpdateStatus)
 		protected.POST("/sprints/:id/close", sprintHandler.Close)
 		protected.POST("/sprints/:id/cancel", sprintHandler.Cancel)
+		protected.POST("/sprints/:id/reorder", sprintHandler.Reorder)
 		protected.DELETE("/sprints/:id", sprintHandler.Delete)
 		protected.GET("/bugs/:id", bugHandler.Get)
 		protected.PUT("/bugs/:id", bugHandler.Update)
 		protected.DELETE("/bugs/:id", bugHandler.Delete)
 		protected.PATCH("/bugs/:id/status", bugHandler.UpdateStatus)
 		protected.PATCH("/bugs/:id/assign", bugHandler.Assign)
+		protected.POST("/bugs/:id/comments", bugCommentHandler.Create)
+		protected.GET("/bugs/:id/comments", bugCommentHandler.List)
+		protected.PUT("/bugs/:id/comments/:commentID", bugCommentHandler.Update)
+		protected.DELETE("/bugs/:id/comments/:commentID", bugCommentHandler.Delete)
 
 		protected.POST("/ai/generate-story", aiLimiter.Middleware(), aiHandler.GenerateStory)
 		protected.POST("/ai/stories/:id/split", aiLimiter.Middleware(), aiHandler.SplitStory)
 		protected.GET("/ai/stories/:id/invest-check", aiLimiter.Middleware(), aiHandler.INVESTCheck)
+		protected.POST("/ai/stories/:id/refine-ac", aiLimiter.Middleware(), aiHandler.RefineAC)
+		protected.GET("/ai/stories/:id/summary", aiLimiter.Middleware(), aiHandler.SummarizeStory)
+		protected.POST("/ai/stories/:id/translate", aiLimiter.Middleware(), aiHandler.TranslateStory)
+		protected.GET("/ai/stories/:id/dor-check", aiLimiter.Middleware(), aiHandler.DoRCheck)
 
 		// 技术负责人专用接口
 		techlead := protected.Group("/techlead")

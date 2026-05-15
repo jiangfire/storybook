@@ -64,6 +64,11 @@ type AIService interface {
 	// BatchGenerate generates multiple story variants (max 5).
 	BatchGenerate(ctx context.Context, requirement string, count int) ([]*StoryResult, error)
 
+	// Chat issues a plain chat completion with the given system+user prompts and
+	// returns the assistant message content. Used by §8.6 helpers (AC refine,
+	// summary, translate) that need free-form text rather than a StoryResult.
+	Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+
 	// IsConfigured returns true when the service can make real API calls.
 	IsConfigured() bool
 }
@@ -349,6 +354,43 @@ func (s *openAIService) BatchGenerate(ctx context.Context, requirement string, c
 	return results, nil
 }
 
+// Chat issues a single chat completion with a custom system+user pair and
+// returns the assistant message text. Used by §8.6 helpers that need free-form
+// text (AC refinement, summarization, translation) rather than parsed StoryResult.
+func (s *openAIService) Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	ctx, cancel := withDefaultAIDeadline(ctx)
+	defer cancel()
+
+	var resp openai.ChatCompletionResponse
+	start := time.Now()
+	err := retryAPI(ctx, func() error {
+		var apiErr error
+		resp, apiErr = s.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+			Model:       s.model,
+			Temperature: s.temperature,
+			MaxTokens:   s.maxTokens,
+			Messages: []openai.ChatCompletionMessage{
+				{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+				{Role: openai.ChatMessageRoleUser, Content: userPrompt},
+			},
+		})
+		return apiErr
+	})
+	metrics.AICallDuration.WithLabelValues("chat", s.model).Observe(time.Since(start).Seconds())
+	if err != nil {
+		metrics.AICallsTotal.WithLabelValues("chat", s.model, "error").Inc()
+		return "", fmt.Errorf("openai chat: %w", err)
+	}
+	metrics.AICallsTotal.WithLabelValues("chat", s.model, "success").Inc()
+	metrics.AITokensTotal.WithLabelValues("chat", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
+	metrics.AITokensTotal.WithLabelValues("chat", s.model, "completion").Add(float64(resp.Usage.CompletionTokens))
+
+	if len(resp.Choices) == 0 {
+		return "", errors.New("openai: empty chat response")
+	}
+	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
+}
+
 // ---------------------------------------------------------------------------
 // Heuristic fallback
 // ---------------------------------------------------------------------------
@@ -431,6 +473,12 @@ func (s *heuristicAIService) BatchGenerate(ctx context.Context, requirement stri
 		results[i] = &cp
 	}
 	return results, nil
+}
+
+// Chat returns a sentinel error so handlers can degrade gracefully when AI is
+// not configured. Callers should branch on IsConfigured() before calling.
+func (s *heuristicAIService) Chat(_ context.Context, _, _ string) (string, error) {
+	return "", errors.New("ai_not_configured: 仅在配置 OpenAI 后可用")
 }
 
 // ---------------------------------------------------------------------------

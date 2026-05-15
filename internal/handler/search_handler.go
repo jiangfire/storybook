@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
@@ -41,6 +42,11 @@ func NewSearchHandlerWithVector(db *gorm.DB, vectorSvc service.VectorService) *S
 func (h *SearchHandler) Capabilities(c *gin.Context) {
 	api.Success(c, "success", gin.H{
 		"semantic_enabled": h.vectorSvc != nil,
+		"filters": gin.H{
+			"date_range":   []string{"created_from", "created_to"},
+			"status_array": true,
+			"assignee":     true,
+		},
 	})
 }
 
@@ -63,6 +69,12 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	}
 	role, _ := middleware.CurrentRole(c)
 
+	filters, err := parseSearchFilters(c)
+	if err != nil {
+		api.BadRequest(c, err.Error())
+		return
+	}
+
 	like := fmt.Sprintf("%%%s%%", q)
 	projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
 	if err != nil {
@@ -73,29 +85,100 @@ func (h *SearchHandler) Search(c *gin.Context) {
 	data := gin.H{}
 
 	if searchType == "all" || searchType == "project" {
-		data["projects"] = h.searchProjects(projectIDs, like, limit)
+		data["projects"] = h.searchProjects(projectIDs, like, limit, filters)
 	}
 	if searchType == "all" || searchType == "story" {
-		data["stories"] = h.searchStories(projectIDs, like, limit)
+		data["stories"] = h.searchStories(projectIDs, like, limit, filters)
 	}
 	if searchType == "all" || searchType == "bug" {
-		data["bugs"] = h.searchBugs(projectIDs, like, limit)
+		data["bugs"] = h.searchBugs(projectIDs, like, limit, filters)
 	}
 
 	api.Success(c, "success", data)
 }
 
-func (h *SearchHandler) searchProjects(projectIDs []uint, like string, limit int) []gin.H {
+// searchFilters captures the optional advanced filters supported by GET /api/search.
+// All fields are independent: date_range narrows by created_at, statuses narrows by
+// the entity's status column (multi-value), and assignee narrows by assigned_to.
+type searchFilters struct {
+	CreatedFrom *time.Time
+	CreatedTo   *time.Time
+	Statuses    []string
+	AssigneeID  *uint
+}
+
+// parseSearchFilters extracts created_from / created_to (RFC3339 or YYYY-MM-DD),
+// status (repeatable or comma-separated), and assignee (user ID) from the query
+// string. Returns a user-facing error if any value is malformed.
+func parseSearchFilters(c *gin.Context) (searchFilters, error) {
+	f := searchFilters{}
+
+	if v := strings.TrimSpace(c.Query("created_from")); v != "" {
+		t, err := parseDateOrTime(v)
+		if err != nil {
+			return f, fmt.Errorf("created_from 格式无效，需为 RFC3339 或 YYYY-MM-DD")
+		}
+		f.CreatedFrom = &t
+	}
+	if v := strings.TrimSpace(c.Query("created_to")); v != "" {
+		t, err := parseDateOrTime(v)
+		if err != nil {
+			return f, fmt.Errorf("created_to 格式无效，需为 RFC3339 或 YYYY-MM-DD")
+		}
+		// When only a date is supplied, treat the upper bound as end-of-day so
+		// "created_to=2026-05-15" matches anything on that day.
+		if len(v) == 10 {
+			t = t.Add(24*time.Hour - time.Nanosecond)
+		}
+		f.CreatedTo = &t
+	}
+
+	// status accepts both repeated (?status=open&status=closed) and comma-separated
+	// (?status=open,closed) forms so callers can pick whichever the client lib makes easy.
+	raw := append([]string(nil), c.QueryArray("status")...)
+	if csv := strings.TrimSpace(c.Query("statuses")); csv != "" {
+		raw = append(raw, strings.Split(csv, ",")...)
+	}
+	for _, s := range raw {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			f.Statuses = append(f.Statuses, s)
+		}
+	}
+
+	if v := strings.TrimSpace(c.Query("assignee")); v != "" {
+		id, err := strconv.ParseUint(v, 10, 64)
+		if err != nil || id == 0 {
+			return f, fmt.Errorf("assignee 必须为有效用户 ID")
+		}
+		uid := uint(id)
+		f.AssigneeID = &uid
+	}
+
+	return f, nil
+}
+
+func parseDateOrTime(s string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+	return time.Parse("2006-01-02", s)
+}
+
+func (h *SearchHandler) searchProjects(projectIDs []uint, like string, limit int, f searchFilters) []gin.H {
 	if len(projectIDs) == 0 {
 		return []gin.H{}
 	}
+	q := h.db.Model(&model.Project{}).
+		Where("projects.id IN ? AND projects.name LIKE ?", projectIDs, like)
+	if f.CreatedFrom != nil {
+		q = q.Where("projects.created_at >= ?", *f.CreatedFrom)
+	}
+	if f.CreatedTo != nil {
+		q = q.Where("projects.created_at <= ?", *f.CreatedTo)
+	}
 	var rows []model.Project
-	err := h.db.Model(&model.Project{}).
-		Where("projects.id IN ? AND projects.name LIKE ?", projectIDs, like).
-		Order("projects.updated_at DESC").
-		Limit(limit).
-		Find(&rows).Error
-	if err != nil {
+	if err := q.Order("projects.updated_at DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return []gin.H{}
 	}
 
@@ -112,17 +195,26 @@ func (h *SearchHandler) searchProjects(projectIDs []uint, like string, limit int
 	return out
 }
 
-func (h *SearchHandler) searchStories(projectIDs []uint, like string, limit int) []gin.H {
+func (h *SearchHandler) searchStories(projectIDs []uint, like string, limit int, f searchFilters) []gin.H {
 	if len(projectIDs) == 0 {
 		return []gin.H{}
 	}
+	q := h.db.Model(&model.UserStory{}).
+		Where("project_id IN ? AND archived = false AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like)
+	if f.CreatedFrom != nil {
+		q = q.Where("created_at >= ?", *f.CreatedFrom)
+	}
+	if f.CreatedTo != nil {
+		q = q.Where("created_at <= ?", *f.CreatedTo)
+	}
+	if len(f.Statuses) > 0 {
+		q = q.Where("status IN ?", f.Statuses)
+	}
+	if f.AssigneeID != nil {
+		q = q.Where("assigned_to = ?", *f.AssigneeID)
+	}
 	var rows []model.UserStory
-	err := h.db.Model(&model.UserStory{}).
-		Where("project_id IN ? AND archived = false AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like).
-		Order("user_stories.updated_at DESC").
-		Limit(limit).
-		Find(&rows).Error
-	if err != nil {
+	if err := q.Order("user_stories.updated_at DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return []gin.H{}
 	}
 
@@ -141,17 +233,26 @@ func (h *SearchHandler) searchStories(projectIDs []uint, like string, limit int)
 	return out
 }
 
-func (h *SearchHandler) searchBugs(projectIDs []uint, like string, limit int) []gin.H {
+func (h *SearchHandler) searchBugs(projectIDs []uint, like string, limit int, f searchFilters) []gin.H {
 	if len(projectIDs) == 0 {
 		return []gin.H{}
 	}
+	q := h.db.Model(&model.BugReport{}).
+		Where("project_id IN ? AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like)
+	if f.CreatedFrom != nil {
+		q = q.Where("created_at >= ?", *f.CreatedFrom)
+	}
+	if f.CreatedTo != nil {
+		q = q.Where("created_at <= ?", *f.CreatedTo)
+	}
+	if len(f.Statuses) > 0 {
+		q = q.Where("status IN ?", f.Statuses)
+	}
+	if f.AssigneeID != nil {
+		q = q.Where("assigned_to = ?", *f.AssigneeID)
+	}
 	var rows []model.BugReport
-	err := h.db.Model(&model.BugReport{}).
-		Where("project_id IN ? AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like).
-		Order("bug_reports.updated_at DESC").
-		Limit(limit).
-		Find(&rows).Error
-	if err != nil {
+	if err := q.Order("bug_reports.updated_at DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return []gin.H{}
 	}
 

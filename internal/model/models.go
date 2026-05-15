@@ -117,6 +117,8 @@ type Project struct {
 	OwnerID     uint      `gorm:"not null;index" json:"owner_id"`
 	Owner       *User     `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	AgileMode   string    `gorm:"size:20;not null;default:kanban;index" json:"agile_mode"`
+	Archived    bool      `gorm:"not null;default:false;index" json:"archived"`
+	ArchivedAt  *time.Time `json:"archived_at,omitempty"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
@@ -220,6 +222,21 @@ type BugReport struct {
 	UpdatedAt   time.Time       `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt  `gorm:"index" json:"-"`
 	Version     int             `gorm:"default:0" json:"version"`
+}
+
+// BugComment 缺陷评论。记录用户在缺陷上下文中的讨论与状态更新备注，
+// 仅作者本人或项目管理员可编辑/删除,所有项目成员均可查看。
+type BugComment struct {
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	BugID     uint           `gorm:"not null;index" json:"bug_id"`
+	Bug       *BugReport     `gorm:"foreignKey:BugID" json:"bug,omitempty"`
+	AuthorID  uint           `gorm:"not null;index" json:"author_id"`
+	Author    *User          `gorm:"foreignKey:AuthorID" json:"author,omitempty"`
+	Body      string         `gorm:"type:text;not null" json:"body"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Version   int            `gorm:"default:0" json:"version"`
 }
 
 // Task 子任务。

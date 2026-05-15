@@ -72,6 +72,7 @@ func autoMigrate(db *gorm.DB) error {
 		&model.Sprint{},
 		&model.UserStory{},
 		&model.BugReport{},
+		&model.BugComment{},
 		&model.Task{},
 		&model.ActivityLog{},
 		&model.TestCase{},

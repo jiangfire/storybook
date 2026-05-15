@@ -59,6 +59,13 @@ func (s stubAIService) IsConfigured() bool {
 	return s.configured
 }
 
+func (s stubAIService) Chat(_ context.Context, _, _ string) (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+	return "stub chat reply", nil
+}
+
 func TestGenerateStoryFallsBackToHeuristicWhenNoConfig(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

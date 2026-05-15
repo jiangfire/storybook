@@ -599,6 +599,125 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 	})
 }
 
+type reorderEntry struct {
+	StoryID  uint    `json:"story_id" binding:"required"`
+	Position float64 `json:"position" binding:"required"`
+}
+
+type reorderRequest struct {
+	Orders []reorderEntry `json:"orders" binding:"required,min=1,dive"`
+}
+
+// Reorder bulk-updates story positions within a sprint so a drag-drop UI can
+// flush a whole new ordering in a single round-trip. Validates every story
+// belongs to this sprint before any UPDATE fires so a malicious payload can't
+// touch unrelated rows; the entire batch runs in one transaction.
+func (h *SprintHandler) Reorder(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可重新排序冲刺")
+		return
+	}
+
+	sprintID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "冲刺ID无效")
+		return
+	}
+
+	sprint, err := h.sprintRepo.FindByID(sprintID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "冲刺不存在")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	var req reorderRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+
+	ids := make([]uint, 0, len(req.Orders))
+	positions := make(map[uint]float64, len(req.Orders))
+	for _, o := range req.Orders {
+		if _, dup := positions[o.StoryID]; dup {
+			api.BadRequest(c, "orders 中出现重复 story_id")
+			return
+		}
+		ids = append(ids, o.StoryID)
+		positions[o.StoryID] = o.Position
+	}
+
+	// Verify every story is actually attached to this sprint before applying.
+	var count int64
+	if err := h.db.Model(&model.UserStory{}).
+		Where("id IN ? AND sprint_id = ?", ids, sprint.ID).
+		Count(&count).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+	if int(count) != len(ids) {
+		api.BadRequest(c, "存在不属于该冲刺的故事 ID")
+		return
+	}
+
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		for _, o := range req.Orders {
+			if err := tx.Model(&model.UserStory{}).
+				Where("id = ? AND sprint_id = ?", o.StoryID, sprint.ID).
+				Update("position", o.Position).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	pid := sprint.ProjectID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "sprint",
+		EntityID:   sprint.ID,
+		Action:     "reordered",
+		UserID:     userID,
+		ProjectID:  &pid,
+		NewValue:   model.MarshalJSON(gin.H{"order_count": len(req.Orders)}),
+	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "reordered")
+
+	if h.events != nil {
+		h.events.BroadcastProject(sprint.ProjectID, "sprint.reordered", gin.H{
+			"sprint_id":  sprint.ID,
+			"project_id": sprint.ProjectID,
+			"orders":     req.Orders,
+			"actor_id":   userID,
+		})
+	}
+
+	api.Success(c, "冲刺排序更新成功", gin.H{
+		"sprint_id":   sprint.ID,
+		"order_count": len(req.Orders),
+	})
+}
+
 func parseDate(raw string) (time.Time, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
