@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -99,6 +100,7 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	}
 
 	userLimiter := middleware.NewUserRateLimiter(100)
+	aiLimiter := middleware.NewNamedUserRateLimiter("ai", aiUserRateLimitPerMin())
 	protected := api.Group("")
 	protected.Use(middleware.AuthRequired(tokenManager))
 	protected.Use(userLimiter.Middleware())
@@ -168,9 +170,9 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.PATCH("/bugs/:id/status", bugHandler.UpdateStatus)
 		protected.PATCH("/bugs/:id/assign", bugHandler.Assign)
 
-		protected.POST("/ai/generate-story", aiHandler.GenerateStory)
-		protected.POST("/ai/stories/:id/split", aiHandler.SplitStory)
-		protected.GET("/ai/stories/:id/invest-check", aiHandler.INVESTCheck)
+		protected.POST("/ai/generate-story", aiLimiter.Middleware(), aiHandler.GenerateStory)
+		protected.POST("/ai/stories/:id/split", aiLimiter.Middleware(), aiHandler.SplitStory)
+		protected.GET("/ai/stories/:id/invest-check", aiLimiter.Middleware(), aiHandler.INVESTCheck)
 
 		// 技术负责人专用接口
 		techlead := protected.Group("/techlead")
@@ -264,4 +266,19 @@ func buildVectorService(db *gorm.DB, logger *slog.Logger) service.VectorService 
 
 	logger.Info("vector search enabled", "provider", provider, "dimension", embeddingSvc.GetDimension())
 	return service.NewVectorService(db, embeddingSvc)
+}
+
+// aiUserRateLimitPerMin reads AI_USER_RATE_LIMIT_PER_MIN with a 10 req/min/user
+// default. Kept inline (rather than threading through config) to preserve the
+// existing router.New / NewWithLogger signature used by tests.
+func aiUserRateLimitPerMin() int {
+	v := strings.TrimSpace(os.Getenv("AI_USER_RATE_LIMIT_PER_MIN"))
+	if v == "" {
+		return 10
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return 10
+	}
+	return n
 }

@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
 )
@@ -41,6 +43,15 @@ func (l *IPLimiter) Middleware() gin.HandlerFunc {
 		ip := c.ClientIP()
 		limiter := l.getLimiter(ip)
 		if !limiter.Allow() {
+			// rate.Limiter.Reserve() gives a precise wait, but the public Allow()
+			// API does not. Approximate Retry-After by inverting the token rate
+			// so a flood of denials still tells the client how long to back off.
+			retryAfter := int(time.Duration(float64(time.Second) / float64(l.r)).Seconds())
+			if retryAfter < 1 {
+				retryAfter = 1
+			}
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+			metrics.RateLimitRejections.WithLabelValues("ip").Inc()
 			api.TooManyRequests(c, "请求过于频繁，请稍后重试")
 			c.Abort()
 			return

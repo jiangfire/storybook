@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +16,7 @@ type windowCounter struct {
 }
 
 type UserRateLimiter struct {
+	name    string
 	mu      sync.Mutex
 	store   map[string]*windowCounter
 	limit   int
@@ -23,11 +25,23 @@ type UserRateLimiter struct {
 }
 
 func NewUserRateLimiter(limitPerMinute int) *UserRateLimiter {
+	return NewNamedUserRateLimiter("user", limitPerMinute)
+}
+
+// NewNamedUserRateLimiter constructs an additional per-user limiter with its
+// own state. The name is used for the metric label and forwarded to logs so
+// stacked limiters (e.g. baseline `user` + tighter `ai`) can be told apart
+// without changing the public Middleware contract.
+func NewNamedUserRateLimiter(name string, limitPerMinute int) *UserRateLimiter {
 	if limitPerMinute <= 0 {
 		limitPerMinute = 100
 	}
+	if name == "" {
+		name = "user"
+	}
 
 	l := &UserRateLimiter{
+		name:    name,
 		store:   make(map[string]*windowCounter),
 		limit:   limitPerMinute,
 		window:  time.Minute,
@@ -60,6 +74,12 @@ func (l *UserRateLimiter) Middleware() gin.HandlerFunc {
 		c.Header("X-RateLimit-Reset", strconv.FormatInt(resetAt.Unix(), 10))
 
 		if !allowed {
+			retryAfter := int(time.Until(resetAt).Seconds())
+			if retryAfter < 1 {
+				retryAfter = 1
+			}
+			c.Header("Retry-After", strconv.Itoa(retryAfter))
+			metrics.RateLimitRejections.WithLabelValues(l.name).Inc()
 			api.TooManyRequests(c, "请求过于频繁，请稍后重试")
 			c.Abort()
 			return
