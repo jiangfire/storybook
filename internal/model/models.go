@@ -52,6 +52,7 @@ const (
 	SprintStatusPlanned   = "planned"
 	SprintStatusActive    = "active"
 	SprintStatusCompleted = "completed"
+	SprintStatusCancelled = "cancelled"
 )
 
 const (

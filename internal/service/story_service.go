@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -348,6 +349,204 @@ func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID,
 	}
 
 	return now, nil
+}
+
+// AddAC appends a new acceptance criterion. ID is server-generated as "ac-<N>"
+// using max(existing N)+1 so it stays compatible with the existing convention
+// produced by normalizeAC.
+func (s *StoryService) AddAC(story *model.UserStory, userID uint, description, ref, notes string, actor any) (model.AcceptanceCriterion, error) {
+	desc := strings.TrimSpace(description)
+	if desc == "" {
+		return model.AcceptanceCriterion{}, NewValidationError(ValidationIssue{Field: "description", Message: "description不能为空"})
+	}
+	if len(desc) > 500 {
+		return model.AcceptanceCriterion{}, NewValidationError(ValidationIssue{Field: "description", Message: "description最多500字符"})
+	}
+
+	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
+	if err != nil {
+		return model.AcceptanceCriterion{}, ErrACCorrupted
+	}
+
+	ac := model.AcceptanceCriterion{
+		ID:          nextACID(criteria),
+		Ref:         strings.TrimSpace(ref),
+		Description: desc,
+		Status:      model.ACStatusPending,
+		Notes:       strings.TrimSpace(notes),
+		Order:       len(criteria) + 1,
+	}
+	criteria = append(criteria, ac)
+
+	story.AcceptanceCriteria = model.MarshalJSON(criteria)
+	if err := s.db.Save(story).Error; err != nil {
+		return model.AcceptanceCriterion{}, err
+	}
+
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "ac_added", nil, map[string]any{
+		"ac_id":       ac.ID,
+		"description": ac.Description,
+		"ref":         ac.Ref,
+		"order":       ac.Order,
+	}), "write story activity log", "story_id", story.ID, "action", "ac_added", "ac_id", ac.ID)
+
+	if s.events != nil {
+		s.events.BroadcastProject(story.ProjectID, "story.ac_added", map[string]any{
+			"story_id": story.ID,
+			"ac_id":    ac.ID,
+			"actor":    actor,
+		})
+	}
+
+	return ac, nil
+}
+
+// UpdateAC selectively edits an existing AC's content fields (description, ref,
+// notes, order). Status changes go through UpdateACStatus to keep the verified
+// audit trail intact.
+func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string, description, ref, notes *string, order *int, actor any) (model.AcceptanceCriterion, error) {
+	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
+	if err != nil {
+		return model.AcceptanceCriterion{}, ErrACCorrupted
+	}
+
+	idx := -1
+	for i := range criteria {
+		if criteria[i].ID == acID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return model.AcceptanceCriterion{}, ErrACNotFound
+	}
+
+	oldValue := map[string]any{
+		"description": criteria[idx].Description,
+		"ref":         criteria[idx].Ref,
+		"notes":       criteria[idx].Notes,
+		"order":       criteria[idx].Order,
+	}
+	changed := false
+
+	if description != nil {
+		desc := strings.TrimSpace(*description)
+		if desc == "" {
+			return model.AcceptanceCriterion{}, NewValidationError(ValidationIssue{Field: "description", Message: "description不能为空"})
+		}
+		if len(desc) > 500 {
+			return model.AcceptanceCriterion{}, NewValidationError(ValidationIssue{Field: "description", Message: "description最多500字符"})
+		}
+		if criteria[idx].Description != desc {
+			criteria[idx].Description = desc
+			changed = true
+		}
+	}
+	if ref != nil {
+		trimmed := strings.TrimSpace(*ref)
+		if criteria[idx].Ref != trimmed {
+			criteria[idx].Ref = trimmed
+			changed = true
+		}
+	}
+	if notes != nil {
+		trimmed := strings.TrimSpace(*notes)
+		if criteria[idx].Notes != trimmed {
+			criteria[idx].Notes = trimmed
+			changed = true
+		}
+	}
+	if order != nil && *order > 0 && criteria[idx].Order != *order {
+		criteria[idx].Order = *order
+		changed = true
+	}
+
+	if !changed {
+		return criteria[idx], nil
+	}
+
+	story.AcceptanceCriteria = model.MarshalJSON(criteria)
+	if err := s.db.Save(story).Error; err != nil {
+		return model.AcceptanceCriterion{}, err
+	}
+
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "ac_edited", oldValue, map[string]any{
+		"ac_id":       criteria[idx].ID,
+		"description": criteria[idx].Description,
+		"ref":         criteria[idx].Ref,
+		"notes":       criteria[idx].Notes,
+		"order":       criteria[idx].Order,
+	}), "write story activity log", "story_id", story.ID, "action", "ac_edited", "ac_id", acID)
+
+	if s.events != nil {
+		s.events.BroadcastProject(story.ProjectID, "story.ac_edited", map[string]any{
+			"story_id": story.ID,
+			"ac_id":    acID,
+			"actor":    actor,
+		})
+	}
+
+	return criteria[idx], nil
+}
+
+// RemoveAC drops a single criterion by ID. Order of the remaining items is
+// preserved as-is; clients that want a compact 1..N sequence can re-issue
+// UpdateAC calls.
+func (s *StoryService) RemoveAC(story *model.UserStory, userID uint, acID string, actor any) error {
+	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
+	if err != nil {
+		return ErrACCorrupted
+	}
+
+	idx := -1
+	for i := range criteria {
+		if criteria[i].ID == acID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return ErrACNotFound
+	}
+
+	removed := criteria[idx]
+	criteria = append(criteria[:idx], criteria[idx+1:]...)
+	story.AcceptanceCriteria = model.MarshalJSON(criteria)
+	if err := s.db.Save(story).Error; err != nil {
+		return err
+	}
+
+	logging.LogIfErr(createActivityLog(s.db, story.ProjectID, userID, "story", story.ID, "ac_removed", map[string]any{
+		"ac_id":       removed.ID,
+		"description": removed.Description,
+		"ref":         removed.Ref,
+		"order":       removed.Order,
+	}, nil), "write story activity log", "story_id", story.ID, "action", "ac_removed", "ac_id", acID)
+
+	if s.events != nil {
+		s.events.BroadcastProject(story.ProjectID, "story.ac_removed", map[string]any{
+			"story_id": story.ID,
+			"ac_id":    acID,
+			"actor":    actor,
+		})
+	}
+
+	return nil
+}
+
+// nextACID picks the smallest "ac-<N>" identifier not already taken so adding
+// new ACs stays predictable and aligned with normalizeAC's seed format. IDs
+// that don't match the pattern are ignored (no scheme collision with custom
+// IDs that may have been imported from elsewhere).
+func nextACID(items []model.AcceptanceCriterion) string {
+	max := 0
+	for _, ac := range items {
+		var n int
+		if _, err := fmt.Sscanf(ac.ID, "ac-%d", &n); err == nil && n > max {
+			max = n
+		}
+	}
+	return fmt.Sprintf("ac-%d", max+1)
 }
 
 func (s *StoryService) Claim(story *model.UserStory, userID uint) error {

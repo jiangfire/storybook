@@ -22,6 +22,7 @@ type BugHandler struct {
 	userRepo    *repository.UserRepository
 	projectRepo *repository.ProjectRepository
 	notifier    service.Notifier
+	events      EventPublisher
 }
 
 func NewBugHandler(db *gorm.DB) *BugHandler {
@@ -45,6 +46,16 @@ func (h *BugHandler) WithNotifier(n service.Notifier) *BugHandler {
 	return h
 }
 
+// WithEvents wires a WebSocket broadcaster after construction so project-level
+// bug events can fan out without changing the existing NewBugHandler signature
+// (preserves the *gorm.DB-only constructor used by tests).
+func (h *BugHandler) WithEvents(p EventPublisher) *BugHandler {
+	if p != nil {
+		h.events = p
+	}
+	return h
+}
+
 type createBugRequest struct {
 	StoryID      *uint  `json:"story_id"`
 	Title        string `json:"title" binding:"required,min=2,max=255"`
@@ -55,6 +66,13 @@ type createBugRequest struct {
 
 type updateBugStatusRequest struct {
 	Status string `json:"status" binding:"required,oneof=open in_progress resolved closed"`
+}
+
+type updateBugRequest struct {
+	Title       *string `json:"title" binding:"omitempty,min=2,max=255"`
+	Description *string `json:"description" binding:"omitempty,max=5000"`
+	Severity    *string `json:"severity" binding:"omitempty,oneof=low medium high critical"`
+	Version     int     `json:"version"`
 }
 
 type assignBugRequest struct {
@@ -451,6 +469,181 @@ func (h *BugHandler) Assign(c *gin.Context) {
 		"assigned_to": bug.AssignedTo,
 		"updated_at":  bug.UpdatedAt,
 	})
+}
+
+// Update edits a bug's editable fields (title/description/severity) using
+// optimistic locking on Version. status/assignee/reporter/projectID are NOT
+// mutable here — UpdateStatus and Assign cover those paths.
+func (h *BugHandler) Update(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	bugID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "缺陷ID无效")
+		return
+	}
+
+	bug, err := h.loadBugWithAccess(bugID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "缺陷不存在")
+			return
+		}
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	role, _ := middleware.CurrentRole(c)
+	if bug.ReportedBy != userID && role != model.RoleAdmin && role != model.RoleProduct {
+		api.Forbidden(c, "仅缺陷上报人、产品经理或管理员可编辑")
+		return
+	}
+
+	var req updateBugRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+
+	fields := map[string]any{}
+	oldValue := gin.H{}
+	newValue := gin.H{}
+	if req.Title != nil {
+		trimmed := strings.TrimSpace(*req.Title)
+		if trimmed == "" {
+			api.BadRequest(c, "title 不能为空")
+			return
+		}
+		oldValue["title"] = bug.Title
+		newValue["title"] = trimmed
+		fields["title"] = trimmed
+	}
+	if req.Description != nil {
+		trimmed := strings.TrimSpace(*req.Description)
+		oldValue["description"] = bug.Description
+		newValue["description"] = trimmed
+		fields["description"] = trimmed
+	}
+	if req.Severity != nil {
+		oldValue["severity"] = bug.Severity
+		newValue["severity"] = *req.Severity
+		fields["severity"] = *req.Severity
+	}
+	if len(fields) == 0 {
+		api.BadRequest(c, "未提供需要更新的字段")
+		return
+	}
+
+	if err := h.bugRepo.UpdateWithVersion(bug.ID, req.Version, fields); err != nil {
+		if strings.Contains(err.Error(), "version conflict") {
+			api.Conflict(c, "缺陷已被他人修改，请刷新后重试")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	updated, err := h.bugRepo.FindByIDWithDetails(bug.ID)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	pid := updated.ProjectID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "bug",
+		EntityID:   updated.ID,
+		Action:     "updated",
+		UserID:     userID,
+		ProjectID:  &pid,
+		OldValue:   model.MarshalJSON(oldValue),
+		NewValue:   model.MarshalJSON(newValue),
+	}).Error, "write bug activity log", "bug_id", updated.ID, "action", "updated")
+
+	if h.events != nil {
+		h.events.BroadcastProject(updated.ProjectID, "bug.updated", gin.H{
+			"bug_id":     updated.ID,
+			"project_id": updated.ProjectID,
+			"updated_by": userID,
+		})
+	}
+
+	api.Success(c, "缺陷更新成功", gin.H{
+		"id":          updated.ID,
+		"title":       updated.Title,
+		"description": updated.Description,
+		"severity":    updated.Severity,
+		"status":      updated.Status,
+		"version":     updated.Version,
+		"updated_at":  updated.UpdatedAt,
+	})
+}
+
+// Delete soft-deletes a bug. Reporter or admin only.
+func (h *BugHandler) Delete(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	bugID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "缺陷ID无效")
+		return
+	}
+
+	bug, err := h.loadBugWithAccess(bugID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "缺陷不存在")
+			return
+		}
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	role, _ := middleware.CurrentRole(c)
+	if bug.ReportedBy != userID && role != model.RoleAdmin {
+		api.Forbidden(c, "仅缺陷上报人或管理员可删除")
+		return
+	}
+
+	if err := h.bugRepo.Delete(bug.ID); err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	pid := bug.ProjectID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "bug",
+		EntityID:   bug.ID,
+		Action:     "deleted",
+		UserID:     userID,
+		ProjectID:  &pid,
+		OldValue:   model.MarshalJSON(gin.H{"title": bug.Title, "status": bug.Status}),
+	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "deleted")
+
+	if h.events != nil {
+		h.events.BroadcastProject(bug.ProjectID, "bug.deleted", gin.H{
+			"bug_id":     bug.ID,
+			"project_id": bug.ProjectID,
+			"deleted_by": userID,
+		})
+	}
+
+	api.Success(c, "缺陷删除成功", gin.H{"id": bug.ID})
 }
 
 func (h *BugHandler) loadBugWithAccess(bugID, userID uint) (*model.BugReport, error) {

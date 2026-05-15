@@ -288,3 +288,193 @@ func (h *StoryHandler) AddCodeReference(c *gin.Context) {
 
 	api.Success(c, "代码关联成功", gin.H{"story_id": story.ID, "code_references": refs})
 }
+
+type addACRequest struct {
+	Description string `json:"description" binding:"required,min=1,max=500"`
+	Ref         string `json:"ref" binding:"omitempty,max=200"`
+	Notes       string `json:"notes" binding:"omitempty,max=1000"`
+}
+
+type updateACRequest struct {
+	Description *string `json:"description" binding:"omitempty,min=1,max=500"`
+	Ref         *string `json:"ref" binding:"omitempty,max=200"`
+	Notes       *string `json:"notes" binding:"omitempty,max=1000"`
+	Order       *int    `json:"order" binding:"omitempty,min=1"`
+}
+
+// AddAC appends a new acceptance criterion to a story.
+func (h *StoryHandler) AddAC(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
+
+	storyID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "故事ID无效")
+		return
+	}
+
+	story, err := h.getStoryWithAccess(storyID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "用户故事不存在")
+			return
+		}
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	var req addACRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+
+	ac, err := h.storySvc.AddAC(story, userID, req.Description, req.Ref, req.Notes, actorFromContext(c, userID))
+	if err != nil {
+		if items, ok := serviceValidationItems(err); ok && len(items) > 0 {
+			api.BadRequest(c, items[0].Message)
+			return
+		}
+		if errors.Is(err, service.ErrACCorrupted) {
+			api.Internal(c, "AC数据损坏")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	api.Success(c, "AC新增成功", ac)
+}
+
+// UpdateAC selectively edits AC content (description/ref/notes/order). Status
+// changes still go through UpdateACStatus.
+func (h *StoryHandler) UpdateAC(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
+
+	storyID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "故事ID无效")
+		return
+	}
+
+	acID := strings.TrimSpace(c.Param("acID"))
+	if acID == "" {
+		api.BadRequest(c, "ac_id不能为空")
+		return
+	}
+
+	story, err := h.getStoryWithAccess(storyID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "用户故事不存在")
+			return
+		}
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	var req updateACRequest
+	if !middleware.BindJSON(c, &req) {
+		return
+	}
+	if req.Description == nil && req.Ref == nil && req.Notes == nil && req.Order == nil {
+		api.BadRequest(c, "未提供需要更新的字段")
+		return
+	}
+
+	ac, err := h.storySvc.UpdateAC(story, userID, acID, req.Description, req.Ref, req.Notes, req.Order, actorFromContext(c, userID))
+	if err != nil {
+		if items, ok := serviceValidationItems(err); ok && len(items) > 0 {
+			api.BadRequest(c, items[0].Message)
+			return
+		}
+		if errors.Is(err, service.ErrACNotFound) {
+			api.NotFound(c, "AC不存在")
+			return
+		}
+		if errors.Is(err, service.ErrACCorrupted) {
+			api.Internal(c, "AC数据损坏")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	api.Success(c, "AC更新成功", ac)
+}
+
+// DeleteAC removes a single criterion by ID.
+func (h *StoryHandler) DeleteAC(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+	role, _ := middleware.CurrentRole(c)
+	if denyTechLeadStoryMutation(c, role) {
+		return
+	}
+
+	storyID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "故事ID无效")
+		return
+	}
+
+	acID := strings.TrimSpace(c.Param("acID"))
+	if acID == "" {
+		api.BadRequest(c, "ac_id不能为空")
+		return
+	}
+
+	story, err := h.getStoryWithAccess(storyID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "用户故事不存在")
+			return
+		}
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if err := h.storySvc.RemoveAC(story, userID, acID, actorFromContext(c, userID)); err != nil {
+		if errors.Is(err, service.ErrACNotFound) {
+			api.NotFound(c, "AC不存在")
+			return
+		}
+		if errors.Is(err, service.ErrACCorrupted) {
+			api.Internal(c, "AC数据损坏")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	api.Success(c, "AC删除成功", gin.H{"story_id": story.ID, "ac_id": acID})
+}

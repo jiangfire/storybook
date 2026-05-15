@@ -100,6 +100,12 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 	sprintHandler.WithNotifier(notifier)
 	bugHandler.WithNotifier(notifier)
 
+	// Bug & Sprint emit project-scope WebSocket events (bug.updated/deleted,
+	// sprint.closed/cancelled/deleted) — wire the Hub the same way as Notifier
+	// so the constructors stay db-only for tests.
+	bugHandler.WithEvents(hub)
+	sprintHandler.WithEvents(hub)
+
 	api := r.Group("/api")
 
 	authLimiter := middleware.NewIPLimiter(3, 1)
@@ -161,6 +167,9 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.POST("/stories/:id/claim", storyHandler.ClaimStory)
 		protected.DELETE("/stories/:id/claim", storyHandler.ReleaseStory)
 		protected.PATCH("/stories/:id/acceptance-criteria/:acID", storyHandler.UpdateACStatus)
+		protected.POST("/stories/:id/ac", storyHandler.AddAC)
+		protected.PUT("/stories/:id/ac/:acID", storyHandler.UpdateAC)
+		protected.DELETE("/stories/:id/ac/:acID", storyHandler.DeleteAC)
 		protected.POST("/stories/:id/code-refs", storyHandler.AddCodeReference)
 		protected.GET("/stories/:id/activities", storyHandler.GetActivities)
 		protected.PATCH("/stories/:id/assignee", storyHandler.AssignStory)
@@ -181,7 +190,12 @@ func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Lo
 		protected.DELETE("/tasks/:id/claim", taskHandler.Release)
 		protected.POST("/tasks/:id/code-refs", taskHandler.AddCodeReference)
 		protected.PATCH("/sprints/:id/status", sprintHandler.UpdateStatus)
+		protected.POST("/sprints/:id/close", sprintHandler.Close)
+		protected.POST("/sprints/:id/cancel", sprintHandler.Cancel)
+		protected.DELETE("/sprints/:id", sprintHandler.Delete)
 		protected.GET("/bugs/:id", bugHandler.Get)
+		protected.PUT("/bugs/:id", bugHandler.Update)
+		protected.DELETE("/bugs/:id", bugHandler.Delete)
 		protected.PATCH("/bugs/:id/status", bugHandler.UpdateStatus)
 		protected.PATCH("/bugs/:id/assign", bugHandler.Assign)
 

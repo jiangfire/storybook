@@ -19,6 +19,7 @@ type SprintHandler struct {
 	db         *gorm.DB
 	sprintRepo *repository.SprintRepository
 	notifier   service.Notifier
+	events     EventPublisher
 }
 
 func NewSprintHandler(db *gorm.DB) *SprintHandler {
@@ -32,6 +33,15 @@ func NewSprintHandler(db *gorm.DB) *SprintHandler {
 func (h *SprintHandler) WithNotifier(n service.Notifier) *SprintHandler {
 	if n != nil {
 		h.notifier = n
+	}
+	return h
+}
+
+// WithEvents wires the project-scope broadcaster post-construction so existing
+// callers that only have *gorm.DB stay green.
+func (h *SprintHandler) WithEvents(p EventPublisher) *SprintHandler {
+	if p != nil {
+		h.events = p
 	}
 	return h
 }
@@ -362,6 +372,230 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 		"story_id":   story.ID,
 		"sprint_id":  story.SprintID,
 		"updated_at": story.UpdatedAt,
+	})
+}
+
+// Close finalizes an active sprint: status active → completed, and any story
+// still attached to this sprint that is not yet done gets reverted to backlog
+// (sprint_id = NULL) so the next iteration can re-plan it.
+func (h *SprintHandler) Close(c *gin.Context) {
+	h.terminate(c, "close")
+}
+
+// Cancel halts a sprint (planned or active) — status → cancelled and ALL
+// attached stories revert sprint_id to NULL regardless of their progress.
+func (h *SprintHandler) Cancel(c *gin.Context) {
+	h.terminate(c, "cancel")
+}
+
+// Delete soft-deletes a planned (draft) sprint. Refuses anything other than
+// planned so callers must explicitly cancel/close active sprints first.
+func (h *SprintHandler) Delete(c *gin.Context) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可删除冲刺")
+		return
+	}
+
+	sprintID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "冲刺ID无效")
+		return
+	}
+
+	sprint, err := h.sprintRepo.FindByID(sprintID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "冲刺不存在")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if sprint.Status != model.SprintStatusPlanned {
+		api.BadRequest(c, "仅未启动的冲刺可删除，请先取消或完成")
+		return
+	}
+
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.UserStory{}).
+			Where("sprint_id = ?", sprint.ID).
+			Update("sprint_id", nil).Error; err != nil {
+			return err
+		}
+		return tx.Delete(sprint).Error
+	}); err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	pid := sprint.ProjectID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "sprint",
+		EntityID:   sprint.ID,
+		Action:     "deleted",
+		UserID:     userID,
+		ProjectID:  &pid,
+		OldValue:   model.MarshalJSON(gin.H{"name": sprint.Name, "status": sprint.Status}),
+	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "deleted")
+
+	if h.events != nil {
+		h.events.BroadcastProject(sprint.ProjectID, "sprint.deleted", gin.H{
+			"sprint_id":  sprint.ID,
+			"project_id": sprint.ProjectID,
+			"deleted_by": userID,
+		})
+	}
+
+	api.Success(c, "冲刺删除成功", gin.H{"id": sprint.ID})
+}
+
+// terminate is the shared close/cancel implementation. Both transitions revert
+// associated stories' sprint_id within the same transaction so a partial
+// failure leaves the sprint+stories consistent.
+func (h *SprintHandler) terminate(c *gin.Context, action string) {
+	userID, ok := middleware.CurrentUserID(c)
+	if !ok {
+		api.Unauthorized(c, "未登录")
+		return
+	}
+
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可变更冲刺状态")
+		return
+	}
+
+	sprintID, ok := parseUintParam(c, "id")
+	if !ok {
+		api.BadRequest(c, "冲刺ID无效")
+		return
+	}
+
+	sprint, err := h.sprintRepo.FindByID(sprintID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.NotFound(c, "冲刺不存在")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
+		if errors.Is(err, errForbidden) {
+			api.Forbidden(c, "非项目成员无法访问")
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	var (
+		newStatus  string
+		notifType  string
+		notifTitle string
+		successMsg string
+		wsEvent    string
+		storyWhere []any
+	)
+	switch action {
+	case "close":
+		if sprint.Status != model.SprintStatusActive {
+			api.BadRequest(c, "仅活跃中的冲刺可完成")
+			return
+		}
+		newStatus = model.SprintStatusCompleted
+		notifType = model.NotificationSprintCompleted
+		notifTitle = "冲刺已完成"
+		successMsg = "冲刺已完成"
+		wsEvent = "sprint.closed"
+		storyWhere = []any{"sprint_id = ? AND status <> ?", sprint.ID, model.StoryStatusDone}
+	case "cancel":
+		if sprint.Status != model.SprintStatusPlanned && sprint.Status != model.SprintStatusActive {
+			api.BadRequest(c, "仅计划或活跃中的冲刺可取消")
+			return
+		}
+		newStatus = model.SprintStatusCancelled
+		notifType = model.NotificationSprintCompleted
+		notifTitle = "冲刺已取消"
+		successMsg = "冲刺已取消"
+		wsEvent = "sprint.cancelled"
+		storyWhere = []any{"sprint_id = ?", sprint.ID}
+	default:
+		api.BadRequest(c, "未知冲刺操作")
+		return
+	}
+
+	oldStatus := sprint.Status
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(sprint).Update("status", newStatus).Error; err != nil {
+			return err
+		}
+		return tx.Model(&model.UserStory{}).
+			Where(storyWhere[0], storyWhere[1:]...).
+			Update("sprint_id", nil).Error
+	}); err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	sprint.Status = newStatus
+	pid := sprint.ProjectID
+	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+		EntityType: "sprint",
+		EntityID:   sprint.ID,
+		Action:     "status_changed",
+		UserID:     userID,
+		ProjectID:  &pid,
+		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
+		NewValue:   model.MarshalJSON(gin.H{"status": newStatus}),
+	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", action)
+
+	h.notifier.NotifyProjectMembers(c.Request.Context(), sprint.ProjectID, service.NotificationEvent{
+		Type:       notifType,
+		EntityType: model.NotificationEntitySprint,
+		EntityID:   sprint.ID,
+		ProjectID:  &pid,
+		ActorID:    &userID,
+		Title:      notifTitle,
+		Body:       sprint.Name,
+		Metadata: gin.H{
+			"sprint_id":   sprint.ID,
+			"sprint_name": sprint.Name,
+			"status":      newStatus,
+		},
+	})
+
+	if h.events != nil {
+		h.events.BroadcastProject(sprint.ProjectID, wsEvent, gin.H{
+			"sprint_id":  sprint.ID,
+			"project_id": sprint.ProjectID,
+			"status":     newStatus,
+			"actor_id":   userID,
+		})
+	}
+
+	api.Success(c, successMsg, gin.H{
+		"id":         sprint.ID,
+		"status":     sprint.Status,
+		"updated_at": sprint.UpdatedAt,
 	})
 }
 

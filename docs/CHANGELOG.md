@@ -1,5 +1,49 @@
 # Changelog
 
+## 2026-05-15 PLAN.md §4 / §6 / §7 / §8 推进
+
+### §6 Prometheus 指标
+
+- **引入 `github.com/prometheus/client_golang`**，新增 `internal/metrics/metrics.go` 单例 Registry，注册 HTTP 请求直方图/计数器、AI 调用计数/延迟/Token、WebSocket 连接 Gauge、AI 缓存命中/未命中等核心指标。
+- **`/metrics` 端点带 Basic Auth 保护** — 凭据从 `METRICS_USER` / `METRICS_PASS` 读取，任一未配置则**不注册**端点(避免误把数据暴露在公网)。新增 `internal/middleware/basicauth.go` 用 `subtle.ConstantTimeCompare` 防止时序攻击。
+- **HTTP/AI/WS 埋点落地** — RequestLogger 在 `c.Next()` 后写直方图,`route` 使用 `c.FullPath()` 避免高基数;`ai_service.go` 与 `ai_retry.go` 在调用前后计时并读取 `resp.Usage` 拆 prompt/completion token;Hub 在连接 Add/Remove 时增减 Gauge。
+
+### §7 AI 端点独立限流
+
+- **新增 `NewNamedUserRateLimiter("ai", n)`** — 复用 user_ratelimit 的 windowCounter,key 形如 `ai:<userID>`,与现有 100/min/user 限流叠加生效(双层独立计数)。
+- **三个 AI 路由叠加 `aiLimiter.Middleware()`**(`router.go:188-190`):`/api/ai/generate-story`、`/api/ai/stories/:id/split`、`/api/ai/stories/:id/invest-check`。
+- **配额可配置** — `AI_USER_RATE_LIMIT_PER_MIN` 默认 10。
+- **429 返回 `Retry-After` 头** — IP 限流与 user 限流统一在拒绝路径写入剩余窗口秒数,方便客户端退避。
+
+### §4 站内通知系统
+
+- **新增 `Notification` 模型**(`internal/model/models.go`)+ `internal/repository/notification_repo.go`(BulkCreate / ListByUser / MarkRead / MarkAllRead / UnreadCount)。
+- **`internal/service/notification_service.go`** — 写入 DB 后通过 `EventPublisher.BroadcastUser` 推送 `notification.new` 给该用户的所有 WS 连接。`Hub.BroadcastUser` 新增,`EventPublisher` 接口同步扩展。
+- **接入触发点** — story claim/release/review、task assign、bug assign、sprint started/completed。Notifier 失败仅记日志不阻塞主流程。
+- **HTTP API** — `GET /api/notifications`、`GET /api/notifications/unread-count`、`POST /api/notifications/:id/read`、`POST /api/notifications/mark-all-read`。
+- **前端铃铛** — `NotificationBell.tsx` + Zustand `notificationStore`,`useWebSocket` 增加 `notification.new` 分支,新通知触发 toast + 红点。
+- **明确不做 SMTP/邮件**(用户决策)。
+
+### §8 CRUD 补全(本轮三项)
+
+- **Bug `PUT /api/bugs/:id` + `DELETE`** — Update 走 `bugRepo.UpdateWithVersion` 乐观锁,字段 title/description/severity 可选更新,version 冲突返回 409;Delete 走软删除。权限:reporter / product / admin(Delete 仅 reporter / admin)。两者均写 ActivityLog 并 WS 广播 `bug.updated` / `bug.deleted`。
+- **Sprint close / cancel / delete**
+  - `POST /api/sprints/:id/close` — 仅 active 可关闭;事务内置状态为 completed 并把仍未完成的 story `sprint_id` 退回 NULL。
+  - `POST /api/sprints/:id/cancel` — planned 或 active 可取消;事务内置状态为 cancelled 并把**所有**关联 story 退回 backlog(不论进度)。
+  - `DELETE /api/sprints/:id` — 仅 planned 可删除,事务内先把 story `sprint_id` 置 NULL,再软删除 sprint;active/completed 必须先 close/cancel。
+  - 三者均广播 `sprint.closed` / `sprint.cancelled` / `sprint.deleted` WS 事件并发送项目级通知。
+  - `model.SprintStatusCancelled` 新增,`workflow.go` 状态机将 cancelled 标记为终态。
+- **AC 单条 add / edit / remove**
+  - `POST /api/stories/:id/ac` — 服务端按 `nextACID` 生成 `ac-<N>` ID(扫描现有最大后缀),order = len+1。
+  - `PUT /api/stories/:id/ac/:acID` — 选择性更新 description / ref / notes / order;status 仍走 `PATCH /acceptance-criteria/:acID` 保留 verified 审计字段。
+  - `DELETE /api/stories/:id/ac/:acID` — 从数组中过滤掉,保留其他元素的 order。
+  - 三者沿用 `UpdateACStatus` 的解析→变更→保存 JSONB + ActivityLog + 广播 `story.ac_added` / `story.ac_edited` / `story.ac_removed` 的模式;权限沿用 `denyTechLeadStoryMutation`。
+
+### 测试
+
+- `internal/handler/__tests__/Header.test.tsx` 增加 useWebSocket / useToast / notificationStore / NotificationBell 四个 vi.mock 适配新铃铛接入,7 个 Header 测试 + 全套 292 个前端测试通过。
+- Go 全套测试通过(`internal/{handler,router,service,e2e}` 等)。
+
 ## 2026-05-14 安全与稳定性修复
 
 ### 严重缺陷修复

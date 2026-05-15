@@ -76,14 +76,17 @@ var sprintTransitions = map[string]map[string]struct{}{
 	model.SprintStatusPlanned: {
 		model.SprintStatusActive:    {},
 		model.SprintStatusCompleted: {},
+		model.SprintStatusCancelled: {},
 	},
 	model.SprintStatusActive: {
 		model.SprintStatusCompleted: {},
 		model.SprintStatusPlanned:   {},
+		model.SprintStatusCancelled: {},
 	},
 	model.SprintStatusCompleted: {
 		model.SprintStatusActive: {},
 	},
+	model.SprintStatusCancelled: {},
 }
 
 var bugTransitions = map[string]map[string]struct{}{
