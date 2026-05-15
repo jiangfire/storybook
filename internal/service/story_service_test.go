@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 
 	"git.neolidy.top/neo/storybook/internal/model"
@@ -10,6 +11,41 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+// logCapture is a test helper that intercepts slog records so assertions can
+// verify that warnings/errors were emitted without coupling to the global logger.
+type logCapture struct {
+	records []slog.Record
+	attrs   []slog.Attr
+	groups  []string
+}
+
+func (c *logCapture) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (c *logCapture) Handle(_ context.Context, r slog.Record) error {
+	c.records = append(c.records, r)
+	return nil
+}
+func (c *logCapture) WithAttrs(attrs []slog.Attr) slog.Handler {
+	cp := *c
+	cp.attrs = append(cp.attrs, attrs...)
+	return &cp
+}
+func (c *logCapture) WithGroup(name string) slog.Handler {
+	cp := *c
+	cp.groups = append(cp.groups, name)
+	return &cp
+}
+
+// findRecord returns the first record whose message equals msg and whose level
+// is at least minLevel.
+func (c *logCapture) findRecord(msg string, minLevel slog.Level) (slog.Record, bool) {
+	for _, r := range c.records {
+		if r.Level >= minLevel && r.Message == msg {
+			return r, true
+		}
+	}
+	return slog.Record{}, false
+}
 
 type storyIndexSpy struct {
 	indexed      []uint
@@ -87,14 +123,17 @@ func TestStoryServiceUpdateReindexesOnContentChange(t *testing.T) {
 }
 
 func TestStoryServiceCreateLogsIndexError(t *testing.T) {
-	// TODO: 需要实现日志捕获机制来验证错误被记录
-	// 这是一个占位测试，记录当前期望
 	db := setupStoryServiceTestDB(t)
 	spy := &storyIndexSpy{
 		shouldFail:   true,
 		errorMessage: "embedding service unavailable",
 	}
 	svc := NewStoryServiceWithVector(db, nil, spy)
+
+	capture := &logCapture{}
+	oldLogger := slog.Default()
+	slog.SetDefault(slog.New(capture))
+	defer slog.SetDefault(oldLogger)
 
 	// 故事创建应该成功，即使索引失败
 	story, err := svc.Create(CreateStoryInput{
@@ -112,11 +151,21 @@ func TestStoryServiceCreateLogsIndexError(t *testing.T) {
 	require.NotNil(t, story)
 	// 索引应该失败了
 	require.Empty(t, spy.indexed)
-	// TODO: 验证错误日志被记录
+	// 验证错误日志被记录
+	rec, ok := capture.findRecord("failed to index story", slog.LevelWarn)
+	require.True(t, ok, "expected warning log for index failure")
+	var errVal slog.Value
+	rec.Attrs(func(a slog.Attr) bool {
+		if a.Key == "error" {
+			errVal = a.Value
+			return false
+		}
+		return true
+	})
+	require.Contains(t, errVal.String(), "embedding service unavailable")
 }
 
 func TestStoryServiceUpdateLogsIndexError(t *testing.T) {
-	// 测试更新时索引失败的情况
 	db := setupStoryServiceTestDB(t)
 	spy := &storyIndexSpy{}
 	svc := NewStoryServiceWithVector(db, nil, spy)
@@ -138,12 +187,28 @@ func TestStoryServiceUpdateLogsIndexError(t *testing.T) {
 	spy.shouldFail = true
 	spy.errorMessage = "vector database connection lost"
 
+	capture := &logCapture{}
+	oldLogger := slog.Default()
+	slog.SetDefault(slog.New(capture))
+	defer slog.SetDefault(oldLogger)
+
 	newTitle := "统一登录"
 	// 更新应该成功，即使索引失败
 	changed, err := svc.Update(story, 1, UpdateStoryInput{Title: &newTitle})
 	require.NoError(t, err)
 	require.True(t, changed)
-	// TODO: 验证错误日志被记录
+	// 验证错误日志被记录
+	rec, ok := capture.findRecord("failed to index story", slog.LevelWarn)
+	require.True(t, ok, "expected warning log for index failure")
+	var errVal slog.Value
+	rec.Attrs(func(a slog.Attr) bool {
+		if a.Key == "error" {
+			errVal = a.Value
+			return false
+		}
+		return true
+	})
+	require.Contains(t, errVal.String(), "vector database connection lost")
 }
 
 func setupStoryServiceTestDB(t *testing.T) *gorm.DB {
