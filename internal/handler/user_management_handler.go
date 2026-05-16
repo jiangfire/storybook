@@ -16,18 +16,20 @@ import (
 )
 
 type UserManagementHandler struct {
-	db       *gorm.DB
-	userRepo *repository.UserRepository
-	storyRepo *repository.StoryRepository
-	taskRepo  *repository.TaskRepository
+	db         *gorm.DB
+	userRepo   *repository.UserRepository
+	storyRepo  *repository.StoryRepository
+	taskRepo   *repository.TaskRepository
+	activityRepo *repository.ActivityLogRepository
 }
 
 func NewUserManagementHandler(db *gorm.DB) *UserManagementHandler {
 	return &UserManagementHandler{
-		db:       db,
-		userRepo: repository.NewUserRepository(db),
-		storyRepo: repository.NewStoryRepository(db),
-		taskRepo:  repository.NewTaskRepository(db),
+		db:         db,
+		userRepo:   repository.NewUserRepository(db),
+		storyRepo:  repository.NewStoryRepository(db),
+		taskRepo:   repository.NewTaskRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
 	}
 }
 
@@ -47,7 +49,7 @@ func (h *UserManagementHandler) ListUsers(c *gin.Context) {
 
 	// 支持按角色筛选
 	roleFilter := strings.TrimSpace(c.Query("role"))
-	query := h.db.Model(&model.User{})
+	query := h.userRepo.DB().Model(&model.User{})
 	if roleFilter != "" {
 		query = query.Where("role = ?", roleFilter)
 	}
@@ -193,10 +195,12 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	logging.LogIfErr(createActivityLog(h.db, nil, userID, "user", user.ID, "created", nil, map[string]any{
-		"email":    user.Email,
-		"username": user.Username,
-		"role":     user.Role,
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
+		EntityType: "user",
+		EntityID:   user.ID,
+		Action:     "created",
+		UserID:     userID,
+		NewValue:   model.MarshalJSON(map[string]any{"email": user.Email, "username": user.Username, "role": user.Role}),
 	}), "write user activity log", "user_id", user.ID, "action", "created")
 
 	api.Success(c, "用户创建成功", gin.H{
@@ -334,7 +338,14 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	logging.LogIfErr(createActivityLog(h.db, nil, userID, "user", targetUser.ID, "updated", oldValues, newValues), "write user activity log", "user_id", targetUser.ID, "action", "updated")
+	log := model.ActivityLog{EntityType: "user", EntityID: targetUser.ID, Action: "updated", UserID: userID}
+	if oldValues != nil {
+		log.OldValue = model.MarshalJSON(oldValues)
+	}
+	if newValues != nil {
+		log.NewValue = model.MarshalJSON(newValues)
+	}
+	logging.LogIfErr(h.activityRepo.Create(&log), "write user activity log", "user_id", targetUser.ID, "action", "updated")
 
 	api.Success(c, "用户更新成功", gin.H{
 		"id":         targetUser.ID,
@@ -376,7 +387,7 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 
 	// 获取活跃故事
 	var activeStories []model.UserStory
-	h.db.Where("assigned_to = ? AND status IN ?", targetUserID, []string{
+	h.storyRepo.DB().Where("assigned_to = ? AND status IN ?", targetUserID, []string{
 		model.StoryStatusReady,
 		model.StoryStatusInProgress,
 		model.StoryStatusTest,
@@ -405,7 +416,7 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 
 	// 获取活跃任务
 	var activeTasks []model.Task
-	h.db.Where("assigned_to = ? AND status IN ?", targetUserID, []string{
+	h.storyRepo.DB().Where("assigned_to = ? AND status IN ?", targetUserID, []string{
 		model.TaskStatusTodo,
 		model.TaskStatusInProgress,
 		model.TaskStatusBlocked,
@@ -444,29 +455,29 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 	// 计算30天前的时间
 	thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
 
-	h.db.Model(&model.UserStory{}).
+	h.storyRepo.DB().Model(&model.UserStory{}).
 		Where("assigned_to = ? AND status = ? AND updated_at >= ?", targetUserID, model.StoryStatusDone, thirtyDaysAgo).
 		Count(&stats.StoriesCompleted)
 
-	h.db.Model(&model.UserStory{}).
+	h.storyRepo.DB().Model(&model.UserStory{}).
 		Where("assigned_to = ? AND status = ?", targetUserID, model.StoryStatusInProgress).
 		Count(&stats.StoriesInProgress)
 
-	h.db.Model(&model.Task{}).
+	h.taskRepo.DB().Model(&model.Task{}).
 		Where("assigned_to = ? AND status = ? AND updated_at >= ?", targetUserID, model.TaskStatusDone, thirtyDaysAgo).
 		Count(&stats.TasksCompleted)
 
-	h.db.Model(&model.Task{}).
+	h.taskRepo.DB().Model(&model.Task{}).
 		Where("assigned_to = ? AND status = ?", targetUserID, model.TaskStatusInProgress).
 		Count(&stats.TasksInProgress)
 
 	// 计算平均完成时间
 	var avgCompletionDays float64
 	dateDiffExpr := "JULIANDAY(updated_at) - JULIANDAY(created_at)"
-	if h.db.Dialector.Name() == "postgres" {
+	if h.storyRepo.DB().Dialector.Name() == "postgres" {
 		dateDiffExpr = "EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400.0"
 	}
-	h.db.Raw("SELECT COALESCE(AVG("+dateDiffExpr+"), 0) FROM user_stories WHERE assigned_to = ? AND status = ? AND updated_at >= ?", targetUserID, model.StoryStatusDone, thirtyDaysAgo).Scan(&avgCompletionDays)
+	h.storyRepo.DB().Raw("SELECT COALESCE(AVG("+dateDiffExpr+"), 0) FROM user_stories WHERE assigned_to = ? AND status = ? AND updated_at >= ?", targetUserID, model.StoryStatusDone, thirtyDaysAgo).Scan(&avgCompletionDays)
 
 	api.Success(c, "success", gin.H{
 		"user": gin.H{
@@ -532,10 +543,13 @@ func (h *UserManagementHandler) DeleteUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	logging.LogIfErr(createActivityLog(h.db, nil, userID, "user", targetUserID, "deleted", map[string]any{
-		"email": targetUser.Email,
-		"role":  targetUser.Role,
-	}, nil), "write user activity log", "user_id", targetUserID, "action", "deleted")
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
+		EntityType: "user",
+		EntityID:   targetUserID,
+		Action:     "deleted",
+		UserID:     userID,
+		OldValue:   model.MarshalJSON(map[string]any{"email": targetUser.Email, "role": targetUser.Role}),
+	}), "write user activity log", "user_id", targetUserID, "action", "deleted")
 
 	api.Success(c, "用户删除成功", gin.H{"id": targetUserID})
 }

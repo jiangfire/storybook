@@ -25,6 +25,14 @@ func (r *ProjectRepository) FindByID(projectID uint) (*model.Project, error) {
 	return &project, nil
 }
 
+func (r *ProjectRepository) FindByIDWithOwner(projectID uint) (*model.Project, error) {
+	var project model.Project
+	if err := r.db.Preload("Owner").First(&project, projectID).Error; err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
 func (r *ProjectRepository) ExistsByOwnerAndName(ownerID uint, name string, excludeID ...uint) (bool, error) {
 	var count int64
 	query := r.db.Model(&model.Project{}).
@@ -79,6 +87,14 @@ func (r *ProjectRepository) IsMember(projectID, userID uint) (bool, error) {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func (r *ProjectRepository) GetMember(projectID, userID uint) (*model.ProjectMember, error) {
+	var member model.ProjectMember
+	if err := r.db.Where("project_id = ? AND user_id = ?", projectID, userID).First(&member).Error; err != nil {
+		return nil, err
+	}
+	return &member, nil
 }
 
 func (r *ProjectRepository) ListByUser(userID uint, page, limit int) ([]model.Project, int64, error) {

@@ -16,23 +16,25 @@ import (
 )
 
 type BugHandler struct {
-	db          *gorm.DB
-	bugRepo     *repository.BugRepository
-	storyRepo   *repository.StoryRepository
-	userRepo    *repository.UserRepository
-	projectRepo *repository.ProjectRepository
-	notifier    service.Notifier
-	events      EventPublisher
+	db           *gorm.DB
+	bugRepo      *repository.BugRepository
+	storyRepo    *repository.StoryRepository
+	userRepo     *repository.UserRepository
+	projectRepo  *repository.ProjectRepository
+	activityRepo *repository.ActivityLogRepository
+	notifier     service.Notifier
+	events       EventPublisher
 }
 
 func NewBugHandler(db *gorm.DB) *BugHandler {
 	return &BugHandler{
-		db:          db,
-		bugRepo:     repository.NewBugRepository(db),
-		storyRepo:   repository.NewStoryRepository(db),
-		userRepo:    repository.NewUserRepository(db),
-		projectRepo: repository.NewProjectRepository(db),
-		notifier:    service.NoopNotifier{},
+		db:           db,
+		bugRepo:      repository.NewBugRepository(db),
+		storyRepo:    repository.NewStoryRepository(db),
+		userRepo:     repository.NewUserRepository(db),
+		projectRepo:  repository.NewProjectRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
+		notifier:     service.NoopNotifier{},
 	}
 }
 
@@ -158,14 +160,14 @@ func (h *BugHandler) Create(c *gin.Context) {
 	}
 
 	pid := project.ID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "created",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"title": bug.Title, "severity": bug.Severity, "status": bug.Status}),
-	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "created")
+	}), "write bug activity log", "bug_id", bug.ID, "action", "created")
 
 	if bug.AssignedTo != nil {
 		h.notifier.Notify(c.Request.Context(), *bug.AssignedTo, service.NotificationEvent{
@@ -213,22 +215,14 @@ func (h *BugHandler) List(c *gin.Context) {
 		return
 	}
 
-	query := h.db.Model(&model.BugReport{}).Where("project_id = ?", projectID)
-	status := strings.TrimSpace(c.Query("status"))
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
-	severity := strings.TrimSpace(c.Query("severity"))
-	if severity != "" {
-		query = query.Where("severity = ?", severity)
-	}
-	assignee := strings.TrimSpace(c.Query("assignee"))
-	if assignee != "" {
-		query = query.Where("assigned_to = ?", assignee)
-	}
-
-	var bugs []model.BugReport
-	if err := query.Preload("Reporter").Preload("Assignee").Order("created_at DESC").Find(&bugs).Error; err != nil {
+	bugs, err := h.bugRepo.ListByProjectUnpaged(projectID, repository.BugListOptions{
+		ListOptions: repository.ListOptions{
+			Status: strings.TrimSpace(c.Query("status")),
+		},
+		Severity: strings.TrimSpace(c.Query("severity")),
+		Assignee: strings.TrimSpace(c.Query("assignee")),
+	})
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -366,7 +360,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	pid := bug.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "status_changed",
@@ -374,7 +368,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
 		NewValue:   model.MarshalJSON(gin.H{"status": bug.Status}),
-	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "status_changed")
+	}), "write bug activity log", "bug_id", bug.ID, "action", "status_changed")
 
 	api.Success(c, "缺陷状态更新成功", gin.H{
 		"id":          bug.ID,
@@ -437,7 +431,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 	}
 
 	pid := bug.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "assigned",
@@ -445,7 +439,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"assigned_to": oldAssigned}),
 		NewValue:   model.MarshalJSON(gin.H{"assigned_to": bug.AssignedTo}),
-	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "assigned")
+	}), "write bug activity log", "bug_id", bug.ID, "action", "assigned")
 
 	if bug.AssignedTo != nil && (oldAssigned == nil || *oldAssigned != *bug.AssignedTo) {
 		h.notifier.Notify(c.Request.Context(), *bug.AssignedTo, service.NotificationEvent{
@@ -557,7 +551,7 @@ func (h *BugHandler) Update(c *gin.Context) {
 	}
 
 	pid := updated.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   updated.ID,
 		Action:     "updated",
@@ -565,7 +559,7 @@ func (h *BugHandler) Update(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(oldValue),
 		NewValue:   model.MarshalJSON(newValue),
-	}).Error, "write bug activity log", "bug_id", updated.ID, "action", "updated")
+	}), "write bug activity log", "bug_id", updated.ID, "action", "updated")
 
 	if h.events != nil {
 		h.events.BroadcastProject(updated.ProjectID, "bug.updated", gin.H{
@@ -626,14 +620,14 @@ func (h *BugHandler) Delete(c *gin.Context) {
 	}
 
 	pid := bug.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "deleted",
 		UserID:     userID,
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"title": bug.Title, "status": bug.Status}),
-	}).Error, "write bug activity log", "bug_id", bug.ID, "action", "deleted")
+	}), "write bug activity log", "bug_id", bug.ID, "action", "deleted")
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.deleted", gin.H{

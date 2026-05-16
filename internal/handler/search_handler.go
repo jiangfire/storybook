@@ -169,7 +169,7 @@ func (h *SearchHandler) searchProjects(projectIDs []uint, like string, limit int
 	if len(projectIDs) == 0 {
 		return []gin.H{}
 	}
-	q := h.db.Model(&model.Project{}).
+	q := h.projectRepo.DB().Model(&model.Project{}).
 		Where("projects.id IN ? AND projects.name LIKE ?", projectIDs, like)
 	if f.CreatedFrom != nil {
 		q = q.Where("projects.created_at >= ?", *f.CreatedFrom)
@@ -199,7 +199,7 @@ func (h *SearchHandler) searchStories(projectIDs []uint, like string, limit int,
 	if len(projectIDs) == 0 {
 		return []gin.H{}
 	}
-	q := h.db.Model(&model.UserStory{}).
+	q := h.storyRepo.DB().Model(&model.UserStory{}).
 		Where("project_id IN ? AND archived = false AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like)
 	if f.CreatedFrom != nil {
 		q = q.Where("created_at >= ?", *f.CreatedFrom)
@@ -237,7 +237,7 @@ func (h *SearchHandler) searchBugs(projectIDs []uint, like string, limit int, f 
 	if len(projectIDs) == 0 {
 		return []gin.H{}
 	}
-	q := h.db.Model(&model.BugReport{}).
+	q := h.bugRepo.DB().Model(&model.BugReport{}).
 		Where("project_id IN ? AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like)
 	if f.CreatedFrom != nil {
 		q = q.Where("created_at >= ?", *f.CreatedFrom)
@@ -713,8 +713,8 @@ func (h *SearchHandler) SearchProjectsSemantic(c *gin.Context) {
 	result := make([]gin.H, 0, len(projectMatches))
 	for _, pm := range projectMatches {
 		// 获取项目详情
-		var project model.Project
-		if err := h.db.First(&project, pm.ProjectID).Error; err != nil {
+		project, err := h.projectRepo.FindByID(pm.ProjectID)
+		if err != nil {
 			continue
 		}
 

@@ -113,7 +113,11 @@ func (h *StoryHandler) ClaimStory(c *gin.Context) {
 	}
 
 	var user model.User
-	logging.LogIfErr(h.db.Select("id, email").First(&user, userID).Error, "load story user failed", "user_id", userID)
+	if u, err := h.userRepo.FindByID(userID); err != nil {
+		logging.LogIfErr(err, "load story user failed", "user_id", userID)
+	} else {
+		user = *u
+	}
 
 	api.Success(c, "故事领取成功", gin.H{
 		"id":          story.ID,

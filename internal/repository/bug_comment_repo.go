@@ -30,6 +30,14 @@ func (r *BugCommentRepository) ListByBug(bugID uint) ([]model.BugComment, error)
 	return items, nil
 }
 
+func (r *BugCommentRepository) FindByIDWithAuthor(id uint) (*model.BugComment, error) {
+	var comment model.BugComment
+	if err := r.db.Preload("Author").First(&comment, id).Error; err != nil {
+		return nil, err
+	}
+	return &comment, nil
+}
+
 func (r *BugCommentRepository) CountByBug(bugID uint) (int64, error) {
 	var count int64
 	if err := r.db.Model(&model.BugComment{}).Where("bug_id = ?", bugID).Count(&count).Error; err != nil {

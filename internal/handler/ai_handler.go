@@ -19,16 +19,18 @@ import (
 )
 
 type AIHandler struct {
-	db        *gorm.DB
-	userRepo  *repository.UserRepository
-	storyRepo *repository.StoryRepository
+	db           *gorm.DB
+	userRepo     *repository.UserRepository
+	storyRepo    *repository.StoryRepository
+	aiConfigRepo *repository.AIConfigRepository
 }
 
 func NewAIHandler(db *gorm.DB) *AIHandler {
 	return &AIHandler{
-		db:        db,
-		userRepo:  repository.NewUserRepository(db),
-		storyRepo: repository.NewStoryRepository(db),
+		db:           db,
+		userRepo:     repository.NewUserRepository(db),
+		storyRepo:    repository.NewStoryRepository(db),
+		aiConfigRepo: repository.NewAIConfigRepository(db),
 	}
 }
 
@@ -206,7 +208,7 @@ func (h *AIHandler) UpsertConfig(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Save(config).Error; err != nil {
+	if err := h.aiConfigRepo.Save(config); err != nil {
 		api.Internal(c, "保存AI配置失败")
 		return
 	}
@@ -403,15 +405,14 @@ func (h *AIHandler) INVESTCheck(c *gin.Context) {
 }
 
 func (h *AIHandler) loadLatestConfig() (model.AIConfig, error) {
-	var cfg model.AIConfig
-	err := h.db.Order("id DESC").Limit(1).Find(&cfg).Error
+	cfg, err := h.aiConfigRepo.FindLatestEnabled()
 	if err != nil {
-		return cfg, err
+		return model.AIConfig{}, err
 	}
-	if cfg.ID == 0 {
-		return cfg, gorm.ErrRecordNotFound
+	if cfg == nil {
+		return model.AIConfig{}, gorm.ErrRecordNotFound
 	}
-	return cfg, nil
+	return *cfg, nil
 }
 
 func (h *AIHandler) serializeConfig(cfg model.AIConfig) gin.H {

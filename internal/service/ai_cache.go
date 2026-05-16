@@ -4,9 +4,12 @@ import (
 	"sync"
 	"time"
 
+	"git.neolidy.top/neo/storybook/internal/metrics"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"gorm.io/gorm"
 )
+
+const aiServiceCacheLabel = "ai_service"
 
 // AIService construction is hot-path: NewAIService is called per request. The
 // previous implementation queried the DB and ran AES-256-GCM key decryption on
@@ -40,12 +43,11 @@ func InvalidateAIServiceCache() {
 func cachedAIServiceFor(configID uint, updatedAt time.Time) AIService {
 	aiCacheMu.RLock()
 	defer aiCacheMu.RUnlock()
-	if aiCache == nil {
-		return nil
-	}
-	if aiCache.configID == configID && aiCache.updatedAt.Equal(updatedAt) {
+	if aiCache != nil && aiCache.configID == configID && aiCache.updatedAt.Equal(updatedAt) {
+		metrics.CacheHits.WithLabelValues(aiServiceCacheLabel).Inc()
 		return aiCache.svc
 	}
+	metrics.CacheMisses.WithLabelValues(aiServiceCacheLabel).Inc()
 	return nil
 }
 

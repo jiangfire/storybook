@@ -16,17 +16,21 @@ import (
 )
 
 type SprintHandler struct {
-	db         *gorm.DB
-	sprintRepo *repository.SprintRepository
-	notifier   service.Notifier
-	events     EventPublisher
+	db          *gorm.DB
+	sprintRepo  *repository.SprintRepository
+	storyRepo   *repository.StoryRepository
+	activityRepo *repository.ActivityLogRepository
+	notifier    service.Notifier
+	events      EventPublisher
 }
 
 func NewSprintHandler(db *gorm.DB) *SprintHandler {
 	return &SprintHandler{
-		db:         db,
-		sprintRepo: repository.NewSprintRepository(db),
-		notifier:   service.NoopNotifier{},
+		db:           db,
+		sprintRepo:   repository.NewSprintRepository(db),
+		storyRepo:    repository.NewStoryRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
+		notifier:     service.NoopNotifier{},
 	}
 }
 
@@ -128,14 +132,14 @@ func (h *SprintHandler) Create(c *gin.Context) {
 	}
 
 	pid := projectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "sprint",
 		EntityID:   sprint.ID,
 		Action:     "created",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"name": sprint.Name, "status": sprint.Status}),
-	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "created")
+	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "created")
 
 	api.Success(c, "冲刺创建成功", sprint)
 }
@@ -174,10 +178,8 @@ func (h *SprintHandler) List(c *gin.Context) {
 
 	items := make([]gin.H, 0, len(sprints))
 	for _, s := range sprints {
-		var totalStories int64
-		logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("sprint_id = ?", s.ID).Count(&totalStories).Error, "count sprint stories failed", "sprint_id", s.ID)
-		var doneStories int64
-		logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("sprint_id = ? AND status = ?", s.ID, model.StoryStatusDone).Count(&doneStories).Error, "count done stories in sprint failed", "sprint_id", s.ID)
+		totalStories, _ := h.storyRepo.CountBySprint(s.ID)
+		doneStories, _ := h.storyRepo.CountBySprintAndStatus(s.ID, model.StoryStatusDone)
 
 		items = append(items, gin.H{
 			"id":            s.ID,
@@ -253,7 +255,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	pid := sprint.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "sprint",
 		EntityID:   sprint.ID,
 		Action:     "status_changed",
@@ -261,7 +263,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
 		NewValue:   model.MarshalJSON(gin.H{"status": sprint.Status}),
-	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "status_changed")
+	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "status_changed")
 
 	if sprint.Status == model.SprintStatusActive || sprint.Status == model.SprintStatusCompleted {
 		notifType := model.NotificationSprintStarted
@@ -352,13 +354,13 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 		story.SprintID = nil
 	}
 
-	if err := h.db.Save(story).Error; err != nil {
+	if err := h.storyRepo.Save(story); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	pid := project.ID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "story",
 		EntityID:   story.ID,
 		Action:     "sprint_assigned",
@@ -366,7 +368,7 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"sprint_id": oldSprintID}),
 		NewValue:   model.MarshalJSON(gin.H{"sprint_id": story.SprintID}),
-	}).Error, "write story sprint-assignment log", "story_id", story.ID, "sprint_id", story.SprintID)
+	}), "write story sprint-assignment log", "story_id", story.ID, "sprint_id", story.SprintID)
 
 	api.Success(c, "故事冲刺规划成功", gin.H{
 		"story_id":   story.ID,
@@ -433,27 +435,20 @@ func (h *SprintHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&model.UserStory{}).
-			Where("sprint_id = ?", sprint.ID).
-			Update("sprint_id", nil).Error; err != nil {
-			return err
-		}
-		return tx.Delete(sprint).Error
-	}); err != nil {
+	if err := h.sprintRepo.DeleteWithClearStories(sprint.ID); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	pid := sprint.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "sprint",
 		EntityID:   sprint.ID,
 		Action:     "deleted",
 		UserID:     userID,
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"name": sprint.Name, "status": sprint.Status}),
-	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "deleted")
+	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "deleted")
 
 	if h.events != nil {
 		h.events.BroadcastProject(sprint.ProjectID, "sprint.deleted", gin.H{
@@ -513,7 +508,6 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 		notifTitle string
 		successMsg string
 		wsEvent    string
-		storyWhere []any
 	)
 	switch action {
 	case "close":
@@ -526,7 +520,6 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 		notifTitle = "冲刺已完成"
 		successMsg = "冲刺已完成"
 		wsEvent = "sprint.closed"
-		storyWhere = []any{"sprint_id = ? AND status <> ?", sprint.ID, model.StoryStatusDone}
 	case "cancel":
 		if sprint.Status != model.SprintStatusPlanned && sprint.Status != model.SprintStatusActive {
 			api.BadRequest(c, "仅计划或活跃中的冲刺可取消")
@@ -537,28 +530,20 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 		notifTitle = "冲刺已取消"
 		successMsg = "冲刺已取消"
 		wsEvent = "sprint.cancelled"
-		storyWhere = []any{"sprint_id = ?", sprint.ID}
 	default:
 		api.BadRequest(c, "未知冲刺操作")
 		return
 	}
 
 	oldStatus := sprint.Status
-	if err := h.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(sprint).Update("status", newStatus).Error; err != nil {
-			return err
-		}
-		return tx.Model(&model.UserStory{}).
-			Where(storyWhere[0], storyWhere[1:]...).
-			Update("sprint_id", nil).Error
-	}); err != nil {
+	if err := h.sprintRepo.CloseOrCancel(sprint.ID, newStatus, action == "close"); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	sprint.Status = newStatus
 	pid := sprint.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "sprint",
 		EntityID:   sprint.ID,
 		Action:     "status_changed",
@@ -566,7 +551,7 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
 		NewValue:   model.MarshalJSON(gin.H{"status": newStatus}),
-	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", action)
+	}), "write sprint activity log", "sprint_id", sprint.ID, "action", action)
 
 	h.notifier.NotifyProjectMembers(c.Request.Context(), sprint.ProjectID, service.NotificationEvent{
 		Type:       notifType,
@@ -667,10 +652,8 @@ func (h *SprintHandler) Reorder(c *gin.Context) {
 	}
 
 	// Verify every story is actually attached to this sprint before applying.
-	var count int64
-	if err := h.db.Model(&model.UserStory{}).
-		Where("id IN ? AND sprint_id = ?", ids, sprint.ID).
-		Count(&count).Error; err != nil {
+	count, err := h.storyRepo.CountBySprintAndIDs(sprint.ID, ids)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -679,29 +662,20 @@ func (h *SprintHandler) Reorder(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Transaction(func(tx *gorm.DB) error {
-		for _, o := range req.Orders {
-			if err := tx.Model(&model.UserStory{}).
-				Where("id = ? AND sprint_id = ?", o.StoryID, sprint.ID).
-				Update("position", o.Position).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	}); err != nil {
+	if err := h.storyRepo.UpdatePositionsBatch(sprint.ID, positions); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	pid := sprint.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "sprint",
 		EntityID:   sprint.ID,
 		Action:     "reordered",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"order_count": len(req.Orders)}),
-	}).Error, "write sprint activity log", "sprint_id", sprint.ID, "action", "reordered")
+	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "reordered")
 
 	if h.events != nil {
 		h.events.BroadcastProject(sprint.ProjectID, "sprint.reordered", gin.H{

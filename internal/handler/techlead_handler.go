@@ -20,14 +20,18 @@ type TechLeadHandler struct {
 	storyRepo   *repository.StoryRepository
 	projectRepo *repository.ProjectRepository
 	userRepo    *repository.UserRepository
+	taskRepo    *repository.TaskRepository
+	activityRepo *repository.ActivityLogRepository
 }
 
 func NewTechLeadHandler(db *gorm.DB) *TechLeadHandler {
 	return &TechLeadHandler{
-		db:          db,
-		storyRepo:   repository.NewStoryRepository(db),
-		projectRepo: repository.NewProjectRepository(db),
-		userRepo:    repository.NewUserRepository(db),
+		db:           db,
+		storyRepo:    repository.NewStoryRepository(db),
+		projectRepo:  repository.NewProjectRepository(db),
+		userRepo:     repository.NewUserRepository(db),
+		taskRepo:     repository.NewTaskRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
 	}
 }
 
@@ -45,7 +49,7 @@ func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
 		return
 	}
 
-	query := h.db.Model(&model.UserStory{}).Where("status = ?", model.StoryStatusPending)
+	query := h.storyRepo.DB().Model(&model.UserStory{}).Where("status = ?", model.StoryStatusPending)
 	if role == model.RoleTechLead {
 		projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
 		if err != nil {
@@ -187,14 +191,14 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 	var developerIDs []uint
 	if projectID > 0 {
 		// 获取特定项目的开发人员
-		h.db.Model(&model.ProjectMember{}).
+		h.projectRepo.DB().Model(&model.ProjectMember{}).
 			Where("project_id = ? AND role_in_project = ?", projectID, model.RoleDeveloper).
 			Pluck("user_id", &developerIDs)
 	} else {
 		if role == model.RoleAdmin {
-			h.db.Model(&model.User{}).Where("role = ?", model.RoleDeveloper).Pluck("id", &developerIDs)
+			h.userRepo.DB().Model(&model.User{}).Where("role = ?", model.RoleDeveloper).Pluck("id", &developerIDs)
 		} else {
-			h.db.Model(&model.ProjectMember{}).
+			h.projectRepo.DB().Model(&model.ProjectMember{}).
 				Where("project_id IN ? AND role_in_project = ?", visibleProjectIDs, model.RoleDeveloper).
 				Distinct().
 				Pluck("user_id", &developerIDs)
@@ -210,13 +214,13 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 	workloads := make([]gin.H, 0, len(developerIDs))
 	for _, devID := range developerIDs {
 		var user model.User
-		if err := h.db.First(&user, devID).Error; err != nil {
+		if _, err := h.userRepo.FindByID(devID); err != nil {
 			continue
 		}
 
 		// 统计活跃故事数
 		var activeStories int64
-		storyQuery := h.db.Model(&model.UserStory{}).
+		storyQuery := h.storyRepo.DB().Model(&model.UserStory{}).
 			Where("assigned_to = ? AND status IN ?", devID, []string{
 				model.StoryStatusInProgress,
 				model.StoryStatusReady,
@@ -230,7 +234,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 
 		// 统计活跃任务数
 		var activeTasks int64
-		taskQuery := h.db.Model(&model.Task{}).
+		taskQuery := h.taskRepo.DB().Model(&model.Task{}).
 			Where("assigned_to = ? AND status IN ?", devID, []string{
 				model.TaskStatusTodo,
 				model.TaskStatusInProgress,
@@ -244,7 +248,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 
 		// 统计故事点
 		var totalPoints float64
-		pointsQuery := h.db.Model(&model.UserStory{}).
+		pointsQuery := h.storyRepo.DB().Model(&model.UserStory{}).
 			Where("assigned_to = ? AND points IS NOT NULL AND status != ?", devID, model.StoryStatusDone)
 		if projectID > 0 {
 			pointsQuery = pointsQuery.Where("project_id = ?", projectID)
@@ -255,7 +259,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 
 		// 统计预估工时
 		var estimatedHours float64
-		taskHoursQuery := h.db.Model(&model.Task{}).
+		taskHoursQuery := h.taskRepo.DB().Model(&model.Task{}).
 			Where("assigned_to = ? AND status != ?", devID, model.TaskStatusDone)
 		if projectID > 0 {
 			taskHoursQuery = taskHoursQuery.Where("project_id = ?", projectID)
@@ -266,9 +270,9 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 
 		// 计算完成率（最近30天）
 		var completedStories, totalAssigned int64
-		completedQuery := h.db.Model(&model.UserStory{}).
+		completedQuery := h.storyRepo.DB().Model(&model.UserStory{}).
 			Where("assigned_to = ? AND status = ?", devID, model.StoryStatusDone)
-		totalAssignedQuery := h.db.Model(&model.UserStory{}).Where("assigned_to = ?", devID)
+		totalAssignedQuery := h.storyRepo.DB().Model(&model.UserStory{}).Where("assigned_to = ?", devID)
 		if projectID > 0 {
 			completedQuery = completedQuery.Where("project_id = ?", projectID)
 			totalAssignedQuery = totalAssignedQuery.Where("project_id = ?", projectID)
@@ -323,7 +327,7 @@ func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
 	}
 
 	var projects []model.Project
-	query := h.db.Model(&model.Project{})
+	query := h.projectRepo.DB().Model(&model.Project{})
 	if role != model.RoleAdmin {
 		if len(projectIDs) == 0 {
 			api.Success(c, "success", gin.H{"projects": []gin.H{}})
@@ -340,7 +344,7 @@ func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
 	for _, p := range projects {
 		// 统计待审批故事数
 		var pendingCount int64
-		h.db.Model(&model.UserStory{}).Where("project_id = ? AND status = ?", p.ID, model.StoryStatusPending).Count(&pendingCount)
+		h.storyRepo.DB().Model(&model.UserStory{}).Where("project_id = ? AND status = ?", p.ID, model.StoryStatusPending).Count(&pendingCount)
 
 		items = append(items, gin.H{
 			"id":              p.ID,
@@ -418,8 +422,13 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	}
 
 	// 记录活动日志
-	logging.LogIfErr(createActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_added", nil, map[string]any{
-		"user_id": req.UserID,
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
+		EntityType: "project",
+		EntityID:   projectID,
+		Action:     "techlead_added",
+		UserID:     userID,
+		ProjectID:  &projectID,
+		NewValue:   model.MarshalJSON(map[string]any{"user_id": req.UserID}),
 	}), "write project activity log", "project_id", projectID, "action", "techlead_added")
 
 	api.Success(c, "技术负责人添加成功", gin.H{
@@ -465,9 +474,14 @@ func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 	}
 
 	// 记录活动日志
-	logging.LogIfErr(createActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_removed", map[string]any{
-		"user_id": targetUserID,
-	}, nil), "write project activity log", "project_id", projectID, "action", "techlead_removed")
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
+		EntityType: "project",
+		EntityID:   projectID,
+		Action:     "techlead_removed",
+		UserID:     userID,
+		ProjectID:  &projectID,
+		OldValue:   model.MarshalJSON(map[string]any{"user_id": targetUserID}),
+	}), "write project activity log", "project_id", projectID, "action", "techlead_removed")
 
 	api.Success(c, "技术负责人移除成功", gin.H{
 		"project_id": projectID,

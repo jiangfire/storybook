@@ -16,12 +16,15 @@ import (
 )
 
 type StoryHandler struct {
-	db        *gorm.DB
-	events    EventPublisher
-	storySvc  *service.StoryService
-	userRepo  *repository.UserRepository
-	storyRepo *repository.StoryRepository
-	notifier  service.Notifier
+	db             *gorm.DB
+	events         EventPublisher
+	storySvc       *service.StoryService
+	userRepo       *repository.UserRepository
+	storyRepo      *repository.StoryRepository
+	projectRepo    *repository.ProjectRepository
+	activityRepo   *repository.ActivityLogRepository
+	boardColumnRepo *repository.BoardColumnRepository
+	notifier       service.Notifier
 }
 
 type EventPublisher interface {
@@ -35,12 +38,15 @@ func NewStoryHandler(db *gorm.DB, events EventPublisher) *StoryHandler {
 
 func NewStoryHandlerWithVector(db *gorm.DB, events EventPublisher, vectorSvc service.VectorService) *StoryHandler {
 	return &StoryHandler{
-		db:        db,
-		events:    events,
-		storySvc:  service.NewStoryServiceWithVector(db, events, vectorSvc),
-		userRepo:  repository.NewUserRepository(db),
-		storyRepo: repository.NewStoryRepository(db),
-		notifier:  service.NoopNotifier{},
+		db:              db,
+		events:          events,
+		storySvc:        service.NewStoryServiceWithVector(db, events, vectorSvc),
+		userRepo:        repository.NewUserRepository(db),
+		storyRepo:       repository.NewStoryRepository(db),
+		projectRepo:     repository.NewProjectRepository(db),
+		activityRepo:    repository.NewActivityLogRepository(db),
+		boardColumnRepo: repository.NewBoardColumnRepository(db),
+		notifier:        service.NoopNotifier{},
 	}
 }
 
@@ -214,7 +220,7 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 		return
 	}
 
-	query := h.db.Model(&model.UserStory{}).Where("project_id = ?", projectID)
+	query := h.storyRepo.DB().Model(&model.UserStory{}).Where("project_id = ?", projectID)
 	includeArchived := strings.EqualFold(strings.TrimSpace(c.DefaultQuery("include_archived", "false")), "true")
 	if !includeArchived {
 		query = query.Where("archived = ?", false)
@@ -340,8 +346,8 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 		return
 	}
 
-	var columns []model.BoardColumn
-	if err := h.db.Where("project_id = ?", projectID).Order("position ASC").Find(&columns).Error; err != nil {
+	columns, err := h.boardColumnRepo.ListByProject(projectID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -355,8 +361,8 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 		model.StoryStatusDone:       {},
 	}
 
-	var stories []model.UserStory
-	if err := h.db.Where("project_id = ? AND archived = ?", projectID, false).Preload("Assignee").Order("position ASC, priority DESC").Find(&stories).Error; err != nil {
+	stories, err := h.storyRepo.ListBoardByProjectWithAssignee(projectID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

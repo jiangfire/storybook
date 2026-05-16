@@ -16,10 +16,12 @@ import (
 )
 
 type ReportHandler struct {
-	db        *gorm.DB
-	storyRepo *repository.StoryRepository
+	db         *gorm.DB
+	storyRepo  *repository.StoryRepository
 	sprintRepo *repository.SprintRepository
 	taskRepo   *repository.TaskRepository
+	bugRepo    *repository.BugRepository
+	activityRepo *repository.ActivityLogRepository
 }
 
 type burndownDoneRange struct {
@@ -29,10 +31,12 @@ type burndownDoneRange struct {
 
 func NewReportHandler(db *gorm.DB) *ReportHandler {
 	return &ReportHandler{
-		db:         db,
-		storyRepo:  repository.NewStoryRepository(db),
-		sprintRepo: repository.NewSprintRepository(db),
-		taskRepo:   repository.NewTaskRepository(db),
+		db:           db,
+		storyRepo:    repository.NewStoryRepository(db),
+		sprintRepo:   repository.NewSprintRepository(db),
+		taskRepo:     repository.NewTaskRepository(db),
+		bugRepo:      repository.NewBugRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
 	}
 }
 
@@ -139,19 +143,19 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 	statusBreakdown := map[string]int64{}
 	for _, st := range []string{model.BugStatusOpen, model.BugStatusInProgress, model.BugStatusResolved, model.BugStatusClosed} {
 		var n int64
-		logging.LogIfErr(h.db.Model(&model.BugReport{}).Where("project_id = ? AND status = ?", projectID, st).Count(&n).Error, "count bugs by status failed", "project_id", projectID, "status", st)
+		logging.LogIfErr(h.bugRepo.DB().Model(&model.BugReport{}).Where("project_id = ? AND status = ?", projectID, st).Count(&n).Error, "count bugs by status failed", "project_id", projectID, "status", st)
 		statusBreakdown[st] = n
 	}
 
 	severityBreakdown := map[string]int64{}
 	for _, sv := range []string{model.BugSeverityLow, model.BugSeverityMedium, model.BugSeverityHigh, model.BugSeverityCritical} {
 		var n int64
-		logging.LogIfErr(h.db.Model(&model.BugReport{}).Where("project_id = ? AND severity = ?", projectID, sv).Count(&n).Error, "count bugs by severity failed", "project_id", projectID, "severity", sv)
+		logging.LogIfErr(h.bugRepo.DB().Model(&model.BugReport{}).Where("project_id = ? AND severity = ?", projectID, sv).Count(&n).Error, "count bugs by severity failed", "project_id", projectID, "severity", sv)
 		severityBreakdown[sv] = n
 	}
 
 	var stories []model.UserStory
-	logging.LogIfErr(h.db.Where("project_id = ?", projectID).Find(&stories).Error, "load project stories failed", "project_id", projectID)
+	logging.LogIfErr(h.storyRepo.DB().Where("project_id = ?", projectID).Find(&stories).Error, "load project stories failed", "project_id", projectID)
 	acTotal := 0
 	acPassed := 0
 	acFailed := 0
@@ -177,7 +181,7 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 	}
 
 	var totalBugs int64
-	logging.LogIfErr(h.db.Model(&model.BugReport{}).Where("project_id = ?", projectID).Count(&totalBugs).Error, "count project bugs failed", "project_id", projectID)
+	logging.LogIfErr(h.bugRepo.DB().Model(&model.BugReport{}).Where("project_id = ?", projectID).Count(&totalBugs).Error, "count project bugs failed", "project_id", projectID)
 
 	api.Success(c, "success", gin.H{
 		"project_id": projectID,
@@ -273,7 +277,7 @@ func (h *ReportHandler) Burndown(c *gin.Context) {
 	logsByStory := map[uint][]model.ActivityLog{}
 	if len(storyIDs) > 0 {
 		var logs []model.ActivityLog
-		if err := h.db.
+		if err := h.activityRepo.DB().
 			Where("entity_type = ? AND action = ? AND entity_id IN ? AND created_at <= ?", "story", "status_changed", storyIDs, todayEnd).
 			Order("entity_id ASC, created_at DESC").
 			Find(&logs).Error; err != nil {
@@ -498,7 +502,7 @@ func (h *ReportHandler) CumulativeFlow(c *gin.Context) {
 	from, to := parseReportWindow(c, 30)
 
 	var stories []model.UserStory
-	if err := h.db.Where("project_id = ? AND created_at <= ?", projectID, to).Find(&stories).Error; err != nil {
+	if err := h.storyRepo.DB().Where("project_id = ? AND created_at <= ?", projectID, to).Find(&stories).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -510,7 +514,7 @@ func (h *ReportHandler) CumulativeFlow(c *gin.Context) {
 	logsByStory := map[uint][]model.ActivityLog{}
 	if len(storyIDs) > 0 {
 		var logs []model.ActivityLog
-		if err := h.db.
+		if err := h.activityRepo.DB().
 			Where("entity_type = ? AND action = ? AND entity_id IN ? AND created_at <= ?", "story", "status_changed", storyIDs, to).
 			Order("entity_id ASC, created_at ASC").
 			Find(&logs).Error; err != nil {
@@ -619,7 +623,7 @@ func (h *ReportHandler) respondTimeMetric(c *gin.Context, label string, extract 
 	from, to := parseReportWindow(c, 90)
 
 	var stories []model.UserStory
-	if err := h.db.Where("project_id = ? AND status = ?", projectID, model.StoryStatusDone).Find(&stories).Error; err != nil {
+	if err := h.storyRepo.DB().Where("project_id = ? AND status = ?", projectID, model.StoryStatusDone).Find(&stories).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -631,7 +635,7 @@ func (h *ReportHandler) respondTimeMetric(c *gin.Context, label string, extract 
 	logsByStory := map[uint][]model.ActivityLog{}
 	if len(storyIDs) > 0 {
 		var logs []model.ActivityLog
-		if err := h.db.
+		if err := h.activityRepo.DB().
 			Where("entity_type = ? AND action = ? AND entity_id IN ?", "story", "status_changed", storyIDs).
 			Order("entity_id ASC, created_at ASC").
 			Find(&logs).Error; err != nil {
@@ -725,7 +729,7 @@ func (h *ReportHandler) Throughput(c *gin.Context) {
 	from, to := parseReportWindow(c, defaultDays)
 
 	var stories []model.UserStory
-	if err := h.db.Where("project_id = ? AND status = ?", projectID, model.StoryStatusDone).Find(&stories).Error; err != nil {
+	if err := h.storyRepo.DB().Where("project_id = ? AND status = ?", projectID, model.StoryStatusDone).Find(&stories).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -737,7 +741,7 @@ func (h *ReportHandler) Throughput(c *gin.Context) {
 	logsByStory := map[uint][]model.ActivityLog{}
 	if len(storyIDs) > 0 {
 		var logs []model.ActivityLog
-		if err := h.db.
+		if err := h.activityRepo.DB().
 			Where("entity_type = ? AND action = ? AND entity_id IN ?", "story", "status_changed", storyIDs).
 			Order("entity_id ASC, created_at ASC").
 			Find(&logs).Error; err != nil {

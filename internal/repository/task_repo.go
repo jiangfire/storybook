@@ -33,6 +33,24 @@ func (r *TaskRepository) ListByStory(storyID uint) ([]model.Task, error) {
 	return tasks, nil
 }
 
+// ListByStoryFiltered returns tasks for a story with optional status / assignee
+// filters and the same ordering used by the task list endpoint.
+// status / assignee empty string means no filter applied.
+func (r *TaskRepository) ListByStoryFiltered(storyID uint, status, assignee string) ([]model.Task, error) {
+	tx := r.db.Model(&model.Task{}).Where("story_id = ?", storyID)
+	if status != "" {
+		tx = tx.Where("status = ?", status)
+	}
+	if assignee != "" {
+		tx = tx.Where("assigned_to = ?", assignee)
+	}
+	var tasks []model.Task
+	if err := tx.Preload("Assignee").Order("priority DESC, id ASC").Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
 func (r *TaskRepository) ListByProject(projectID uint, opts ListOptions) ([]model.Task, int64, error) {
 	var total int64
 	tx := r.db.Model(&model.Task{}).Where("project_id = ?", projectID)

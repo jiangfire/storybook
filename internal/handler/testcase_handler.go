@@ -15,14 +15,16 @@ import (
 )
 
 type TestCaseHandler struct {
-	db     *gorm.DB
-	tcRepo *repository.TestCaseRepository
+	db         *gorm.DB
+	tcRepo     *repository.TestCaseRepository
+	activityRepo *repository.ActivityLogRepository
 }
 
 func NewTestCaseHandler(db *gorm.DB) *TestCaseHandler {
 	return &TestCaseHandler{
-		db:     db,
-		tcRepo: repository.NewTestCaseRepository(db),
+		db:         db,
+		tcRepo:     repository.NewTestCaseRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
 	}
 }
 
@@ -116,7 +118,7 @@ func (h *TestCaseHandler) Create(c *gin.Context) {
 		ProjectID:  &story.ProjectID,
 		NewValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "title": tc.Title}),
 	}
-	logging.LogIfErr(h.db.Create(&log).Error, "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_created")
+	logging.LogIfErr(h.activityRepo.Create(&log), "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_created")
 
 	api.Success(c, "测试用例创建成功", gin.H{
 		"id":              tc.ID,
@@ -251,7 +253,7 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 		OldValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "status": oldStatus}),
 		NewValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "status": tc.Status}),
 	}
-	logging.LogIfErr(h.db.Create(&log).Error, "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_status_changed")
+	logging.LogIfErr(h.activityRepo.Create(&log), "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_status_changed")
 
 	api.Success(c, "测试用例状态更新成功", gin.H{
 		"id":         tc.ID,
@@ -377,7 +379,7 @@ func (h *TestCaseHandler) Update(c *gin.Context) {
 		return
 	}
 
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "story",
 		EntityID:   story.ID,
 		Action:     "test_case_updated",
@@ -385,7 +387,7 @@ func (h *TestCaseHandler) Update(c *gin.Context) {
 		ProjectID:  &story.ProjectID,
 		OldValue:   model.MarshalJSON(oldValue),
 		NewValue:   model.MarshalJSON(newValue),
-	}).Error, "write testcase activity log", "test_case_id", updated.ID, "action", "test_case_updated")
+	}), "write testcase activity log", "test_case_id", updated.ID, "action", "test_case_updated")
 
 	var steps []string
 	_ = jsonUnmarshalSteps(updated.Steps, &steps)
@@ -451,14 +453,14 @@ func (h *TestCaseHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "story",
 		EntityID:   story.ID,
 		Action:     "test_case_deleted",
 		UserID:     userID,
 		ProjectID:  &story.ProjectID,
 		OldValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "title": tc.Title, "status": tc.Status}),
-	}).Error, "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_deleted")
+	}), "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_deleted")
 
 	api.Success(c, "测试用例删除成功", gin.H{"id": tc.ID})
 }

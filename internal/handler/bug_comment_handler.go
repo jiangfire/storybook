@@ -14,17 +14,19 @@ import (
 )
 
 type BugCommentHandler struct {
-	db          *gorm.DB
-	commentRepo *repository.BugCommentRepository
-	bugRepo     *repository.BugRepository
-	events      EventPublisher
+	db           *gorm.DB
+	commentRepo  *repository.BugCommentRepository
+	bugRepo      *repository.BugRepository
+	activityRepo *repository.ActivityLogRepository
+	events       EventPublisher
 }
 
 func NewBugCommentHandler(db *gorm.DB) *BugCommentHandler {
 	return &BugCommentHandler{
-		db:          db,
-		commentRepo: repository.NewBugCommentRepository(db),
-		bugRepo:     repository.NewBugRepository(db),
+		db:           db,
+		commentRepo:  repository.NewBugCommentRepository(db),
+		bugRepo:      repository.NewBugRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
 	}
 }
 
@@ -103,21 +105,19 @@ func (h *BugCommentHandler) Create(c *gin.Context) {
 	}
 
 	// Reload to attach Author for response rendering.
-	if fresh, err := h.commentRepo.FindByID(comment.ID); err == nil {
-		if err := h.db.Preload("Author").First(fresh, fresh.ID).Error; err == nil {
-			comment = *fresh
-		}
+	if fresh, err := h.commentRepo.FindByIDWithAuthor(comment.ID); err == nil {
+		comment = *fresh
 	}
 
 	pid := bug.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "comment_added",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"comment_id": comment.ID, "preview": truncateForLog(body, 120)}),
-	}).Error, "write bug comment activity log", "bug_id", bug.ID)
+	}), "write bug comment activity log", "bug_id", bug.ID)
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.comment.created", gin.H{
@@ -230,21 +230,20 @@ func (h *BugCommentHandler) Update(c *gin.Context) {
 		return
 	}
 
-	reloaded, err := h.commentRepo.FindByID(comment.ID)
+	reloaded, err := h.commentRepo.FindByIDWithAuthor(comment.ID)
 	if err == nil {
-		_ = h.db.Preload("Author").First(reloaded, reloaded.ID).Error
 		comment = reloaded
 	}
 
 	pid := bug.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "comment_updated",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"comment_id": comment.ID, "preview": truncateForLog(body, 120)}),
-	}).Error, "write bug comment activity log", "bug_id", bug.ID)
+	}), "write bug comment activity log", "bug_id", bug.ID)
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.comment.updated", gin.H{
@@ -305,14 +304,14 @@ func (h *BugCommentHandler) Delete(c *gin.Context) {
 	}
 
 	pid := bug.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "bug",
 		EntityID:   bug.ID,
 		Action:     "comment_deleted",
 		UserID:     userID,
 		ProjectID:  &pid,
 		OldValue:   model.MarshalJSON(gin.H{"comment_id": comment.ID}),
-	}).Error, "write bug comment activity log", "bug_id", bug.ID)
+	}), "write bug comment activity log", "bug_id", bug.ID)
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.comment.deleted", gin.H{

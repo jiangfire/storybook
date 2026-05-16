@@ -7,6 +7,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -16,6 +17,7 @@ type TaskHandler struct {
 	db       *gorm.DB
 	events   EventPublisher
 	taskSvc  *service.TaskService
+	taskRepo *repository.TaskRepository
 	notifier service.Notifier
 }
 
@@ -24,6 +26,7 @@ func NewTaskHandler(db *gorm.DB, events EventPublisher) *TaskHandler {
 		db:       db,
 		events:   events,
 		taskSvc:  service.NewTaskService(db, events),
+		taskRepo: repository.NewTaskRepository(db),
 		notifier: service.NoopNotifier{},
 	}
 }
@@ -180,16 +183,8 @@ func (h *TaskHandler) ListByStory(c *gin.Context) {
 		return
 	}
 
-	query := h.db.Model(&model.Task{}).Where("story_id = ?", story.ID)
-	if status := strings.TrimSpace(c.Query("status")); status != "" {
-		query = query.Where("status = ?", status)
-	}
-	if assignee := strings.TrimSpace(c.Query("assignee")); assignee != "" {
-		query = query.Where("assigned_to = ?", assignee)
-	}
-
-	var tasks []model.Task
-	if err := query.Preload("Assignee").Order("priority DESC, id ASC").Find(&tasks).Error; err != nil {
+	tasks, err := h.taskRepo.ListByStoryFiltered(story.ID, strings.TrimSpace(c.Query("status")), strings.TrimSpace(c.Query("assignee")))
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

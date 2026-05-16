@@ -318,8 +318,8 @@ func buildVectorService(db *gorm.DB, logger *slog.Logger) service.VectorService 
 }
 
 // aiUserRateLimitPerMin reads AI_USER_RATE_LIMIT_PER_MIN with a 10 req/min/user
-// default. Kept inline (rather than threading through config) to preserve the
-// existing router.New / NewWithLogger signature used by tests.
+// default. router is the single consumer of this env var (Config does not hold
+// it), keeping router.New / NewWithLogger signature unchanged for tests.
 func aiUserRateLimitPerMin() int {
 	v := strings.TrimSpace(os.Getenv("AI_USER_RATE_LIMIT_PER_MIN"))
 	if v == "" {

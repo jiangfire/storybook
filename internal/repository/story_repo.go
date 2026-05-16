@@ -73,12 +73,36 @@ func (r *StoryRepository) ListBoardByProject(projectID uint) ([]model.UserStory,
 	return stories, nil
 }
 
+func (r *StoryRepository) ListBoardByProjectWithAssignee(projectID uint) ([]model.UserStory, error) {
+	var stories []model.UserStory
+	if err := r.db.Where("project_id = ? AND archived = ?", projectID, false).Preload("Assignee").Order("position ASC, priority DESC").Find(&stories).Error; err != nil {
+		return nil, err
+	}
+	return stories, nil
+}
+
 func (r *StoryRepository) ListByIDs(storyIDs []uint) ([]model.UserStory, error) {
 	var stories []model.UserStory
 	if err := r.db.Where("id IN ?", storyIDs).Find(&stories).Error; err != nil {
 		return nil, err
 	}
 	return stories, nil
+}
+
+func (r *StoryRepository) CountBySprint(sprintID uint) (int64, error) {
+	var count int64
+	if err := r.db.Model(&model.UserStory{}).Where("sprint_id = ? AND archived = ?", sprintID, false).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *StoryRepository) CountBySprintAndStatus(sprintID uint, status string) (int64, error) {
+	var count int64
+	if err := r.db.Model(&model.UserStory{}).Where("sprint_id = ? AND status = ? AND archived = ?", sprintID, status, false).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (r *StoryRepository) CountByProjectAndStatus(projectID uint, status string) (int64, error) {
@@ -137,6 +161,31 @@ func (r *StoryRepository) CountByAssigneeAndStatus(userID uint, status string) (
 		return 0, err
 	}
 	return count, nil
+}
+
+// CountBySprintAndIDs counts how many of the given story IDs are attached to the sprint.
+func (r *StoryRepository) CountBySprintAndIDs(sprintID uint, storyIDs []uint) (int64, error) {
+	var count int64
+	if err := r.db.Model(&model.UserStory{}).
+		Where("id IN ? AND sprint_id = ?", storyIDs, sprintID).
+		Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// UpdatePositionsBatch updates positions for multiple stories within a sprint in a transaction.
+func (r *StoryRepository) UpdatePositionsBatch(sprintID uint, positions map[uint]float64) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for storyID, position := range positions {
+			if err := tx.Model(&model.UserStory{}).
+				Where("id = ? AND sprint_id = ?", storyID, sprintID).
+				Update("position", position).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *StoryRepository) ListPendingReview(projectIDs []uint, search string) ([]model.UserStory, error) {

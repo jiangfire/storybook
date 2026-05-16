@@ -18,18 +18,28 @@ import (
 )
 
 type ProjectHandler struct {
-	db          *gorm.DB
-	projectRepo *repository.ProjectRepository
-	userRepo    *repository.UserRepository
-	storyRepo   *repository.StoryRepository
+	db           *gorm.DB
+	projectRepo  *repository.ProjectRepository
+	userRepo     *repository.UserRepository
+	storyRepo    *repository.StoryRepository
+	activityRepo *repository.ActivityLogRepository
+	sprintRepo   *repository.SprintRepository
+	bugRepo      *repository.BugRepository
+	taskRepo     *repository.TaskRepository
+	testcaseRepo *repository.TestCaseRepository
 }
 
 func NewProjectHandler(db *gorm.DB) *ProjectHandler {
 	return &ProjectHandler{
-		db:          db,
-		projectRepo: repository.NewProjectRepository(db),
-		userRepo:    repository.NewUserRepository(db),
-		storyRepo:   repository.NewStoryRepository(db),
+		db:           db,
+		projectRepo:  repository.NewProjectRepository(db),
+		userRepo:     repository.NewUserRepository(db),
+		storyRepo:    repository.NewStoryRepository(db),
+		activityRepo: repository.NewActivityLogRepository(db),
+		sprintRepo:   repository.NewSprintRepository(db),
+		bugRepo:      repository.NewBugRepository(db),
+		taskRepo:     repository.NewTaskRepository(db),
+		testcaseRepo: repository.NewTestCaseRepository(db),
 	}
 }
 
@@ -161,7 +171,7 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 
 	search := strings.TrimSpace(c.Query("search"))
 
-	query := h.db.Model(&model.Project{})
+	query := h.projectRepo.DB().Model(&model.Project{})
 	if role != model.RoleAdmin {
 		projectIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
 		if err != nil {
@@ -215,11 +225,10 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 
 	items := make([]projectItem, 0, len(projects))
 	for _, p := range projects {
-		var memberCount int64
-		logging.LogIfErr(h.db.Model(&model.ProjectMember{}).Where("project_id = ?", p.ID).Count(&memberCount).Error, "count project members failed", "project_id", p.ID)
+		memberCount, _ := h.projectRepo.CountMembers(p.ID)
 
 		var storyCount int64
-		logging.LogIfErr(h.db.Model(&model.UserStory{}).Where("project_id = ?", p.ID).Count(&storyCount).Error, "count project stories failed", "project_id", p.ID)
+		logging.LogIfErr(h.storyRepo.DB().Model(&model.UserStory{}).Where("project_id = ?", p.ID).Count(&storyCount).Error, "count project stories failed", "project_id", p.ID)
 
 		owner, err := h.userRepo.FindByID(p.OwnerID)
 		if err != nil {
@@ -474,11 +483,10 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 		completionRate = (float64(doneCount) / float64(totalStories)) * 100
 	}
 
-	var activeMembers int64
-	logging.LogIfErr(h.db.Model(&model.ProjectMember{}).Where("project_id = ?", project.ID).Count(&activeMembers).Error, "count active members failed", "project_id", project.ID)
+	activeMembers, _ := h.projectRepo.CountMembers(project.ID)
 
 	var avgPoints float64
-	logging.LogIfErr(h.db.Model(&model.UserStory{}).
+	logging.LogIfErr(h.storyRepo.DB().Model(&model.UserStory{}).
 		Where("project_id = ? AND points IS NOT NULL", project.ID).
 		Select("COALESCE(AVG(points), 0)").
 		Scan(&avgPoints).Error, "compute avg story points failed", "project_id", project.ID)
@@ -702,12 +710,12 @@ func (h *ProjectHandler) ListMemberCandidates(c *gin.Context) {
 		return
 	}
 
-	subQuery := h.db.Model(&model.ProjectMember{}).
+	subQuery := h.projectRepo.DB().Model(&model.ProjectMember{}).
 		Select("user_id").
 		Where("project_id = ?", project.ID)
 
 	var users []model.User
-	if err := h.db.
+	if err := h.userRepo.DB().
 		Select("id, email, role, avatar_url, created_at").
 		Where("id <> ?", project.OwnerID).
 		Where("id NOT IN (?)", subQuery).
@@ -843,14 +851,14 @@ func (h *ProjectHandler) ArchiveProject(c *gin.Context) {
 	}
 
 	pid := project.ID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "project",
 		EntityID:   project.ID,
 		Action:     "archived",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"archived": true, "archived_at": now}),
-	}).Error, "write project activity log", "project_id", project.ID, "action", "archived")
+	}), "write project activity log", "project_id", project.ID, "action", "archived")
 
 	api.Success(c, "项目归档成功", gin.H{
 		"id":          project.ID,
@@ -905,14 +913,14 @@ func (h *ProjectHandler) UnarchiveProject(c *gin.Context) {
 	}
 
 	pid := project.ID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "project",
 		EntityID:   project.ID,
 		Action:     "unarchived",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"archived": false}),
-	}).Error, "write project activity log", "project_id", project.ID, "action", "unarchived")
+	}), "write project activity log", "project_id", project.ID, "action", "unarchived")
 
 	api.Success(c, "项目还原成功", gin.H{
 		"id":       project.ID,
@@ -963,7 +971,7 @@ func (h *ProjectHandler) ExportProject(c *gin.Context) {
 
 	// Stories (include archived so the snapshot is complete).
 	var stories []model.UserStory
-	if err := h.db.Where("project_id = ?", project.ID).Find(&stories).Error; err != nil {
+	if err := h.storyRepo.DB().Where("project_id = ?", project.ID).Find(&stories).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -974,30 +982,28 @@ func (h *ProjectHandler) ExportProject(c *gin.Context) {
 
 	// Sprints.
 	var sprints []model.Sprint
-	if err := h.db.Where("project_id = ?", project.ID).Find(&sprints).Error; err != nil {
+	if err := h.sprintRepo.DB().Where("project_id = ?", project.ID).Find(&sprints).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	// Bugs.
 	var bugs []model.BugReport
-	if err := h.db.Where("project_id = ?", project.ID).Find(&bugs).Error; err != nil {
+	if err := h.bugRepo.DB().Where("project_id = ?", project.ID).Find(&bugs).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
 	// Test cases (scoped via story IDs since TestCase has no project_id).
-	var testCases []model.TestCase
-	if len(storyIDs) > 0 {
-		if err := h.db.Where("story_id IN ?", storyIDs).Find(&testCases).Error; err != nil {
-			api.Internal(c, "服务器内部错误")
-			return
-		}
+	testCases, err := h.testcaseRepo.ListByStoryIDs(storyIDs)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
 	}
 
 	// Tasks.
 	var tasks []model.Task
-	if err := h.db.Where("project_id = ?", project.ID).Find(&tasks).Error; err != nil {
+	if err := h.taskRepo.DB().Where("project_id = ?", project.ID).Find(&tasks).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
@@ -1016,14 +1022,14 @@ func (h *ProjectHandler) ExportProject(c *gin.Context) {
 	}
 
 	pid := project.ID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "project",
 		EntityID:   project.ID,
 		Action:     "exported",
 		UserID:     userID,
 		ProjectID:  &pid,
 		NewValue:   model.MarshalJSON(gin.H{"stories": len(stories), "sprints": len(sprints), "bugs": len(bugs)}),
-	}).Error, "write project activity log", "project_id", project.ID, "action", "exported")
+	}), "write project activity log", "project_id", project.ID, "action", "exported")
 
 	api.Success(c, "项目导出成功", gin.H{
 		"format_version": "1.0",
@@ -1054,22 +1060,24 @@ func (h *ProjectHandler) getProjectWithAccess(projectID, userID uint) (*model.Pr
 		}
 		return nil, false, err
 	}
-	if err := h.db.Preload("Owner").First(project, project.ID).Error; err != nil {
+	projectWithOwner, err := h.projectRepo.FindByIDWithOwner(project.ID)
+	if err != nil {
 		return nil, false, err
 	}
+	*project = *projectWithOwner
 	return project, isOwner, nil
 }
 
 func (h *ProjectHandler) storyStats(projectID uint) (map[string]int64, int64, error) {
 	var totalStories int64
-	if err := h.db.Model(&model.UserStory{}).Where("project_id = ?", projectID).Count(&totalStories).Error; err != nil {
+	if err := h.storyRepo.DB().Model(&model.UserStory{}).Where("project_id = ?", projectID).Count(&totalStories).Error; err != nil {
 		return nil, 0, err
 	}
 
 	statusBreakdown := make(map[string]int64, len(projectStoryStatuses))
 	for _, status := range projectStoryStatuses {
 		var count int64
-		if err := h.db.Model(&model.UserStory{}).
+		if err := h.storyRepo.DB().Model(&model.UserStory{}).
 			Where("project_id = ? AND status = ?", projectID, status).
 			Count(&count).Error; err != nil {
 			return nil, 0, err
@@ -1081,12 +1089,8 @@ func (h *ProjectHandler) storyStats(projectID uint) (map[string]int64, int64, er
 }
 
 func (h *ProjectHandler) recentActivities(projectID uint, limit int) []gin.H {
-	var logs []model.ActivityLog
-	if err := h.db.Where("project_id = ?", projectID).
-		Preload("User").
-		Order("created_at DESC").
-		Limit(limit).
-		Find(&logs).Error; err != nil {
+	logs, err := h.activityRepo.ListRecentByProject(projectID, limit)
+	if err != nil {
 		return []gin.H{}
 	}
 
@@ -1123,7 +1127,7 @@ func (h *ProjectHandler) lastUpdatedAt(projectID uint, fallback time.Time) time.
 
 func (h *ProjectHandler) queryProjectMaxTime(target any, column string, projectID uint) (time.Time, bool) {
 	var raw any
-	row := h.db.Model(target).
+	row := h.projectRepo.DB().Model(target).
 		Select(fmt.Sprintf("MAX(%s) AS t", column)).
 		Where("project_id = ?", projectID).
 		Row()

@@ -54,8 +54,8 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 	oldAssigned := story.AssignedTo
 
 	if req.AssignedTo != nil {
-		var member model.ProjectMember
-		if err := h.db.Where("project_id = ? AND user_id = ?", story.ProjectID, *req.AssignedTo).First(&member).Error; err != nil {
+		member, err := h.projectRepo.GetMember(story.ProjectID, *req.AssignedTo)
+		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				api.BadRequest(c, "被分配人不是项目成员")
 				return
@@ -78,7 +78,7 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 	}
 
 	pid := story.ProjectID
-	logging.LogIfErr(h.db.Create(&model.ActivityLog{
+	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
 		EntityType: "story",
 		EntityID:   story.ID,
 		Action:     "assigned",
@@ -90,7 +90,7 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 		NewValue: model.MarshalJSON(gin.H{
 			"assigned_to": story.AssignedTo,
 		}),
-	}).Error, "write story activity log", "story_id", story.ID, "action", "assigned")
+	}), "write story activity log", "story_id", story.ID, "action", "assigned")
 
 	if story.AssignedTo != nil && (oldAssigned == nil || *oldAssigned != *story.AssignedTo) {
 		h.notifier.Notify(c.Request.Context(), *story.AssignedTo, service.NotificationEvent{

@@ -140,27 +140,9 @@ func (h *StoryHandler) GetActivities(c *gin.Context) {
 		limit = 20
 	}
 
-	query := h.db.Model(&model.ActivityLog{}).
-		Where("entity_type = ? AND entity_id = ?", "story", story.ID)
-
 	action := strings.TrimSpace(c.Query("action"))
-	if action != "" {
-		query = query.Where("action = ?", action)
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	var logs []model.ActivityLog
-	if err := query.
-		Preload("User").
-		Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&logs).Error; err != nil {
+	logs, total, err := h.activityRepo.ListByEntityFiltered("story", story.ID, action, page, limit)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

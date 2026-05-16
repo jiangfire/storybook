@@ -24,8 +24,8 @@ type Config struct {
 	DBConnMaxLifetimeMinutes int  // 连接最大生存时间（分钟）
 	DBAutoMigrate            bool // 是否在启动时执行 AutoMigrate（生产建议关闭，使用独立迁移工具）
 
-	// 限流
-	AIUserRateLimitPerMin int // AI 端点每用户每分钟请求上限
+	// 限流相关 env(AI_USER_RATE_LIMIT_PER_MIN 等)由 router 直接读取,详见 router/router.go
+	// aiUserRateLimitPerMin。此处不再在 Config 中重复持有以保持单一来源。
 
 	// Metrics
 	MetricsUser string // /metrics Basic Auth 用户名（为空则不注册 /metrics）
@@ -67,11 +67,6 @@ func load(requireJWT bool) (*Config, error) {
 		return nil, err
 	}
 
-	aiRate, err := getEnvInt("AI_USER_RATE_LIMIT_PER_MIN", 10)
-	if err != nil {
-		return nil, err
-	}
-
 	cfg := &Config{
 		ServerAddr:               getEnv("SERVER_ADDR", ":8080"),
 		DBDriver:                 getEnv("DB_DRIVER", "sqlite"),
@@ -85,7 +80,6 @@ func load(requireJWT bool) (*Config, error) {
 		DBMaxIdleConns:           maxIdle,
 		DBConnMaxLifetimeMinutes: connLifetime,
 		DBAutoMigrate:            autoMigrate,
-		AIUserRateLimitPerMin:    aiRate,
 		MetricsUser:              strings.TrimSpace(os.Getenv("METRICS_USER")),
 		MetricsPass:              strings.TrimSpace(os.Getenv("METRICS_PASS")),
 	}
