@@ -34,15 +34,7 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -137,15 +129,7 @@ func (h *StoryHandler) ReviewStory(c *gin.Context) {
 
 	story, err := h.getStoryWithAccess(storyID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 

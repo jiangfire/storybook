@@ -53,15 +53,7 @@ func (h *ReportHandler) Velocity(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -128,15 +120,7 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -211,15 +195,7 @@ func (h *ReportHandler) Burndown(c *gin.Context) {
 		return
 	}
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -487,15 +463,7 @@ func (h *ReportHandler) CumulativeFlow(c *gin.Context) {
 		return
 	}
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -608,15 +576,7 @@ func (h *ReportHandler) respondTimeMetric(c *gin.Context, label string, extract 
 		return
 	}
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -706,15 +666,7 @@ func (h *ReportHandler) Throughput(c *gin.Context) {
 		return
 	}
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 

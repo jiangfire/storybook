@@ -73,15 +73,7 @@ func (h *BugCommentHandler) Create(c *gin.Context) {
 	}
 	bug, err := h.loadBugForUser(bugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 
@@ -138,15 +130,7 @@ func (h *BugCommentHandler) List(c *gin.Context) {
 	}
 	bug, err := h.loadBugForUser(bugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 
@@ -187,15 +171,7 @@ func (h *BugCommentHandler) Update(c *gin.Context) {
 
 	bug, err := h.loadBugForUser(comment.BugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 
@@ -269,15 +245,7 @@ func (h *BugCommentHandler) Delete(c *gin.Context) {
 
 	bug, err := h.loadBugForUser(comment.BugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 

@@ -276,15 +276,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 
 	project, isOwner, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -459,15 +451,7 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -560,15 +544,7 @@ func (h *ProjectHandler) ListMembers(c *gin.Context) {
 
 	project, isOwner, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -619,15 +595,7 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -693,15 +661,7 @@ func (h *ProjectHandler) ListMemberCandidates(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -762,15 +722,7 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 
 	project, _, err := h.getProjectWithAccess(projectID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 

@@ -104,15 +104,7 @@ func (h *BugHandler) Create(c *gin.Context) {
 
 	project, _, err := ensureProjectAccess(h.db, projectID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -197,15 +189,7 @@ func (h *BugHandler) List(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -262,15 +246,7 @@ func (h *BugHandler) Get(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 
@@ -317,15 +293,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 
@@ -386,15 +354,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 
@@ -463,15 +423,7 @@ func (h *BugHandler) Update(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 
@@ -569,15 +521,7 @@ func (h *BugHandler) Delete(c *gin.Context) {
 
 	bug, err := h.loadBugWithAccess(bugID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "缺陷不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "缺陷不存在")
 		return
 	}
 

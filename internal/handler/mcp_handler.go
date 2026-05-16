@@ -282,15 +282,7 @@ func (h *MCPHandler) requireStoryAccess(c *gin.Context, storyID uint) bool {
 	}
 
 	if _, _, _, err := ensureStoryAccess(h.db, storyID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return false
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return false
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "用户故事不存在")
 		return false
 	}
 
@@ -305,15 +297,7 @@ func (h *MCPHandler) requireProjectAccess(c *gin.Context, projectID uint) bool {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return false
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return false
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return false
 	}
 

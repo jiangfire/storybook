@@ -85,15 +85,7 @@ func (h *SprintHandler) Create(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -152,15 +144,7 @@ func (h *SprintHandler) List(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -223,11 +207,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -303,15 +283,7 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 
 	story, project, _, err := ensureStoryAccess(h.db, storyID, userID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -402,11 +374,7 @@ func (h *SprintHandler) Delete(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -468,11 +436,7 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
@@ -594,11 +558,7 @@ func (h *SprintHandler) Reorder(c *gin.Context) {
 	}
 
 	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
+		respondAccessError(c, err, "项目不存在")
 		return
 	}
 
