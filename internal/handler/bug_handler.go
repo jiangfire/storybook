@@ -563,25 +563,9 @@ func (h *BugHandler) loadBugWithAccess(bugID, userID uint) (*model.BugReport, er
 	return bug, nil
 }
 
-func (h *BugHandler) isProjectMember(projectID, userID uint) bool {
-	project, err := h.projectRepo.FindByID(projectID)
-	if err != nil {
-		return false
-	}
-	if project.OwnerID == userID {
-		return true
-	}
-
-	isMember, err := h.projectRepo.IsMember(projectID, userID)
-	if err != nil {
-		return false
-	}
-	return isMember
-}
-
 func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
-	if !h.isProjectMember(projectID, userID) {
-		return errForbidden
+	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
+		return err
 	}
 
 	user, err := h.userRepo.FindByID(userID)
