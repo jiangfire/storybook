@@ -131,15 +131,9 @@ func (h *SprintHandler) Create(c *gin.Context) {
 		return
 	}
 
-	pid := projectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "sprint",
-		EntityID:   sprint.ID,
-		Action:     "created",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"name": sprint.Name, "status": sprint.Status}),
-	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "created")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &projectID, userID, "sprint", sprint.ID, "created",
+		nil, map[string]any{"name": sprint.Name, "status": sprint.Status}),
+		"write sprint activity log", "sprint_id", sprint.ID, "action", "created")
 
 	api.Success(c, "冲刺创建成功", sprint)
 }
@@ -254,16 +248,9 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	pid := sprint.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "sprint",
-		EntityID:   sprint.ID,
-		Action:     "status_changed",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
-		NewValue:   model.MarshalJSON(gin.H{"status": sprint.Status}),
-	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "status_changed")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &sprint.ProjectID, userID, "sprint", sprint.ID, "status_changed",
+		map[string]any{"status": oldStatus}, map[string]any{"status": sprint.Status}),
+		"write sprint activity log", "sprint_id", sprint.ID, "action", "status_changed")
 
 	if sprint.Status == model.SprintStatusActive || sprint.Status == model.SprintStatusCompleted {
 		notifType := model.NotificationSprintStarted
@@ -276,7 +263,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 			Type:       notifType,
 			EntityType: model.NotificationEntitySprint,
 			EntityID:   sprint.ID,
-			ProjectID:  &pid,
+			ProjectID:  &sprint.ProjectID,
 			ActorID:    &userID,
 			Title:      title,
 			Body:       sprint.Name,
@@ -359,16 +346,9 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 		return
 	}
 
-	pid := project.ID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "story",
-		EntityID:   story.ID,
-		Action:     "sprint_assigned",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"sprint_id": oldSprintID}),
-		NewValue:   model.MarshalJSON(gin.H{"sprint_id": story.SprintID}),
-	}), "write story sprint-assignment log", "story_id", story.ID, "sprint_id", story.SprintID)
+	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "story", story.ID, "sprint_assigned",
+		map[string]any{"sprint_id": oldSprintID}, map[string]any{"sprint_id": story.SprintID}),
+		"write story sprint-assignment log", "story_id", story.ID, "sprint_id", story.SprintID)
 
 	api.Success(c, "故事冲刺规划成功", gin.H{
 		"story_id":   story.ID,
@@ -440,15 +420,9 @@ func (h *SprintHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	pid := sprint.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "sprint",
-		EntityID:   sprint.ID,
-		Action:     "deleted",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"name": sprint.Name, "status": sprint.Status}),
-	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "deleted")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &sprint.ProjectID, userID, "sprint", sprint.ID, "deleted",
+		map[string]any{"name": sprint.Name, "status": sprint.Status}, nil),
+		"write sprint activity log", "sprint_id", sprint.ID, "action", "deleted")
 
 	if h.events != nil {
 		h.events.BroadcastProject(sprint.ProjectID, "sprint.deleted", gin.H{
@@ -542,22 +516,15 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 	}
 
 	sprint.Status = newStatus
-	pid := sprint.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "sprint",
-		EntityID:   sprint.ID,
-		Action:     "status_changed",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
-		NewValue:   model.MarshalJSON(gin.H{"status": newStatus}),
-	}), "write sprint activity log", "sprint_id", sprint.ID, "action", action)
+	logging.LogIfErr(service.WriteActivityLog(h.db, &sprint.ProjectID, userID, "sprint", sprint.ID, "status_changed",
+		map[string]any{"status": oldStatus}, map[string]any{"status": newStatus}),
+		"write sprint activity log", "sprint_id", sprint.ID, "action", action)
 
 	h.notifier.NotifyProjectMembers(c.Request.Context(), sprint.ProjectID, service.NotificationEvent{
 		Type:       notifType,
 		EntityType: model.NotificationEntitySprint,
 		EntityID:   sprint.ID,
-		ProjectID:  &pid,
+		ProjectID:  &sprint.ProjectID,
 		ActorID:    &userID,
 		Title:      notifTitle,
 		Body:       sprint.Name,
@@ -667,15 +634,9 @@ func (h *SprintHandler) Reorder(c *gin.Context) {
 		return
 	}
 
-	pid := sprint.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "sprint",
-		EntityID:   sprint.ID,
-		Action:     "reordered",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"order_count": len(req.Orders)}),
-	}), "write sprint activity log", "sprint_id", sprint.ID, "action", "reordered")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &sprint.ProjectID, userID, "sprint", sprint.ID, "reordered",
+		nil, map[string]any{"order_count": len(req.Orders)}),
+		"write sprint activity log", "sprint_id", sprint.ID, "action", "reordered")
 
 	if h.events != nil {
 		h.events.BroadcastProject(sprint.ProjectID, "sprint.reordered", gin.H{

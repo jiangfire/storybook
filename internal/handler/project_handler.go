@@ -850,15 +850,9 @@ func (h *ProjectHandler) ArchiveProject(c *gin.Context) {
 		return
 	}
 
-	pid := project.ID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "project",
-		EntityID:   project.ID,
-		Action:     "archived",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"archived": true, "archived_at": now}),
-	}), "write project activity log", "project_id", project.ID, "action", "archived")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "project", project.ID, "archived",
+		nil, map[string]any{"archived": true, "archived_at": now}),
+		"write project activity log", "project_id", project.ID, "action", "archived")
 
 	api.Success(c, "项目归档成功", gin.H{
 		"id":          project.ID,
@@ -912,15 +906,9 @@ func (h *ProjectHandler) UnarchiveProject(c *gin.Context) {
 		return
 	}
 
-	pid := project.ID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "project",
-		EntityID:   project.ID,
-		Action:     "unarchived",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"archived": false}),
-	}), "write project activity log", "project_id", project.ID, "action", "unarchived")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "project", project.ID, "unarchived",
+		nil, map[string]any{"archived": false}),
+		"write project activity log", "project_id", project.ID, "action", "unarchived")
 
 	api.Success(c, "项目还原成功", gin.H{
 		"id":       project.ID,
@@ -1021,15 +1009,9 @@ func (h *ProjectHandler) ExportProject(c *gin.Context) {
 		memberPayload = append(memberPayload, entry)
 	}
 
-	pid := project.ID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "project",
-		EntityID:   project.ID,
-		Action:     "exported",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"stories": len(stories), "sprints": len(sprints), "bugs": len(bugs)}),
-	}), "write project activity log", "project_id", project.ID, "action", "exported")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "project", project.ID, "exported",
+		nil, map[string]any{"stories": len(stories), "sprints": len(sprints), "bugs": len(bugs)}),
+		"write project activity log", "project_id", project.ID, "action", "exported")
 
 	api.Success(c, "项目导出成功", gin.H{
 		"format_version": "1.0",

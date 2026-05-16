@@ -9,6 +9,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -109,15 +110,9 @@ func (h *BugCommentHandler) Create(c *gin.Context) {
 		comment = *fresh
 	}
 
-	pid := bug.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   bug.ID,
-		Action:     "comment_added",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"comment_id": comment.ID, "preview": truncateForLog(body, 120)}),
-	}), "write bug comment activity log", "bug_id", bug.ID)
+	logging.LogIfErr(service.WriteActivityLog(h.db, &bug.ProjectID, userID, "bug", bug.ID, "comment_added",
+		map[string]any{"comment_id": comment.ID, "preview": truncateForLog(body, 120)}, nil),
+		"write bug comment activity log", "bug_id", bug.ID)
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.comment.created", gin.H{
@@ -235,15 +230,9 @@ func (h *BugCommentHandler) Update(c *gin.Context) {
 		comment = reloaded
 	}
 
-	pid := bug.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   bug.ID,
-		Action:     "comment_updated",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"comment_id": comment.ID, "preview": truncateForLog(body, 120)}),
-	}), "write bug comment activity log", "bug_id", bug.ID)
+	logging.LogIfErr(service.WriteActivityLog(h.db, &bug.ProjectID, userID, "bug", bug.ID, "comment_updated",
+		map[string]any{"comment_id": comment.ID, "preview": truncateForLog(body, 120)}, nil),
+		"write bug comment activity log", "bug_id", bug.ID)
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.comment.updated", gin.H{
@@ -303,15 +292,9 @@ func (h *BugCommentHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	pid := bug.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   bug.ID,
-		Action:     "comment_deleted",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"comment_id": comment.ID}),
-	}), "write bug comment activity log", "bug_id", bug.ID)
+	logging.LogIfErr(service.WriteActivityLog(h.db, &bug.ProjectID, userID, "bug", bug.ID, "comment_deleted",
+		map[string]any{"comment_id": comment.ID}, nil),
+		"write bug comment activity log", "bug_id", bug.ID)
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.comment.deleted", gin.H{

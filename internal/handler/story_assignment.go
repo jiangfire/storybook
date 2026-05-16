@@ -77,27 +77,17 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 		return
 	}
 
-	pid := story.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "story",
-		EntityID:   story.ID,
-		Action:     "assigned",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue: model.MarshalJSON(gin.H{
-			"assigned_to": oldAssigned,
-		}),
-		NewValue: model.MarshalJSON(gin.H{
-			"assigned_to": story.AssignedTo,
-		}),
-	}), "write story activity log", "story_id", story.ID, "action", "assigned")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &story.ProjectID, userID, "story", story.ID, "assigned",
+		map[string]any{"assigned_to": oldAssigned},
+		map[string]any{"assigned_to": story.AssignedTo}),
+		"write story activity log", "story_id", story.ID, "action", "assigned")
 
 	if story.AssignedTo != nil && (oldAssigned == nil || *oldAssigned != *story.AssignedTo) {
 		h.notifier.Notify(c.Request.Context(), *story.AssignedTo, service.NotificationEvent{
 			Type:       model.NotificationStoryAssigned,
 			EntityType: model.NotificationEntityStory,
 			EntityID:   story.ID,
-			ProjectID:  &pid,
+			ProjectID:  &story.ProjectID,
 			ActorID:    &userID,
 			Title:      "新故事指派给你",
 			Body:       story.Title,

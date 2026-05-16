@@ -422,14 +422,9 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	}
 
 	// 记录活动日志
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "project",
-		EntityID:   projectID,
-		Action:     "techlead_added",
-		UserID:     userID,
-		ProjectID:  &projectID,
-		NewValue:   model.MarshalJSON(map[string]any{"user_id": req.UserID}),
-	}), "write project activity log", "project_id", projectID, "action", "techlead_added")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_added",
+		nil, map[string]any{"user_id": req.UserID}),
+		"write project activity log", "project_id", projectID, "action", "techlead_added")
 
 	api.Success(c, "技术负责人添加成功", gin.H{
 		"project_id": projectID,
@@ -474,14 +469,9 @@ func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 	}
 
 	// 记录活动日志
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "project",
-		EntityID:   projectID,
-		Action:     "techlead_removed",
-		UserID:     userID,
-		ProjectID:  &projectID,
-		OldValue:   model.MarshalJSON(map[string]any{"user_id": targetUserID}),
-	}), "write project activity log", "project_id", projectID, "action", "techlead_removed")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &projectID, userID, "project", projectID, "techlead_removed",
+		map[string]any{"user_id": targetUserID}, nil),
+		"write project activity log", "project_id", projectID, "action", "techlead_removed")
 
 	api.Success(c, "技术负责人移除成功", gin.H{
 		"project_id": projectID,

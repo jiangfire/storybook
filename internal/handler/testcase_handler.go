@@ -10,6 +10,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -110,15 +111,9 @@ func (h *TestCaseHandler) Create(c *gin.Context) {
 		return
 	}
 
-	log := model.ActivityLog{
-		EntityType: "story",
-		EntityID:   story.ID,
-		Action:     "test_case_created",
-		UserID:     userID,
-		ProjectID:  &story.ProjectID,
-		NewValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "title": tc.Title}),
-	}
-	logging.LogIfErr(h.activityRepo.Create(&log), "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_created")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &story.ProjectID, userID, "story", story.ID, "test_case_created",
+		nil, map[string]any{"test_case_id": tc.ID, "title": tc.Title}),
+		"write testcase activity log", "test_case_id", tc.ID, "action", "test_case_created")
 
 	api.Success(c, "测试用例创建成功", gin.H{
 		"id":              tc.ID,
@@ -244,16 +239,10 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	log := model.ActivityLog{
-		EntityType: "story",
-		EntityID:   story.ID,
-		Action:     "test_case_status_changed",
-		UserID:     userID,
-		ProjectID:  &story.ProjectID,
-		OldValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "status": oldStatus}),
-		NewValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "status": tc.Status}),
-	}
-	logging.LogIfErr(h.activityRepo.Create(&log), "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_status_changed")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &story.ProjectID, userID, "story", story.ID, "test_case_status_changed",
+		map[string]any{"test_case_id": tc.ID, "status": oldStatus},
+		map[string]any{"test_case_id": tc.ID, "status": tc.Status}),
+		"write testcase activity log", "test_case_id", tc.ID, "action", "test_case_status_changed")
 
 	api.Success(c, "测试用例状态更新成功", gin.H{
 		"id":         tc.ID,
@@ -379,15 +368,9 @@ func (h *TestCaseHandler) Update(c *gin.Context) {
 		return
 	}
 
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "story",
-		EntityID:   story.ID,
-		Action:     "test_case_updated",
-		UserID:     userID,
-		ProjectID:  &story.ProjectID,
-		OldValue:   model.MarshalJSON(oldValue),
-		NewValue:   model.MarshalJSON(newValue),
-	}), "write testcase activity log", "test_case_id", updated.ID, "action", "test_case_updated")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &story.ProjectID, userID, "story", story.ID, "test_case_updated",
+		oldValue, newValue),
+		"write testcase activity log", "test_case_id", updated.ID, "action", "test_case_updated")
 
 	var steps []string
 	_ = jsonUnmarshalSteps(updated.Steps, &steps)
@@ -453,14 +436,9 @@ func (h *TestCaseHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "story",
-		EntityID:   story.ID,
-		Action:     "test_case_deleted",
-		UserID:     userID,
-		ProjectID:  &story.ProjectID,
-		OldValue:   model.MarshalJSON(gin.H{"test_case_id": tc.ID, "title": tc.Title, "status": tc.Status}),
-	}), "write testcase activity log", "test_case_id", tc.ID, "action", "test_case_deleted")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &story.ProjectID, userID, "story", story.ID, "test_case_deleted",
+		map[string]any{"test_case_id": tc.ID, "title": tc.Title, "status": tc.Status}, nil),
+		"write testcase activity log", "test_case_id", tc.ID, "action", "test_case_deleted")
 
 	api.Success(c, "测试用例删除成功", gin.H{"id": tc.ID})
 }

@@ -99,7 +99,7 @@ func (s *TaskService) Create(input CreateTaskInput) (*model.Task, error) {
 		return nil, err
 	}
 
-	logging.LogIfErr(createActivityLog(s.db, task.ProjectID, input.CreatedBy, "task", task.ID, "created", nil, map[string]any{
+	logging.LogIfErr(WriteActivityLog(s.db, &task.ProjectID, input.CreatedBy, "task", task.ID, "created", nil, map[string]any{
 		"title":    task.Title,
 		"status":   task.Status,
 		"priority": task.Priority,
@@ -169,7 +169,7 @@ func (s *TaskService) Update(task *model.Task, projectID, userID uint, input Upd
 		return false, err
 	}
 
-	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "updated", oldValue, newValue), "write task activity log", "task_id", task.ID, "action", "updated")
+	logging.LogIfErr(WriteActivityLog(s.db, &projectID, userID, "task", task.ID, "updated", oldValue, newValue), "write task activity log", "task_id", task.ID, "action", "updated")
 	return true, nil
 }
 
@@ -194,7 +194,7 @@ func (s *TaskService) UpdateStatus(task *model.Task, projectID, userID uint, rol
 		return err
 	}
 
-	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "status_changed", map[string]any{
+	logging.LogIfErr(WriteActivityLog(s.db, &projectID, userID, "task", task.ID, "status_changed", map[string]any{
 		"status":   oldStatus,
 		"progress": oldProgress,
 	}, map[string]any{
@@ -233,7 +233,7 @@ func (s *TaskService) AddCodeReference(task *model.Task, projectID, userID uint,
 	if err := s.db.Save(task).Error; err != nil {
 		return nil, err
 	}
-	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "code_ref_added", nil, map[string]any{"reference": ref}), "write task activity log", "task_id", task.ID, "action", "code_ref_added")
+	logging.LogIfErr(WriteActivityLog(s.db, &projectID, userID, "task", task.ID, "code_ref_added", nil, map[string]any{"reference": ref}), "write task activity log", "task_id", task.ID, "action", "code_ref_added")
 	return refs, nil
 }
 
@@ -256,7 +256,7 @@ func (s *TaskService) UpdateProgress(task *model.Task, projectID, userID uint, r
 		return err
 	}
 
-	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "progress_changed", map[string]any{
+	logging.LogIfErr(WriteActivityLog(s.db, &projectID, userID, "task", task.ID, "progress_changed", map[string]any{
 		"progress": oldProgress,
 		"status":   oldStatus,
 	}, map[string]any{
@@ -299,7 +299,7 @@ func (s *TaskService) Claim(task *model.Task, projectID, userID uint) error {
 			return err
 		}
 
-		logging.LogIfErr(createActivityLog(tx, projectID, userID, "task", current.ID, "claimed", map[string]any{
+		logging.LogIfErr(WriteActivityLog(tx, &projectID, userID, "task", current.ID, "claimed", map[string]any{
 			"assigned_to": oldAssigned,
 			"status":      oldStatus,
 		}, map[string]any{
@@ -364,7 +364,7 @@ func (s *TaskService) Release(task *model.Task, projectID, userID uint, role str
 			return err
 		}
 
-		logging.LogIfErr(createActivityLog(tx, projectID, userID, "task", current.ID, "released", map[string]any{
+		logging.LogIfErr(WriteActivityLog(tx, &projectID, userID, "task", current.ID, "released", map[string]any{
 			"assigned_to": oldAssigned,
 			"status":      oldStatus,
 		}, map[string]any{
@@ -380,7 +380,7 @@ func (s *TaskService) Delete(task *model.Task, projectID, userID uint) error {
 	if err := s.db.Delete(&model.Task{}, task.ID).Error; err != nil {
 		return err
 	}
-	logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "deleted", map[string]any{"title": task.Title}, nil), "write task activity log", "task_id", task.ID, "action", "deleted")
+	logging.LogIfErr(WriteActivityLog(s.db, &projectID, userID, "task", task.ID, "deleted", map[string]any{"title": task.Title}, nil), "write task activity log", "task_id", task.ID, "action", "deleted")
 	return nil
 }
 
@@ -419,7 +419,7 @@ func (s *TaskService) SplitFromAC(story *model.UserStory, projectID, userID uint
 
 		if err := s.db.Create(&task).Error; err == nil {
 			created = append(created, task)
-			logging.LogIfErr(createActivityLog(s.db, projectID, userID, "task", task.ID, "created_from_ac", nil, map[string]any{
+			logging.LogIfErr(WriteActivityLog(s.db, &projectID, userID, "task", task.ID, "created_from_ac", nil, map[string]any{
 				"title": task.Title,
 				"ac_id": ac.ID,
 			}), "write task activity log", "task_id", task.ID, "action", "created_from_ac")

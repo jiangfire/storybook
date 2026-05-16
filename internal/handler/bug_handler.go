@@ -159,22 +159,16 @@ func (h *BugHandler) Create(c *gin.Context) {
 		return
 	}
 
-	pid := project.ID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   bug.ID,
-		Action:     "created",
-		UserID:     userID,
-		ProjectID:  &pid,
-		NewValue:   model.MarshalJSON(gin.H{"title": bug.Title, "severity": bug.Severity, "status": bug.Status}),
-	}), "write bug activity log", "bug_id", bug.ID, "action", "created")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "bug", bug.ID, "created",
+		nil, map[string]any{"title": bug.Title, "severity": bug.Severity, "status": bug.Status}),
+		"write bug activity log", "bug_id", bug.ID, "action", "created")
 
 	if bug.AssignedTo != nil {
 		h.notifier.Notify(c.Request.Context(), *bug.AssignedTo, service.NotificationEvent{
 			Type:       model.NotificationBugAssigned,
 			EntityType: model.NotificationEntityBug,
 			EntityID:   bug.ID,
-			ProjectID:  &pid,
+			ProjectID:  &project.ID,
 			ActorID:    &userID,
 			Title:      "新缺陷指派给你",
 			Body:       bug.Title,
@@ -359,16 +353,9 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	pid := bug.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   bug.ID,
-		Action:     "status_changed",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"status": oldStatus}),
-		NewValue:   model.MarshalJSON(gin.H{"status": bug.Status}),
-	}), "write bug activity log", "bug_id", bug.ID, "action", "status_changed")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &bug.ProjectID, userID, "bug", bug.ID, "status_changed",
+		map[string]any{"status": oldStatus}, map[string]any{"status": bug.Status}),
+		"write bug activity log", "bug_id", bug.ID, "action", "status_changed")
 
 	api.Success(c, "缺陷状态更新成功", gin.H{
 		"id":          bug.ID,
@@ -430,23 +417,16 @@ func (h *BugHandler) Assign(c *gin.Context) {
 		return
 	}
 
-	pid := bug.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   bug.ID,
-		Action:     "assigned",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"assigned_to": oldAssigned}),
-		NewValue:   model.MarshalJSON(gin.H{"assigned_to": bug.AssignedTo}),
-	}), "write bug activity log", "bug_id", bug.ID, "action", "assigned")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &bug.ProjectID, userID, "bug", bug.ID, "assigned",
+		map[string]any{"assigned_to": oldAssigned}, map[string]any{"assigned_to": bug.AssignedTo}),
+		"write bug activity log", "bug_id", bug.ID, "action", "assigned")
 
 	if bug.AssignedTo != nil && (oldAssigned == nil || *oldAssigned != *bug.AssignedTo) {
 		h.notifier.Notify(c.Request.Context(), *bug.AssignedTo, service.NotificationEvent{
 			Type:       model.NotificationBugAssigned,
 			EntityType: model.NotificationEntityBug,
 			EntityID:   bug.ID,
-			ProjectID:  &pid,
+			ProjectID:  &bug.ProjectID,
 			ActorID:    &userID,
 			Title:      "新缺陷指派给你",
 			Body:       bug.Title,
@@ -550,16 +530,9 @@ func (h *BugHandler) Update(c *gin.Context) {
 		return
 	}
 
-	pid := updated.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   updated.ID,
-		Action:     "updated",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(oldValue),
-		NewValue:   model.MarshalJSON(newValue),
-	}), "write bug activity log", "bug_id", updated.ID, "action", "updated")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &updated.ProjectID, userID, "bug", updated.ID, "updated",
+		oldValue, newValue),
+		"write bug activity log", "bug_id", updated.ID, "action", "updated")
 
 	if h.events != nil {
 		h.events.BroadcastProject(updated.ProjectID, "bug.updated", gin.H{
@@ -619,15 +592,9 @@ func (h *BugHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	pid := bug.ProjectID
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "bug",
-		EntityID:   bug.ID,
-		Action:     "deleted",
-		UserID:     userID,
-		ProjectID:  &pid,
-		OldValue:   model.MarshalJSON(gin.H{"title": bug.Title, "status": bug.Status}),
-	}), "write bug activity log", "bug_id", bug.ID, "action", "deleted")
+	logging.LogIfErr(service.WriteActivityLog(h.db, &bug.ProjectID, userID, "bug", bug.ID, "deleted",
+		map[string]any{"title": bug.Title, "status": bug.Status}, nil),
+		"write bug activity log", "bug_id", bug.ID, "action", "deleted")
 
 	if h.events != nil {
 		h.events.BroadcastProject(bug.ProjectID, "bug.deleted", gin.H{

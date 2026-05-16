@@ -10,6 +10,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -195,13 +196,9 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "user",
-		EntityID:   user.ID,
-		Action:     "created",
-		UserID:     userID,
-		NewValue:   model.MarshalJSON(map[string]any{"email": user.Email, "username": user.Username, "role": user.Role}),
-	}), "write user activity log", "user_id", user.ID, "action", "created")
+	logging.LogIfErr(service.WriteActivityLog(h.db, nil, userID, "user", user.ID, "created",
+		nil, map[string]any{"email": user.Email, "username": user.Username, "role": user.Role}),
+		"write user activity log", "user_id", user.ID, "action", "created")
 
 	api.Success(c, "用户创建成功", gin.H{
 		"id":       user.ID,
@@ -338,14 +335,9 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	log := model.ActivityLog{EntityType: "user", EntityID: targetUser.ID, Action: "updated", UserID: userID}
-	if oldValues != nil {
-		log.OldValue = model.MarshalJSON(oldValues)
-	}
-	if newValues != nil {
-		log.NewValue = model.MarshalJSON(newValues)
-	}
-	logging.LogIfErr(h.activityRepo.Create(&log), "write user activity log", "user_id", targetUser.ID, "action", "updated")
+	logging.LogIfErr(service.WriteActivityLog(h.db, nil, userID, "user", targetUser.ID, "updated",
+		oldValues, newValues),
+		"write user activity log", "user_id", targetUser.ID, "action", "updated")
 
 	api.Success(c, "用户更新成功", gin.H{
 		"id":         targetUser.ID,
@@ -543,13 +535,9 @@ func (h *UserManagementHandler) DeleteUser(c *gin.Context) {
 	}
 
 	// 记录活动
-	logging.LogIfErr(h.activityRepo.Create(&model.ActivityLog{
-		EntityType: "user",
-		EntityID:   targetUserID,
-		Action:     "deleted",
-		UserID:     userID,
-		OldValue:   model.MarshalJSON(map[string]any{"email": targetUser.Email, "role": targetUser.Role}),
-	}), "write user activity log", "user_id", targetUserID, "action", "deleted")
+	logging.LogIfErr(service.WriteActivityLog(h.db, nil, userID, "user", targetUserID, "deleted",
+		map[string]any{"email": targetUser.Email, "role": targetUser.Role}, nil),
+		"write user activity log", "user_id", targetUserID, "action", "deleted")
 
 	api.Success(c, "用户删除成功", gin.H{"id": targetUserID})
 }
