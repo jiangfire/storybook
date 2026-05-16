@@ -324,7 +324,7 @@ func (h *BugCommentHandler) Delete(c *gin.Context) {
 	api.Success(c, "评论删除成功", gin.H{"id": comment.ID})
 }
 
-// truncateForLog clips a string to n bytes (UTF-8 safe via rune slicing) so
+// truncateForLog clips a string to n runes (UTF-8 safe) so
 // activity-log NewValue payloads stay small and readable.
 func truncateForLog(s string, n int) string {
 	if n <= 0 {
