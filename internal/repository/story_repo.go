@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"git.neolidy.top/neo/storybook/internal/model"
 	"gorm.io/gorm"
 )
@@ -202,6 +204,19 @@ func (r *StoryRepository) UpdateStatus(storyID uint, status string, position flo
 
 func (r *StoryRepository) UpdateAssignee(storyID uint, assignedTo *uint) error {
 	return r.DB().Model(&model.UserStory{}).Where("id = ?", storyID).Update("assigned_to", assignedTo).Error
+}
+
+// AvgCompletionDaysForUser returns the average number of days between creation
+// and completion for stories done by the given user since the provided time.
+// It handles SQLite (JULIANDAY) and Postgres (EXTRACT EPOCH) dialects internally.
+func (r *StoryRepository) AvgCompletionDaysForUser(userID uint, since time.Time) (float64, error) {
+	var avg float64
+	dateDiffExpr := "JULIANDAY(updated_at) - JULIANDAY(created_at)"
+	if r.DB().Dialector.Name() == "postgres" {
+		dateDiffExpr = "EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400.0"
+	}
+	err := r.DB().Raw("SELECT COALESCE(AVG("+dateDiffExpr+"), 0) FROM user_stories WHERE assigned_to = ? AND status = ? AND updated_at >= ?", userID, model.StoryStatusDone, since).Scan(&avg).Error
+	return avg, err
 }
 
 type ListOptions struct {

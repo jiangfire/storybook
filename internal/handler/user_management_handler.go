@@ -463,13 +463,12 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 		Where("assigned_to = ? AND status = ?", targetUserID, model.TaskStatusInProgress).
 		Count(&stats.TasksInProgress)
 
-	// 计算平均完成时间
-	var avgCompletionDays float64
-	dateDiffExpr := "JULIANDAY(updated_at) - JULIANDAY(created_at)"
-	if h.storyRepo.DB().Dialector.Name() == "postgres" {
-		dateDiffExpr = "EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400.0"
-	}
-	h.storyRepo.DB().Raw("SELECT COALESCE(AVG("+dateDiffExpr+"), 0) FROM user_stories WHERE assigned_to = ? AND status = ? AND updated_at >= ?", targetUserID, model.StoryStatusDone, thirtyDaysAgo).Scan(&avgCompletionDays)
+		// 计算平均完成时间
+		avgCompletionDays, err := h.storyRepo.AvgCompletionDaysForUser(targetUserID, thirtyDaysAgo)
+		if err != nil {
+			api.Internal(c, "统计查询失败")
+			return
+		}
 
 	api.Success(c, "success", gin.H{
 		"user": gin.H{
