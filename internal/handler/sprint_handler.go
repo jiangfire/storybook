@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"strings"
-	"time"
 
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/logging"
@@ -11,6 +10,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
+	"git.neolidy.top/neo/storybook/internal/util/dateparse"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -94,12 +94,12 @@ func (h *SprintHandler) Create(c *gin.Context) {
 		return
 	}
 
-	start, err := parseDate(req.StartDate)
+	start, err := dateparse.Parse(req.StartDate)
 	if err != nil {
 		api.BadRequest(c, "start_date格式错误，支持 YYYY-MM-DD 或 RFC3339")
 		return
 	}
-	end, err := parseDate(req.EndDate)
+	end, err := dateparse.Parse(req.EndDate)
 	if err != nil {
 		api.BadRequest(c, "end_date格式错误，支持 YYYY-MM-DD 或 RFC3339")
 		return
@@ -613,14 +613,3 @@ func (h *SprintHandler) Reorder(c *gin.Context) {
 	})
 }
 
-func parseDate(raw string) (time.Time, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return time.Time{}, errors.New("empty date")
-	}
-
-	if t, err := time.Parse("2006-01-02", raw); err == nil {
-		return t, nil
-	}
-	return time.Parse(time.RFC3339, raw)
-}

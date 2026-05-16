@@ -9,6 +9,7 @@ import (
 
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/util/dateparse"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/datatypes"
@@ -130,7 +131,7 @@ func TestParseAggregatedTime(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, ok := parseAggregatedTime(tc.input)
+			got, ok := dateparse.ParseAny(tc.input)
 			if ok != tc.ok {
 				t.Fatalf("expected ok=%v, got %v", tc.ok, ok)
 			}

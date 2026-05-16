@@ -11,6 +11,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
+	"git.neolidy.top/neo/storybook/internal/util/dateparse"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -383,12 +384,12 @@ func parseReportWindow(c *gin.Context, defaultDays int) (time.Time, time.Time) {
 	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, now.Location())
 
 	if raw := strings.TrimSpace(c.Query("from")); raw != "" {
-		if t, err := parseDateOrTime(raw); err == nil {
+		if t, err := dateparse.Parse(raw); err == nil {
 			from = t
 		}
 	}
 	if raw := strings.TrimSpace(c.Query("to")); raw != "" {
-		if t, err := parseDateOrTime(raw); err == nil {
+		if t, err := dateparse.Parse(raw); err == nil {
 			// Pure date should be inclusive: roll to end of that day.
 			if len(raw) <= 10 {
 				to = endOfDay(t)

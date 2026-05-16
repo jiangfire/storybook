@@ -13,6 +13,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
+	"git.neolidy.top/neo/storybook/internal/util/dateparse"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -115,14 +116,14 @@ func parseSearchFilters(c *gin.Context) (searchFilters, error) {
 	f := searchFilters{}
 
 	if v := strings.TrimSpace(c.Query("created_from")); v != "" {
-		t, err := parseDateOrTime(v)
+		t, err := dateparse.Parse(v)
 		if err != nil {
 			return f, fmt.Errorf("created_from 格式无效，需为 RFC3339 或 YYYY-MM-DD")
 		}
 		f.CreatedFrom = &t
 	}
 	if v := strings.TrimSpace(c.Query("created_to")); v != "" {
-		t, err := parseDateOrTime(v)
+		t, err := dateparse.Parse(v)
 		if err != nil {
 			return f, fmt.Errorf("created_to 格式无效，需为 RFC3339 或 YYYY-MM-DD")
 		}
@@ -159,12 +160,6 @@ func parseSearchFilters(c *gin.Context) (searchFilters, error) {
 	return f, nil
 }
 
-func parseDateOrTime(s string) (time.Time, error) {
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, nil
-	}
-	return time.Parse("2006-01-02", s)
-}
 
 func (h *SearchHandler) searchProjects(projectIDs []uint, like string, limit int, f searchFilters) []gin.H {
 	if len(projectIDs) == 0 {
