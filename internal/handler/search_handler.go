@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -577,14 +578,7 @@ func (h *SearchHandler) extractTopTags(stories []service.SimilarStory, limit int
 		scores = append(scores, tagScore{Tag: tag, Count: count})
 	}
 
-	// 冒泡排序
-	for i := 0; i < len(scores); i++ {
-		for j := i + 1; j < len(scores); j++ {
-			if scores[i].Count < scores[j].Count {
-				scores[i], scores[j] = scores[j], scores[i]
-			}
-		}
-	}
+	sort.Slice(scores, func(i, j int) bool { return scores[i].Count > scores[j].Count })
 
 	// 返回 top N
 	result := make([]string, 0, limit)
@@ -787,28 +781,14 @@ func (h *SearchHandler) groupStoriesByProject(stories []service.SimilarStory, pr
 		}
 	}
 
-	// 按平均相似度排序
-	for i := 0; i < len(results); i++ {
-		for j := i + 1; j < len(results); j++ {
-			if results[i].AvgSimilarity < results[j].AvgSimilarity {
-				results[i], results[j] = results[j], results[i]
-			}
-		}
-	}
+	sort.Slice(results, func(i, j int) bool { return results[i].AvgSimilarity > results[j].AvgSimilarity })
 
 	return results
 }
 
 // getTopStoriesInProject 获取项目中最相关的 N 个故事（单一职责）
 func (h *SearchHandler) getTopStoriesInProject(stories []service.SimilarStory, limit int) []gin.H {
-	// 按相似度排序
-	for i := 0; i < len(stories); i++ {
-		for j := i + 1; j < len(stories); j++ {
-			if stories[i].Similarity < stories[j].Similarity {
-				stories[i], stories[j] = stories[j], stories[i]
-			}
-		}
-	}
+	sort.Slice(stories, func(i, j int) bool { return stories[i].Similarity > stories[j].Similarity })
 
 	// 返回 top N
 	result := make([]gin.H, 0, limit)
