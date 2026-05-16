@@ -213,8 +213,8 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 	// 计算每个开发人员的工作负载
 	workloads := make([]gin.H, 0, len(developerIDs))
 	for _, devID := range developerIDs {
-		var user model.User
-		if _, err := h.userRepo.FindByID(devID); err != nil {
+		user, err := h.userRepo.FindByID(devID)
+		if err != nil {
 			continue
 		}
 
