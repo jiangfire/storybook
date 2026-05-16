@@ -792,13 +792,6 @@ func normalizeValue(value string) string {
 	return value
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func SanitizeRequirement(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
