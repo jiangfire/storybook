@@ -24,10 +24,6 @@ type ProjectHandler struct {
 	userRepo     *repository.UserRepository
 	storyRepo    *repository.StoryRepository
 	activityRepo *repository.ActivityLogRepository
-	sprintRepo   *repository.SprintRepository
-	bugRepo      *repository.BugRepository
-	taskRepo     *repository.TaskRepository
-	testcaseRepo *repository.TestCaseRepository
 }
 
 func NewProjectHandler(db *gorm.DB) *ProjectHandler {
@@ -37,10 +33,6 @@ func NewProjectHandler(db *gorm.DB) *ProjectHandler {
 		userRepo:     repository.NewUserRepository(db),
 		storyRepo:    repository.NewStoryRepository(db),
 		activityRepo: repository.NewActivityLogRepository(db),
-		sprintRepo:   repository.NewSprintRepository(db),
-		bugRepo:      repository.NewBugRepository(db),
-		taskRepo:     repository.NewTaskRepository(db),
-		testcaseRepo: repository.NewTestCaseRepository(db),
 	}
 }
 
@@ -903,54 +895,14 @@ func (h *ProjectHandler) ExportProject(c *gin.Context) {
 		}
 	}
 
-	// Members.
-	members, err := h.projectRepo.ListMembers(project.ID)
+	snapshot, err := service.ExportSnapshot(h.db, project.ID)
 	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
 
-	// Stories (include archived so the snapshot is complete).
-	var stories []model.UserStory
-	if err := h.storyRepo.DB().Where("project_id = ?", project.ID).Find(&stories).Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-	storyIDs := make([]uint, 0, len(stories))
-	for _, s := range stories {
-		storyIDs = append(storyIDs, s.ID)
-	}
-
-	// Sprints.
-	var sprints []model.Sprint
-	if err := h.sprintRepo.DB().Where("project_id = ?", project.ID).Find(&sprints).Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	// Bugs.
-	var bugs []model.BugReport
-	if err := h.bugRepo.DB().Where("project_id = ?", project.ID).Find(&bugs).Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	// Test cases (scoped via story IDs since TestCase has no project_id).
-	testCases, err := h.testcaseRepo.ListByStoryIDs(storyIDs)
-	if err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	// Tasks.
-	var tasks []model.Task
-	if err := h.taskRepo.DB().Where("project_id = ?", project.ID).Find(&tasks).Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	memberPayload := make([]gin.H, 0, len(members))
-	for _, m := range members {
+	memberPayload := make([]gin.H, 0, len(snapshot.Members))
+	for _, m := range snapshot.Members {
 		entry := gin.H{
 			"user_id":         m.UserID,
 			"role_in_project": m.RoleInProject,
@@ -963,27 +915,27 @@ func (h *ProjectHandler) ExportProject(c *gin.Context) {
 	}
 
 	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "project", project.ID, "exported",
-		nil, map[string]any{"stories": len(stories), "sprints": len(sprints), "bugs": len(bugs)}),
+		nil, map[string]any{"stories": len(snapshot.Stories), "sprints": len(snapshot.Sprints), "bugs": len(snapshot.Bugs)}),
 		"write project activity log", "project_id", project.ID, "action", "exported")
 
 	api.Success(c, "项目导出成功", gin.H{
-		"format_version": "1.0",
-		"exported_at":    time.Now(),
+		"format_version": snapshot.FormatVersion,
+		"exported_at":    snapshot.ExportedAt,
 		"project": gin.H{
-			"id":          project.ID,
-			"name":        project.Name,
-			"description": project.Description,
-			"agile_mode":  project.AgileMode,
-			"owner_id":    project.OwnerID,
-			"archived":    project.Archived,
-			"created_at":  project.CreatedAt,
+			"id":          snapshot.Project.ID,
+			"name":        snapshot.Project.Name,
+			"description": snapshot.Project.Description,
+			"agile_mode":  snapshot.Project.AgileMode,
+			"owner_id":    snapshot.Project.OwnerID,
+			"archived":    snapshot.Project.Archived,
+			"created_at":  snapshot.Project.CreatedAt,
 		},
 		"members":    memberPayload,
-		"stories":    stories,
-		"sprints":    sprints,
-		"bugs":       bugs,
-		"tasks":      tasks,
-		"test_cases": testCases,
+		"stories":    snapshot.Stories,
+		"sprints":    snapshot.Sprints,
+		"bugs":       snapshot.Bugs,
+		"tasks":      snapshot.Tasks,
+		"test_cases": snapshot.TestCases,
 	})
 }
 
