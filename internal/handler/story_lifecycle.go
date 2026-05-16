@@ -10,23 +10,8 @@ import (
 )
 
 func (h *StoryHandler) ArchiveStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
@@ -50,23 +35,8 @@ func (h *StoryHandler) ArchiveStory(c *gin.Context) {
 }
 
 func (h *StoryHandler) RestoreStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
@@ -90,23 +60,7 @@ func (h *StoryHandler) RestoreStory(c *gin.Context) {
 }
 
 func (h *StoryHandler) GetActivities(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	page := parseIntQuery(c, "page", 1)
 	limit := parseIntQuery(c, "limit", 20)

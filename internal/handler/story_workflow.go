@@ -13,25 +13,10 @@ import (
 )
 
 func (h *StoryHandler) UpdateStatus(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -58,27 +43,12 @@ func (h *StoryHandler) UpdateStatus(c *gin.Context) {
 }
 
 func (h *StoryHandler) ClaimStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleDeveloper && role != model.RoleAdmin {
 		api.Forbidden(c, "只有开发人员可以领取故事")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -111,25 +81,10 @@ func (h *StoryHandler) ClaimStory(c *gin.Context) {
 }
 
 func (h *StoryHandler) ReleaseStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -155,31 +110,16 @@ func (h *StoryHandler) ReleaseStory(c *gin.Context) {
 }
 
 func (h *StoryHandler) UpdateACStatus(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
 		return
 	}
 
 	acID := strings.TrimSpace(c.Param("acID"))
 	if acID == "" {
 		api.BadRequest(c, "ac_id不能为空")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -211,26 +151,11 @@ func (h *StoryHandler) UpdateACStatus(c *gin.Context) {
 }
 
 func (h *StoryHandler) AddCodeReference(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleDeveloper && role != model.RoleAdmin {
 		api.Forbidden(c, "仅开发人员可关联代码")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -267,25 +192,10 @@ type updateACRequest struct {
 
 // AddAC appends a new acceptance criterion to a story.
 func (h *StoryHandler) AddAC(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -314,31 +224,16 @@ func (h *StoryHandler) AddAC(c *gin.Context) {
 // UpdateAC selectively edits AC content (description/ref/notes/order). Status
 // changes still go through UpdateACStatus.
 func (h *StoryHandler) UpdateAC(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
 		return
 	}
 
 	acID := strings.TrimSpace(c.Param("acID"))
 	if acID == "" {
 		api.BadRequest(c, "ac_id不能为空")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -374,31 +269,16 @@ func (h *StoryHandler) UpdateAC(c *gin.Context) {
 
 // DeleteAC removes a single criterion by ID.
 func (h *StoryHandler) DeleteAC(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
 		return
 	}
 
 	acID := strings.TrimSpace(c.Param("acID"))
 	if acID == "" {
 		api.BadRequest(c, "ac_id不能为空")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 

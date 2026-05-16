@@ -178,11 +178,17 @@ func setupTestCaseHandlerFixture(t *testing.T) testCaseHandlerFixture {
 	}
 }
 
-func newTestCaseRouter(userID uint, role string) *gin.Engine {
+func newTestCaseRouter(userID uint, role string, story *model.UserStory, project *model.Project) *gin.Engine {
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, userID)
 		c.Set(middleware.CtxRoleKey, role)
+		if story != nil {
+			c.Set(middleware.CtxStoryKey, story)
+		}
+		if project != nil {
+			c.Set(middleware.CtxProjectKey, project)
+		}
 		c.Next()
 	})
 	return r
@@ -204,7 +210,7 @@ func TestListByStoryAllowsAssignedTechLead(t *testing.T) {
 		t.Fatalf("create test case: %v", err)
 	}
 
-	r := newTestCaseRouter(fixture.techLead.ID, model.RoleTechLead)
+	r := newTestCaseRouter(fixture.techLead.ID, model.RoleTechLead, &fixture.story, &fixture.project)
 	r.GET("/stories/:id/test-cases", fixture.handler.ListByStory)
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/stories/%d/test-cases", fixture.story.ID), nil)
@@ -222,7 +228,7 @@ func TestListByStoryAllowsAssignedTechLead(t *testing.T) {
 func TestCreateRejectsBlankStepsAfterTrim(t *testing.T) {
 	fixture := setupTestCaseHandlerFixture(t)
 
-	r := newTestCaseRouter(fixture.tester.ID, model.RoleTester)
+	r := newTestCaseRouter(fixture.tester.ID, model.RoleTester, &fixture.story, &fixture.project)
 	r.POST("/stories/:id/test-cases", fixture.handler.Create)
 
 	req := httptest.NewRequest(
@@ -265,7 +271,7 @@ func TestUpdateStatusRejectsDeveloperEvenWithProjectAccess(t *testing.T) {
 		t.Fatalf("create test case: %v", err)
 	}
 
-	r := newTestCaseRouter(fixture.developer.ID, model.RoleDeveloper)
+	r := newTestCaseRouter(fixture.developer.ID, model.RoleDeveloper, nil, nil)
 	r.PATCH("/test-cases/:id/status", fixture.handler.UpdateStatus)
 
 	req := httptest.NewRequest(
@@ -300,7 +306,7 @@ func TestUpdateStatusAllowsAdminAccessAcrossProjects(t *testing.T) {
 		t.Fatalf("create test case: %v", err)
 	}
 
-	r := newTestCaseRouter(fixture.admin.ID, model.RoleAdmin)
+	r := newTestCaseRouter(fixture.admin.ID, model.RoleAdmin, nil, nil)
 	r.PATCH("/test-cases/:id/status", fixture.handler.UpdateStatus)
 
 	req := httptest.NewRequest(

@@ -84,11 +84,8 @@ type assignBugRequest struct {
 var errBugAssigneeRole = errors.New("bug_assignee_role")
 
 func (h *BugHandler) Create(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTester && role != model.RoleAdmin {
@@ -96,17 +93,7 @@ func (h *BugHandler) Create(c *gin.Context) {
 		return
 	}
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, _, err := ensureProjectAccess(h.db, projectID, userID)
-	if err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	projectID := project.ID
 
 	var req createBugRequest
 	if !middleware.BindJSON(c, &req) {
@@ -176,24 +163,9 @@ func (h *BugHandler) Create(c *gin.Context) {
 }
 
 func (h *BugHandler) List(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
-
-	bugs, err := h.bugRepo.ListByProjectUnpaged(projectID, repository.BugListOptions{
+	bugs, err := h.bugRepo.ListByProjectUnpaged(project.ID, repository.BugListOptions{
 		ListOptions: repository.ListOptions{
 			Status: strings.TrimSpace(c.Query("status")),
 		},

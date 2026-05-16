@@ -14,17 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (h *StoryHandler) getStoryWithAccess(storyID, userID uint) (*model.UserStory, error) {
-	story, err := h.storySvc.GetWithAccess(storyID, userID)
-	if err != nil {
-		if errors.Is(err, service.ErrForbidden) {
-			return nil, errForbidden
-		}
-		return nil, err
-	}
-	return story, nil
-}
-
 func (h *StoryHandler) ensureProjectMember(projectID, userID uint) error {
 	err := h.storySvc.EnsureProjectMember(projectID, userID)
 	if errors.Is(err, service.ErrForbidden) {

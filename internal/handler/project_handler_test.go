@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -52,12 +53,14 @@ func TestGetOverviewReturnsZeroWhenAveragePointsIsNull(t *testing.T) {
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, owner.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxProjectKey, &project)
+		c.Set(middleware.CtxIsOwnerKey, project.OwnerID == owner.ID)
 		c.Next()
 	})
 	r.GET("/api/projects/:id/overview", h.GetOverview)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/projects/1/overview", nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/projects/%d/overview", project.ID), nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -254,12 +257,14 @@ func TestGetProjectIncludesPendingStoriesInTotals(t *testing.T) {
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, owner.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxProjectKey, &project)
+		c.Set(middleware.CtxIsOwnerKey, project.OwnerID == owner.ID)
 		c.Next()
 	})
 	r.GET("/api/projects/:id", h.GetProject)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/projects/1", nil)
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/projects/%d", project.ID), nil)
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -328,12 +333,14 @@ func TestListMemberCandidatesOnlyAllowsOwnerAndExcludesExistingMembers(t *testin
 	ownerRouter.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, owner.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxProjectKey, &project)
+		c.Set(middleware.CtxIsOwnerKey, project.OwnerID == owner.ID)
 		c.Next()
 	})
 	ownerRouter.GET("/api/projects/:id/member-candidates", h.ListMemberCandidates)
 
 	ownerResp := httptest.NewRecorder()
-	ownerReq := httptest.NewRequest(http.MethodGet, "/api/projects/1/member-candidates", nil)
+	ownerReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/projects/%d/member-candidates", project.ID), nil)
 	ownerRouter.ServeHTTP(ownerResp, ownerReq)
 
 	if ownerResp.Code != http.StatusOK {
@@ -357,12 +364,14 @@ func TestListMemberCandidatesOnlyAllowsOwnerAndExcludesExistingMembers(t *testin
 	memberRouter.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, nonOwner.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxProjectKey, &project)
+		c.Set(middleware.CtxIsOwnerKey, project.OwnerID == nonOwner.ID)
 		c.Next()
 	})
 	memberRouter.GET("/api/projects/:id/member-candidates", h.ListMemberCandidates)
 
 	memberResp := httptest.NewRecorder()
-	memberReq := httptest.NewRequest(http.MethodGet, "/api/projects/1/member-candidates", nil)
+	memberReq := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/projects/%d/member-candidates", project.ID), nil)
 	memberRouter.ServeHTTP(memberResp, memberReq)
 
 	if memberResp.Code != http.StatusForbidden {

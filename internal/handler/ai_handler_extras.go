@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type refineACRequest struct {
@@ -34,21 +32,7 @@ func (h *AIHandler) RefineAC(c *gin.Context) {
 		return
 	}
 
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.storyRepo.FindByID(storyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	var req refineACRequest
 	if !middleware.BindJSON(c, &req) {
@@ -102,36 +86,7 @@ func (h *AIHandler) RefineAC(c *gin.Context) {
 // SummarizeStory returns a 2-3 sentence stakeholder summary of the story so
 // product can drop it into a status update without reading the full description.
 func (h *AIHandler) SummarizeStory(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	story, err := h.storyRepo.FindByID(storyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, story.ProjectID, userID); err != nil {
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	criteria, _ := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
 	acText := make([]string, 0, len(criteria))
@@ -172,39 +127,10 @@ func (h *AIHandler) SummarizeStory(c *gin.Context) {
 // TranslateStory returns title+description+AC translated into the requested
 // language. Source is whichever language the story is currently in.
 func (h *AIHandler) TranslateStory(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	var req translateStoryRequest
 	if !middleware.BindJSON(c, &req) {
-		return
-	}
-
-	story, err := h.storyRepo.FindByID(storyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, story.ProjectID, userID); err != nil {
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
 		return
 	}
 
@@ -264,36 +190,7 @@ Output requirements:
 // It runs without invoking the LLM so it's always available; the rate-limited
 // AI endpoint group still fronts it for consistency with other AI helpers.
 func (h *AIHandler) DoRCheck(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	story, err := h.storyRepo.FindByID(storyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, story.ProjectID, userID); err != nil {
-		if errors.Is(err, errForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	criteria, _ := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
 	titleLen := len([]rune(strings.TrimSpace(story.Title)))

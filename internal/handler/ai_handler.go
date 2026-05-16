@@ -265,11 +265,7 @@ func (h *AIHandler) SplitStory(c *gin.Context) {
 		return
 	}
 
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	var req splitStoryReq
 	if c.Request.ContentLength > 0 {
@@ -279,16 +275,6 @@ func (h *AIHandler) SplitStory(c *gin.Context) {
 	}
 	if req.TargetCount <= 0 || req.TargetCount > 8 {
 		req.TargetCount = 3
-	}
-
-	story, err := h.storyRepo.FindByID(storyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
 	}
 
 	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
@@ -335,21 +321,7 @@ func (h *AIHandler) INVESTCheck(c *gin.Context) {
 		return
 	}
 
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.storyRepo.FindByID(storyID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "用户故事不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	criteria, _ := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
 	contentLen := len([]rune(strings.TrimSpace(story.Description + " " + story.Title)))

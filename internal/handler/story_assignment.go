@@ -14,27 +14,12 @@ import (
 )
 
 func (h *StoryHandler) AssignStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleTechLead && role != model.RoleAdmin {
 		api.Forbidden(c, "仅产品经理、技术负责人或管理员可分配故事")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -109,27 +94,12 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 
 // ReviewStory 审批故事（技术负责人）
 func (h *StoryHandler) ReviewStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTechLead && role != model.RoleAdmin {
 		api.Forbidden(c, "仅技术负责人可审批故事")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 

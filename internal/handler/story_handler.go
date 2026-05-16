@@ -429,23 +429,7 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 }
 
 func (h *StoryHandler) GetStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
 	if err != nil {
@@ -494,23 +478,8 @@ func (h *StoryHandler) GetStory(c *gin.Context) {
 }
 
 func (h *StoryHandler) UpdateStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
@@ -576,23 +545,8 @@ func (h *StoryHandler) UpdateStory(c *gin.Context) {
 }
 
 func (h *StoryHandler) DeleteStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.getStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {

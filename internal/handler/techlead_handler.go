@@ -360,11 +360,8 @@ func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
 
 // AddTechLead 为项目指定技术负责人（admin）
 func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {
@@ -372,11 +369,7 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 		return
 	}
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
+	projectID := project.ID
 
 	var req struct {
 		UserID uint `json:"user_id" binding:"required"`
@@ -435,11 +428,8 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 
 // RemoveTechLead 移除项目技术负责人（admin）
 func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {
@@ -447,11 +437,7 @@ func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 		return
 	}
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
+	projectID := project.ID
 
 	targetUserID, ok := parseUintParam(c, "userID")
 	if !ok {
@@ -482,27 +468,8 @@ func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 
 // ListProjectTechLeads 获取项目技术负责人列表
 func (h *TechLeadHandler) ListProjectTechLeads(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	// 检查项目访问权限
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := service.EnsureProjectAccess(h.db, projectID, userID); err != nil {
-		if errors.Is(err, service.ErrForbidden) {
-			api.Forbidden(c, "非项目成员无法访问")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
+	project := middleware.MustProject(c)
+	projectID := project.ID
 
 	techLeads, err := h.projectRepo.ListTechLeads(projectID)
 	if err != nil {

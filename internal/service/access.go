@@ -14,7 +14,7 @@ var ErrForbidden = errors.New("forbidden")
 func EnsureProjectAccess(db *gorm.DB, projectID, userID uint) (*model.Project, bool, error) {
 	projectRepo := repository.NewProjectRepository(db)
 
-	project, err := projectRepo.FindByID(projectID)
+	project, err := projectRepo.FindByIDWithOwner(projectID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -54,7 +54,7 @@ func EnsureProjectAccess(db *gorm.DB, projectID, userID uint) (*model.Project, b
 
 func EnsureStoryAccess(db *gorm.DB, storyID, userID uint) (*model.UserStory, *model.Project, bool, error) {
 	storyRepo := repository.NewStoryRepository(db)
-	story, err := storyRepo.FindByID(storyID)
+	story, err := storyRepo.FindByIDWithDetails(storyID)
 	if err != nil {
 		return nil, nil, false, err
 	}

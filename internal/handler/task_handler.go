@@ -66,27 +66,13 @@ type addTaskCodeRefRequest struct {
 }
 
 func (h *TaskHandler) Create(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleDeveloper && role != model.RoleAdmin {
 		api.Forbidden(c, "仅产品或开发可创建子任务")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, project, _, err := ensureStoryAccess(h.db, storyID, userID)
-	if err != nil {
-		h.handleStoryAccessErr(c, err)
 		return
 	}
 
@@ -117,27 +103,13 @@ func (h *TaskHandler) Create(c *gin.Context) {
 }
 
 func (h *TaskHandler) SplitFromAC(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
 		api.Forbidden(c, "仅产品经理可拆分子任务")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, project, _, err := ensureStoryAccess(h.db, storyID, userID)
-	if err != nil {
-		h.handleStoryAccessErr(c, err)
 		return
 	}
 
@@ -165,23 +137,7 @@ func (h *TaskHandler) SplitFromAC(c *gin.Context) {
 }
 
 func (h *TaskHandler) ListByStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, _, _, err := ensureStoryAccess(h.db, storyID, userID)
-	if err != nil {
-		h.handleStoryAccessErr(c, err)
-		return
-	}
+	story := middleware.MustStory(c)
 
 	tasks, err := h.taskRepo.ListByStoryFiltered(story.ID, strings.TrimSpace(c.Query("status")), strings.TrimSpace(c.Query("assignee")))
 	if err != nil {
@@ -544,10 +500,6 @@ func (h *TaskHandler) taskPayload(task *model.Task) gin.H {
 		payload["created_by"] = task.CreatedBy
 	}
 	return payload
-}
-
-func (h *TaskHandler) handleStoryAccessErr(c *gin.Context, err error) {
-	respondAccessError(c, err, "用户故事不存在")
 }
 
 func (h *TaskHandler) handleTaskAccessErr(c *gin.Context, err error) {

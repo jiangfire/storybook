@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,11 +51,14 @@ func TestDeleteStoryByCreator(t *testing.T) {
 	r.DELETE("/api/stories/:id", func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, creator.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxStoryKey, &story)
+		c.Set(middleware.CtxProjectKey, &project)
+		c.Set(middleware.CtxIsOwnerKey, project.OwnerID == creator.ID)
 		h.DeleteStory(c)
 	})
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/stories/1", nil)
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/stories/%d", story.ID), nil)
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())

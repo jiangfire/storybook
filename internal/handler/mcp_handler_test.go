@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -58,6 +59,7 @@ func TestMCPBatchUpdateACStatus(t *testing.T) {
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, owner.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxStoryKey, &story)
 		c.Next()
 	})
 	r.POST("/mcp/v1/stories/:id/update-ac-status", h.BatchUpdateACStatus)
@@ -71,7 +73,7 @@ func TestMCPBatchUpdateACStatus(t *testing.T) {
 	payload, _ := json.Marshal(body)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/stories/1/update-ac-status", bytes.NewReader(payload))
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/mcp/v1/stories/%d/update-ac-status", story.ID), bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -218,6 +220,7 @@ func TestMCPAnalyzeCodeACRejectPathTraversal(t *testing.T) {
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, owner.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxStoryKey, &story)
 		c.Next()
 	})
 	r.POST("/mcp/v1/stories/:id/analyze-code-ac", h.AnalyzeCodeAC)
@@ -225,7 +228,7 @@ func TestMCPAnalyzeCodeACRejectPathTraversal(t *testing.T) {
 	body := map[string]any{"file_path": "..\\go.mod"}
 	payload, _ := json.Marshal(body)
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/mcp/v1/stories/1/analyze-code-ac", bytes.NewReader(payload))
+	req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/mcp/v1/stories/%d/analyze-code-ac", story.ID), bytes.NewReader(payload))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusBadRequest {

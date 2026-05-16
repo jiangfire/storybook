@@ -49,26 +49,11 @@ type updateTestCaseRequest struct {
 }
 
 func (h *TestCaseHandler) Create(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTester && role != model.RoleAdmin {
 		api.Forbidden(c, "仅测试人员可创建测试用例")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.loadStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -120,23 +105,7 @@ func (h *TestCaseHandler) Create(c *gin.Context) {
 }
 
 func (h *TestCaseHandler) ListByStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, err := h.loadStoryWithAccess(storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	story := middleware.MustStory(c)
 
 	tcs, err := h.tcRepo.ListByStory(story.ID)
 	if err != nil {

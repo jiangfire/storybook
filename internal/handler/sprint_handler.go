@@ -66,11 +66,8 @@ type assignStorySprintRequest struct {
 }
 
 func (h *SprintHandler) Create(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -78,16 +75,7 @@ func (h *SprintHandler) Create(c *gin.Context) {
 		return
 	}
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	projectID := project.ID
 
 	var req createSprintRequest
 	if !middleware.BindJSON(c, &req) {
@@ -131,24 +119,9 @@ func (h *SprintHandler) Create(c *gin.Context) {
 }
 
 func (h *SprintHandler) List(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
-
-	sprints, err := h.sprintRepo.ListByProjectDesc(projectID)
+	sprints, err := h.sprintRepo.ListByProjectDesc(project.ID)
 	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
@@ -263,27 +236,13 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 }
 
 func (h *SprintHandler) AssignStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	story := middleware.MustStory(c)
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
 		api.Forbidden(c, "仅产品经理可规划冲刺")
-		return
-	}
-
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-
-	story, project, _, err := ensureStoryAccess(h.db, storyID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 

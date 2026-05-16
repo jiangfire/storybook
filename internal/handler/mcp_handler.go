@@ -51,16 +51,9 @@ func (h *MCPHandler) Health(c *gin.Context) {
 }
 
 func (h *MCPHandler) GetStory(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-	if !h.requireStoryAccess(c, storyID) {
-		return
-	}
+	story := middleware.MustStory(c)
 
-	data, err := h.svc.GetStory(storyID)
+	data, err := h.svc.GetStory(story.ID)
 	if err != nil {
 		h.respondMCPError(c, err, "用户故事不存在")
 		return
@@ -70,16 +63,9 @@ func (h *MCPHandler) GetStory(c *gin.Context) {
 }
 
 func (h *MCPHandler) ListStories(c *gin.Context) {
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-	if !h.requireProjectAccess(c, projectID) {
-		return
-	}
+	project := middleware.MustProject(c)
 
-	data, err := h.svc.ListStories(projectID, c.Query("status"))
+	data, err := h.svc.ListStories(project.ID, c.Query("status"))
 	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
@@ -89,16 +75,9 @@ func (h *MCPHandler) ListStories(c *gin.Context) {
 }
 
 func (h *MCPHandler) GetStoryAC(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-	if !h.requireStoryAccess(c, storyID) {
-		return
-	}
+	story := middleware.MustStory(c)
 
-	data, err := h.svc.GetStoryAC(storyID)
+	data, err := h.svc.GetStoryAC(story.ID)
 	if err != nil {
 		h.respondMCPError(c, err, "用户故事不存在")
 		return
@@ -108,16 +87,9 @@ func (h *MCPHandler) GetStoryAC(c *gin.Context) {
 }
 
 func (h *MCPHandler) ACCoverage(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-	if !h.requireStoryAccess(c, storyID) {
-		return
-	}
+	story := middleware.MustStory(c)
 
-	data, err := h.svc.GetACCoverage(storyID)
+	data, err := h.svc.GetACCoverage(story.ID)
 	if err != nil {
 		h.respondMCPError(c, err, "用户故事不存在")
 		return
@@ -127,14 +99,7 @@ func (h *MCPHandler) ACCoverage(c *gin.Context) {
 }
 
 func (h *MCPHandler) Validate(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-	if !h.requireStoryAccess(c, storyID) {
-		return
-	}
+	story := middleware.MustStory(c)
 
 	var req mcpValidateReq
 	if !middleware.BindJSON(c, &req) {
@@ -149,7 +114,7 @@ func (h *MCPHandler) Validate(c *gin.Context) {
 		return
 	}
 
-	data, err := h.svc.ValidateAC(storyID, req.ACID, req.Status, req.Evidence)
+	data, err := h.svc.ValidateAC(story.ID, req.ACID, req.Status, req.Evidence)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrACNotFound):
@@ -168,14 +133,7 @@ func (h *MCPHandler) Validate(c *gin.Context) {
 }
 
 func (h *MCPHandler) BatchUpdateACStatus(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-	if !h.requireStoryAccess(c, storyID) {
-		return
-	}
+	story := middleware.MustStory(c)
 
 	var req mcpBatchUpdateReq
 	if !middleware.BindJSON(c, &req) {
@@ -186,7 +144,7 @@ func (h *MCPHandler) BatchUpdateACStatus(c *gin.Context) {
 		return
 	}
 
-	data, err := h.svc.BatchUpdateACStatus(storyID, req.Updates)
+	data, err := h.svc.BatchUpdateACStatus(story.ID, req.Updates)
 	if err != nil {
 		h.respondMCPError(c, err, "用户故事不存在")
 		return
@@ -223,16 +181,9 @@ func (h *MCPHandler) ACCompletionStats(c *gin.Context) {
 }
 
 func (h *MCPHandler) GenerateACTests(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-	if !h.requireStoryAccess(c, storyID) {
-		return
-	}
+	story := middleware.MustStory(c)
 
-	data, err := h.svc.GenerateACTests(storyID)
+	data, err := h.svc.GenerateACTests(story.ID)
 	if err != nil {
 		h.respondMCPError(c, err, "用户故事不存在")
 		return
@@ -242,21 +193,14 @@ func (h *MCPHandler) GenerateACTests(c *gin.Context) {
 }
 
 func (h *MCPHandler) AnalyzeCodeAC(c *gin.Context) {
-	storyID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "故事ID无效")
-		return
-	}
-	if !h.requireStoryAccess(c, storyID) {
-		return
-	}
+	story := middleware.MustStory(c)
 
 	var req mcpAnalyzeReq
 	if !middleware.BindJSON(c, &req) {
 		return
 	}
 
-	data, err := h.svc.AnalyzeCodeAC(storyID, req.FilePath)
+	data, err := h.svc.AnalyzeCodeAC(story.ID, req.FilePath)
 	if err != nil {
 		switch {
 		case errors.Is(err, fileutil.ErrPathOutsideWorkspace), errors.Is(err, fileutil.ErrPathEmpty):
@@ -272,36 +216,6 @@ func (h *MCPHandler) AnalyzeCodeAC(c *gin.Context) {
 	}
 
 	api.Success(c, "success", data)
-}
-
-func (h *MCPHandler) requireStoryAccess(c *gin.Context, storyID uint) bool {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return false
-	}
-
-	if _, _, _, err := ensureStoryAccess(h.db, storyID, userID); err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return false
-	}
-
-	return true
-}
-
-func (h *MCPHandler) requireProjectAccess(c *gin.Context, projectID uint) bool {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return false
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return false
-	}
-
-	return true
 }
 
 func (h *MCPHandler) respondMCPError(c *gin.Context, err error, notFoundMessage string) {

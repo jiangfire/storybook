@@ -132,11 +132,15 @@ func setupBugHandlerFixture(t *testing.T) bugHandlerFixture {
 	}
 }
 
-func newBugHandlerRouter(userID uint, role string) *gin.Engine {
+func newBugHandlerRouter(userID uint, role string, project *model.Project) *gin.Engine {
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, userID)
 		c.Set(middleware.CtxRoleKey, role)
+		if project != nil {
+			c.Set(middleware.CtxProjectKey, project)
+			c.Set(middleware.CtxIsOwnerKey, project.OwnerID == userID)
+		}
 		c.Next()
 	})
 	return r
@@ -145,7 +149,7 @@ func newBugHandlerRouter(userID uint, role string) *gin.Engine {
 func TestCreateRejectsNonDeveloperInitialAssignee(t *testing.T) {
 	fixture := setupBugHandlerFixture(t)
 
-	r := newBugHandlerRouter(fixture.tester.ID, model.RoleTester)
+	r := newBugHandlerRouter(fixture.tester.ID, model.RoleTester, &fixture.project)
 	r.POST("/projects/:id/bugs", fixture.handler.Create)
 
 	body := bytes.NewBufferString(fmt.Sprintf(`{"title":"登录缺陷","severity":"high","assigned_to":%d}`, fixture.tester.ID))
@@ -185,7 +189,7 @@ func TestAssignRejectsNonDeveloperAssignee(t *testing.T) {
 		t.Fatalf("create bug: %v", err)
 	}
 
-	r := newBugHandlerRouter(fixture.owner.ID, model.RoleProduct)
+	r := newBugHandlerRouter(fixture.owner.ID, model.RoleProduct, nil)
 	r.PATCH("/bugs/:id/assign", fixture.handler.Assign)
 
 	body := bytes.NewBufferString(fmt.Sprintf(`{"assigned_to":%d}`, fixture.tester.ID))
@@ -226,7 +230,7 @@ func TestUpdateStatusMaintainsResolvedAtLifecycle(t *testing.T) {
 		t.Fatalf("create bug: %v", err)
 	}
 
-	r := newBugHandlerRouter(fixture.developer.ID, model.RoleDeveloper)
+	r := newBugHandlerRouter(fixture.developer.ID, model.RoleDeveloper, nil)
 	r.PATCH("/bugs/:id/status", fixture.handler.UpdateStatus)
 
 	resolveReq := httptest.NewRequest(

@@ -255,23 +255,8 @@ func (h *ProjectHandler) ListProjects(c *gin.Context) {
 }
 
 func (h *ProjectHandler) GetProject(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, isOwner, err := h.getProjectWithAccess(projectID, userID)
-	if err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	isOwner := middleware.IsProjectOwner(c)
 
 	members, err := h.projectRepo.ListMembers(project.ID)
 	if err != nil {
@@ -324,29 +309,10 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 }
 
 func (h *ProjectHandler) UpdateProject(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, err := h.projectRepo.FindByID(projectID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		api.Forbidden(c, "仅项目Owner可更新项目")
 		return
 	}
@@ -430,23 +396,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 }
 
 func (h *ProjectHandler) GetOverview(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, _, err := h.getProjectWithAccess(projectID, userID)
-	if err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
 
 	statusBreakdown, totalStories, err := h.storyStats(project.ID)
 	if err != nil {
@@ -487,29 +437,9 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 }
 
 func (h *ProjectHandler) DeleteProject(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, err := h.projectRepo.FindByID(projectID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		api.Forbidden(c, "仅项目Owner可删除项目")
 		return
 	}
@@ -519,27 +449,12 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	api.Success(c, "项目删除成功", gin.H{"id": projectID})
+	api.Success(c, "项目删除成功", gin.H{"id": project.ID})
 }
 
 func (h *ProjectHandler) ListMembers(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, isOwner, err := h.getProjectWithAccess(projectID, userID)
-	if err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	isOwner := middleware.IsProjectOwner(c)
 
 	members, err := h.projectRepo.ListMembers(project.ID)
 	if err != nil {
@@ -574,25 +489,9 @@ func (h *ProjectHandler) ListMembers(c *gin.Context) {
 }
 
 func (h *ProjectHandler) AddMember(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, _, err := h.getProjectWithAccess(projectID, userID)
-	if err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		api.Forbidden(c, "仅项目Owner可管理成员")
 		return
 	}
@@ -640,25 +539,9 @@ func (h *ProjectHandler) AddMember(c *gin.Context) {
 }
 
 func (h *ProjectHandler) ListMemberCandidates(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, _, err := h.getProjectWithAccess(projectID, userID)
-	if err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		api.Forbidden(c, "仅项目Owner可管理成员")
 		return
 	}
@@ -696,30 +579,15 @@ func (h *ProjectHandler) ListMemberCandidates(c *gin.Context) {
 }
 
 func (h *ProjectHandler) RemoveMember(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
 	targetUserID, ok := parseUintParam(c, "userID")
 	if !ok {
 		api.BadRequest(c, "用户ID无效")
 		return
 	}
 
-	project, _, err := h.getProjectWithAccess(projectID, userID)
-	if err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		api.Forbidden(c, "仅项目Owner可管理成员")
 		return
 	}
@@ -752,29 +620,10 @@ var errForbidden = fmt.Errorf("forbidden")
 // access; ListProjects filters archived projects out unless include_archived
 // or archived_only is set.
 func (h *ProjectHandler) ArchiveProject(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, err := h.projectRepo.FindByID(projectID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		role, _ := middleware.CurrentRole(c)
 		if role != model.RoleAdmin {
 			api.Forbidden(c, "仅项目Owner或管理员可归档项目")
@@ -809,29 +658,10 @@ func (h *ProjectHandler) ArchiveProject(c *gin.Context) {
 // UnarchiveProject restores an archived project so it appears in default
 // listings again. Owner or admin only.
 func (h *ProjectHandler) UnarchiveProject(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, err := h.projectRepo.FindByID(projectID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		role, _ := middleware.CurrentRole(c)
 		if role != model.RoleAdmin {
 			api.Forbidden(c, "仅项目Owner或管理员可还原项目")
@@ -865,29 +695,10 @@ func (h *ProjectHandler) UnarchiveProject(c *gin.Context) {
 // stories, sprints, bugs, and test cases so the owner can back the project up
 // or migrate it elsewhere. Only the project owner / admin can export.
 func (h *ProjectHandler) ExportProject(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
+	userID, _ := middleware.CurrentUserID(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	project, err := h.projectRepo.FindByID(projectID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "项目不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if project.OwnerID != userID {
+	if !middleware.IsProjectOwner(c) {
 		role, _ := middleware.CurrentRole(c)
 		if role != model.RoleAdmin {
 			api.Forbidden(c, "仅项目Owner或管理员可导出项目")
@@ -937,22 +748,6 @@ func (h *ProjectHandler) ExportProject(c *gin.Context) {
 		"tasks":      snapshot.Tasks,
 		"test_cases": snapshot.TestCases,
 	})
-}
-
-func (h *ProjectHandler) getProjectWithAccess(projectID, userID uint) (*model.Project, bool, error) {
-	project, isOwner, err := service.EnsureProjectAccess(h.db, projectID, userID)
-	if err != nil {
-		if errors.Is(err, service.ErrForbidden) {
-			return nil, false, errForbidden
-		}
-		return nil, false, err
-	}
-	projectWithOwner, err := h.projectRepo.FindByIDWithOwner(project.ID)
-	if err != nil {
-		return nil, false, err
-	}
-	*project = *projectWithOwner
-	return project, isOwner, nil
 }
 
 func (h *ProjectHandler) storyStats(projectID uint) (map[string]int64, int64, error) {

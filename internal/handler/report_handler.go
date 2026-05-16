@@ -42,21 +42,8 @@ func NewReportHandler(db *gorm.DB) *ReportHandler {
 }
 
 func (h *ReportHandler) Velocity(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	projectID := project.ID
 
 	sprints, err := h.sprintRepo.ListByProject(projectID)
 	if err != nil {
@@ -109,21 +96,8 @@ func (h *ReportHandler) Velocity(c *gin.Context) {
 }
 
 func (h *ReportHandler) Quality(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	projectID := project.ID
 
 	statusBreakdown := map[string]int64{}
 	for _, st := range []string{model.BugStatusOpen, model.BugStatusInProgress, model.BugStatusResolved, model.BugStatusClosed} {
@@ -185,20 +159,8 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 }
 
 func (h *ReportHandler) Burndown(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	projectID := project.ID
 
 	sprintID, ok := parseUintQuery(c, "sprint_id")
 	if !ok {
@@ -453,20 +415,8 @@ func firstTransitionAt(logs []model.ActivityLog, targetStatus string) time.Time 
 // CumulativeFlow renders day-by-day status distribution across the window.
 // Each point is a histogram of how many stories sat in each status at end-of-day.
 func (h *ReportHandler) CumulativeFlow(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	projectID := project.ID
 
 	from, to := parseReportWindow(c, 30)
 
@@ -566,20 +516,8 @@ func (h *ReportHandler) LeadTime(c *gin.Context) {
 // respondTimeMetric is the shared aggregator behind CycleTime and LeadTime: load
 // stories completed in [from, to], compute per-story interval, average, respond.
 func (h *ReportHandler) respondTimeMetric(c *gin.Context, label string, extract func(model.UserStory, []model.ActivityLog) (time.Time, time.Time, bool)) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	projectID := project.ID
 
 	from, to := parseReportWindow(c, 90)
 
@@ -656,20 +594,8 @@ func (h *ReportHandler) respondTimeMetric(c *gin.Context, label string, extract 
 // Throughput counts stories whose first `done` transition lands in each interval
 // of the window. interval=week (default) or interval=day.
 func (h *ReportHandler) Throughput(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
+	projectID := project.ID
 
 	interval := strings.ToLower(strings.TrimSpace(c.Query("interval")))
 	if interval != "day" {
