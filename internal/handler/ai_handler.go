@@ -118,24 +118,11 @@ func generateStoryWithFallback(ctx context.Context, requirement string, primary 
 	if fallbackErr != nil {
 		return nil, primary, fmt.Errorf("openai 调用失败: %w; 规则降级也失败: %v", err, fallbackErr)
 	}
-	fallbackResult.Warnings = prependAIWarning(
+	fallbackResult.Warnings = service.PrependAIWarning(
 		fallbackResult.Warnings,
 		"OpenAI 调用失败，已自动回退到规则草稿，请检查 AI 配置或稍后重试",
 	)
 	return fallbackResult, fallback, nil
-}
-
-func prependAIWarning(warnings []string, warning string) []string {
-	warning = strings.TrimSpace(warning)
-	if warning == "" {
-		return warnings
-	}
-	for _, item := range warnings {
-		if item == warning {
-			return warnings
-		}
-	}
-	return append([]string{warning}, warnings...)
 }
 
 type aiConfigRequest struct {
@@ -330,7 +317,7 @@ func (h *AIHandler) SplitStory(c *gin.Context) {
 			"title":               title,
 			"description":         fmt.Sprintf("由原故事 #%d 拆分", story.ID),
 			"acceptance_criteria": chunk,
-			"story_points":        estimatePoints(title, len(chunk)),
+			"story_points":        service.EstimatePoints(title, len(chunk)),
 		})
 	}
 
@@ -574,25 +561,6 @@ func (h *AIHandler) resolveTestRuntimeConfig(existing model.AIConfig, req aiConf
 
 func contextWithTimeout(c *gin.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(c.Request.Context(), timeout)
-}
-
-func estimatePoints(text string, acCount int) int {
-	l := len([]rune(text))
-	score := l/120 + acCount/2
-	switch {
-	case score <= 1:
-		return 1
-	case score <= 2:
-		return 2
-	case score <= 3:
-		return 3
-	case score <= 5:
-		return 5
-	case score <= 8:
-		return 8
-	default:
-		return 13
-	}
 }
 
 func chunkCriteria(criteria []model.AcceptanceCriterion, chunkCount int) [][]model.AcceptanceCriterion {

@@ -428,7 +428,7 @@ func (s *heuristicAIService) GenerateStory(_ context.Context, requirement string
 		StoryType:   storyType,
 		Priority:    priority,
 		SuggestedAC: ac,
-		StoryPoints: estimatePoints(reqText, len(ac)),
+		StoryPoints: EstimatePoints(reqText, len(ac)),
 		Tags:        tags,
 		Warnings:    warnings,
 		Source:      AIResponseSourceHeuristic,
@@ -517,7 +517,7 @@ func inferValue(text string) string {
 	return "提升任务交付效率"
 }
 
-func estimatePoints(text string, acCount int) int {
+func EstimatePoints(text string, acCount int) int {
 	l := len([]rune(text))
 	score := l/120 + acCount/2
 	switch {
@@ -579,7 +579,7 @@ func parseStoryFromContent(content, fallbackRequirement string) (*StoryResult, e
 		result.UserStory = fmt.Sprintf("作为 %s，\n我想要 %s，\n以便 %s", result.Actor, result.Action, result.Value)
 	}
 	if result.StoryPoints <= 0 {
-		result.StoryPoints = estimatePoints(result.Action, len(result.SuggestedAC))
+		result.StoryPoints = EstimatePoints(result.Action, len(result.SuggestedAC))
 	}
 	result.StoryPoints = normalizeStoryPoints(result.StoryPoints)
 	result.Source = AIResponseSourceOpenAI
@@ -821,14 +821,14 @@ func withOpenAIFallbackWarning(result *StoryResult) *StoryResult {
 	if result == nil || result.Source == AIResponseSourceOpenAI {
 		return result
 	}
-	result.Warnings = prependStoryWarning(
+	result.Warnings = PrependAIWarning(
 		result.Warnings,
 		"OpenAI 返回结果不可解析，已自动回退到规则草稿，请人工确认后再保存",
 	)
 	return result
 }
 
-func prependStoryWarning(warnings []string, warning string) []string {
+func PrependAIWarning(warnings []string, warning string) []string {
 	warning = strings.TrimSpace(warning)
 	if warning == "" {
 		return warnings
