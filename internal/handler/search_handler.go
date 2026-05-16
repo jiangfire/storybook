@@ -362,7 +362,6 @@ func (h *SearchHandler) SearchSemantic(c *gin.Context) {
 		return
 	}
 
-	// 转换响应（DRY：提取公共方法）
 	response := h.convertSimilarStoriesToResponse(stories)
 
 	api.Success(c, "success", gin.H{
@@ -414,7 +413,6 @@ func (h *SearchHandler) SimilarStories(c *gin.Context) {
 		return
 	}
 
-	// 构建临时查询内容（KISS：保持简单）
 	query := req.Title
 	if req.Description != "" {
 		query += "\n" + req.Description
@@ -490,7 +488,6 @@ func (h *SearchHandler) SuggestTags(c *gin.Context) {
 		return
 	}
 
-	// 统计高频标签（DRY：提取公共方法）
 	tags := h.extractTopTags(stories, req.Limit)
 
 	api.Success(c, "success", gin.H{
@@ -500,7 +497,7 @@ func (h *SearchHandler) SuggestTags(c *gin.Context) {
 
 // ========== 辅助方法 ==========
 
-// convertSimilarStoriesToResponse 转换相似故事为响应格式（DRY 原则）
+// convertSimilarStoriesToResponse 转换相似故事为响应格式
 func (h *SearchHandler) convertSimilarStoriesToResponse(stories []service.SimilarStory) []gin.H {
 	response := make([]gin.H, len(stories))
 	for i, story := range stories {
@@ -568,7 +565,6 @@ func (h *SearchHandler) extractTopTags(stories []service.SimilarStory, limit int
 		}
 	}
 
-	// 简单排序（KISS：不使用复杂算法）
 	type tagScore struct {
 		Tag   string
 		Count int
