@@ -12,6 +12,7 @@ import (
 
 	"git.neolidy.top/neo/storybook/internal/metrics"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	openai "github.com/sashabaranov/go-openai"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
@@ -82,7 +83,7 @@ type AIService interface {
 // path skips AES-256-GCM decryption and OpenAI client construction when the
 // config has not changed since the last call.
 func NewAIService(db *gorm.DB) AIService {
-	cfg, err := loadActiveAIConfig(db)
+	cfg, err := repository.NewAIConfigRepository(db).FindLatestEnabled()
 	if err != nil || cfg == nil {
 		return &heuristicAIService{}
 	}
@@ -800,17 +801,6 @@ func SanitizeRequirement(raw string) string {
 
 	spaceRegexp := regexp.MustCompile(`\s+`)
 	return strings.TrimSpace(spaceRegexp.ReplaceAllString(trimmed, " "))
-}
-
-func IsOpenAIConfigured(db *gorm.DB) bool {
-	var cfg model.AIConfig
-	if err := db.Where("enabled = ?", true).Order("id DESC").Limit(1).Find(&cfg).Error; err != nil {
-		return false
-	}
-	if cfg.ID == 0 {
-		return false
-	}
-	return cfg.Enabled && strings.TrimSpace(cfg.APIKeyEncrypted) != ""
 }
 
 func ResolveAIResponseSource(svc AIService) string {

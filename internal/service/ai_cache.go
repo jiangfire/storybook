@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/metrics"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"gorm.io/gorm"
 )
 
 const aiServiceCacheLabel = "ai_service"
@@ -61,18 +59,4 @@ func storeAIServiceCache(svc AIService, configID uint, updatedAt time.Time) AISe
 	}
 	aiCache = &aiCacheEntry{svc: svc, configID: configID, updatedAt: updatedAt}
 	return svc
-}
-
-// loadActiveAIConfig fetches the most recent enabled AIConfig.
-// Returns (nil, nil) when no config exists; that is not an error condition.
-func loadActiveAIConfig(db *gorm.DB) (*model.AIConfig, error) {
-	var cfg model.AIConfig
-	err := db.Where("enabled = ?", true).Order("id DESC").Limit(1).Find(&cfg).Error
-	if err != nil {
-		return nil, err
-	}
-	if cfg.ID == 0 {
-		return nil, nil
-	}
-	return &cfg, nil
 }
