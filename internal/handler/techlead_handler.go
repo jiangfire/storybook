@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -159,8 +160,8 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 	// 获取项目ID（可选，用于筛选特定项目的负载）
 	projectID := uint(0)
 	if pid := c.Query("project_id"); pid != "" {
-		if id, ok := parseUint(pid); ok {
-			projectID = id
+		if id, err := strconv.ParseUint(pid, 10, 64); err == nil {
+			projectID = uint(id)
 		}
 	}
 

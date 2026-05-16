@@ -41,11 +41,4 @@ func parseUintQuery(c *gin.Context, key string) (uint, bool) {
 	return uint(value), true
 }
 
-func parseUint(s string) (uint, bool) {
-	value, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return 0, false
-	}
-	return uint(value), true
-}
 
