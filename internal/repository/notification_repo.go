@@ -9,13 +9,11 @@ import (
 
 type NotificationRepository struct {
 	BaseRepository[model.Notification]
-	db *gorm.DB
 }
 
 func NewNotificationRepository(db *gorm.DB) *NotificationRepository {
 	return &NotificationRepository{
 		BaseRepository: NewBaseRepository[model.Notification](db),
-		db:             db,
 	}
 }
 
@@ -26,7 +24,7 @@ func (r *NotificationRepository) BulkCreate(items []model.Notification) error {
 	if len(items) == 0 {
 		return nil
 	}
-	return r.db.Create(&items).Error
+	return r.DB().Create(&items).Error
 }
 
 func (r *NotificationRepository) ListByUser(userID uint, unreadOnly bool, page, limit int) ([]model.Notification, int64, error) {
@@ -37,7 +35,7 @@ func (r *NotificationRepository) ListByUser(userID uint, unreadOnly bool, page, 
 		limit = 20
 	}
 
-	tx := r.db.Model(&model.Notification{}).Where("user_id = ?", userID)
+	tx := r.DB().Model(&model.Notification{}).Where("user_id = ?", userID)
 	if unreadOnly {
 		tx = tx.Where("read_at IS NULL")
 	}
@@ -57,7 +55,7 @@ func (r *NotificationRepository) ListByUser(userID uint, unreadOnly bool, page, 
 
 func (r *NotificationRepository) UnreadCount(userID uint) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.Notification{}).Where("user_id = ? AND read_at IS NULL", userID).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.Notification{}).Where("user_id = ? AND read_at IS NULL", userID).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -68,7 +66,7 @@ func (r *NotificationRepository) UnreadCount(userID uint) (int64, error) {
 // another user's notification.
 func (r *NotificationRepository) MarkRead(id, userID uint) (bool, error) {
 	now := time.Now()
-	result := r.db.Model(&model.Notification{}).
+	result := r.DB().Model(&model.Notification{}).
 		Where("id = ? AND user_id = ? AND read_at IS NULL", id, userID).
 		Update("read_at", now)
 	if result.Error != nil {
@@ -79,7 +77,7 @@ func (r *NotificationRepository) MarkRead(id, userID uint) (bool, error) {
 
 func (r *NotificationRepository) MarkAllRead(userID uint) (int64, error) {
 	now := time.Now()
-	result := r.db.Model(&model.Notification{}).
+	result := r.DB().Model(&model.Notification{}).
 		Where("user_id = ? AND read_at IS NULL", userID).
 		Update("read_at", now)
 	if result.Error != nil {

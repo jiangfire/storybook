@@ -7,19 +7,17 @@ import (
 
 type BugRepository struct {
 	BaseRepository[model.BugReport]
-	db *gorm.DB
 }
 
 func NewBugRepository(db *gorm.DB) *BugRepository {
 	return &BugRepository{
 		BaseRepository: NewBaseRepository[model.BugReport](db),
-		db:             db,
 	}
 }
 
 func (r *BugRepository) FindByIDWithDetails(bugID uint) (*model.BugReport, error) {
 	var bug model.BugReport
-	if err := r.db.Preload("Reporter").Preload("Assignee").Preload("Story").First(&bug, bugID).Error; err != nil {
+	if err := r.DB().Preload("Reporter").Preload("Assignee").Preload("Story").First(&bug, bugID).Error; err != nil {
 		return nil, err
 	}
 	return &bug, nil
@@ -27,7 +25,7 @@ func (r *BugRepository) FindByIDWithDetails(bugID uint) (*model.BugReport, error
 
 func (r *BugRepository) ListByProject(projectID uint, opts BugListOptions) ([]model.BugReport, int64, error) {
 	var total int64
-	tx := r.db.Model(&model.BugReport{}).Where("project_id = ?", projectID)
+	tx := r.DB().Model(&model.BugReport{}).Where("project_id = ?", projectID)
 	if opts.Status != "" {
 		tx = tx.Where("status = ?", opts.Status)
 	}
@@ -52,7 +50,7 @@ func (r *BugRepository) ListByProject(projectID uint, opts BugListOptions) ([]mo
 // ListByProjectUnpaged returns all matching bugs for a project without
 // pagination. Used by endpoints that render a complete inline list.
 func (r *BugRepository) ListByProjectUnpaged(projectID uint, opts BugListOptions) ([]model.BugReport, error) {
-	tx := r.db.Model(&model.BugReport{}).Where("project_id = ?", projectID)
+	tx := r.DB().Model(&model.BugReport{}).Where("project_id = ?", projectID)
 	if opts.Status != "" {
 		tx = tx.Where("status = ?", opts.Status)
 	}
@@ -70,11 +68,11 @@ func (r *BugRepository) ListByProjectUnpaged(projectID uint, opts BugListOptions
 }
 
 func (r *BugRepository) UpdateStatus(bugID uint, status string) error {
-	return r.db.Model(&model.BugReport{}).Where("id = ?", bugID).Update("status", status).Error
+	return r.DB().Model(&model.BugReport{}).Where("id = ?", bugID).Update("status", status).Error
 }
 
 func (r *BugRepository) UpdateAssignee(bugID uint, assignedTo *uint) error {
-	return r.db.Model(&model.BugReport{}).Where("id = ?", bugID).Update("assigned_to", assignedTo).Error
+	return r.DB().Model(&model.BugReport{}).Where("id = ?", bugID).Update("assigned_to", assignedTo).Error
 }
 
 type BugListOptions struct {

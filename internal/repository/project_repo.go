@@ -7,27 +7,17 @@ import (
 
 type ProjectRepository struct {
 	BaseRepository[model.Project]
-	db *gorm.DB
 }
 
 func NewProjectRepository(db *gorm.DB) *ProjectRepository {
 	return &ProjectRepository{
 		BaseRepository: NewBaseRepository[model.Project](db),
-		db:             db,
 	}
-}
-
-func (r *ProjectRepository) FindByID(projectID uint) (*model.Project, error) {
-	var project model.Project
-	if err := r.db.First(&project, projectID).Error; err != nil {
-		return nil, err
-	}
-	return &project, nil
 }
 
 func (r *ProjectRepository) FindByIDWithOwner(projectID uint) (*model.Project, error) {
 	var project model.Project
-	if err := r.db.Preload("Owner").First(&project, projectID).Error; err != nil {
+	if err := r.DB().Preload("Owner").First(&project, projectID).Error; err != nil {
 		return nil, err
 	}
 	return &project, nil
@@ -35,7 +25,7 @@ func (r *ProjectRepository) FindByIDWithOwner(projectID uint) (*model.Project, e
 
 func (r *ProjectRepository) ExistsByOwnerAndName(ownerID uint, name string, excludeID ...uint) (bool, error) {
 	var count int64
-	query := r.db.Model(&model.Project{}).
+	query := r.DB().Model(&model.Project{}).
 		Where("owner_id = ? AND name = ?", ownerID, name)
 	if len(excludeID) > 0 {
 		query = query.Where("id <> ?", excludeID[0])
@@ -47,7 +37,7 @@ func (r *ProjectRepository) ExistsByOwnerAndName(ownerID uint, name string, excl
 }
 
 func (r *ProjectRepository) CreateWithTransaction(project *model.Project, member *model.ProjectMember, columns []model.BoardColumn) error {
-	tx := r.db.Begin()
+	tx := r.DB().Begin()
 	if err := tx.Create(project).Error; err != nil {
 		tx.Rollback()
 		return err
@@ -68,11 +58,11 @@ func (r *ProjectRepository) CreateWithTransaction(project *model.Project, member
 }
 
 func (r *ProjectRepository) AddMember(member *model.ProjectMember) error {
-	return r.db.Create(member).Error
+	return r.DB().Create(member).Error
 }
 
 func (r *ProjectRepository) RemoveMember(projectID, userID uint) (int64, error) {
-	result := r.db.Where("project_id = ? AND user_id = ?", projectID, userID).Delete(&model.ProjectMember{})
+	result := r.DB().Where("project_id = ? AND user_id = ?", projectID, userID).Delete(&model.ProjectMember{})
 	if result.Error != nil {
 		return 0, result.Error
 	}
@@ -81,7 +71,7 @@ func (r *ProjectRepository) RemoveMember(projectID, userID uint) (int64, error) 
 
 func (r *ProjectRepository) IsMember(projectID, userID uint) (bool, error) {
 	var count int64
-	if err := r.db.Model(&model.ProjectMember{}).
+	if err := r.DB().Model(&model.ProjectMember{}).
 		Where("project_id = ? AND user_id = ?", projectID, userID).
 		Count(&count).Error; err != nil {
 		return false, err
@@ -91,7 +81,7 @@ func (r *ProjectRepository) IsMember(projectID, userID uint) (bool, error) {
 
 func (r *ProjectRepository) GetMember(projectID, userID uint) (*model.ProjectMember, error) {
 	var member model.ProjectMember
-	if err := r.db.Where("project_id = ? AND user_id = ?", projectID, userID).First(&member).Error; err != nil {
+	if err := r.DB().Where("project_id = ? AND user_id = ?", projectID, userID).First(&member).Error; err != nil {
 		return nil, err
 	}
 	return &member, nil
@@ -99,7 +89,7 @@ func (r *ProjectRepository) GetMember(projectID, userID uint) (*model.ProjectMem
 
 func (r *ProjectRepository) ListByUser(userID uint, page, limit int) ([]model.Project, int64, error) {
 	var total int64
-	tx := r.db.Model(&model.Project{}).
+	tx := r.DB().Model(&model.Project{}).
 		Joins("LEFT JOIN project_members ON project_members.project_id = projects.id").
 		Where("projects.owner_id = ? OR project_members.user_id = ?", userID, userID).
 		Distinct("projects.id")
@@ -117,7 +107,7 @@ func (r *ProjectRepository) ListByUser(userID uint, page, limit int) ([]model.Pr
 
 func (r *ProjectRepository) CountMembers(projectID uint) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.ProjectMember{}).Where("project_id = ?", projectID).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.ProjectMember{}).Where("project_id = ?", projectID).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -125,17 +115,17 @@ func (r *ProjectRepository) CountMembers(projectID uint) (int64, error) {
 
 func (r *ProjectRepository) ListMembers(projectID uint) ([]model.ProjectMember, error) {
 	var members []model.ProjectMember
-	if err := r.db.Preload("User").Where("project_id = ?", projectID).Find(&members).Error; err != nil {
+	if err := r.DB().Preload("User").Where("project_id = ?", projectID).Find(&members).Error; err != nil {
 		return nil, err
 	}
 	return members, nil
 }
 
 func (r *ProjectRepository) ListMemberCandidates(projectID uint, search string) ([]model.User, error) {
-	query := r.db.Model(&model.User{}).
+	query := r.DB().Model(&model.User{}).
 		Where("role != ?", model.RoleAdmin).
 		Where("id NOT IN (?)",
-			r.db.Model(&model.ProjectMember{}).Select("user_id").Where("project_id = ?", projectID),
+			r.DB().Model(&model.ProjectMember{}).Select("user_id").Where("project_id = ?", projectID),
 		)
 	if search != "" {
 		query = query.Where("email LIKE ? OR username LIKE ?", BuildLike(search), BuildLike(search))
@@ -149,18 +139,18 @@ func (r *ProjectRepository) ListMemberCandidates(projectID uint, search string) 
 
 func (r *ProjectRepository) HasTechLead(projectID, userID uint) (bool, error) {
 	var count int64
-	if err := r.db.Model(&model.ProjectTechLead{}).Where("project_id = ? AND user_id = ?", projectID, userID).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.ProjectTechLead{}).Where("project_id = ? AND user_id = ?", projectID, userID).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
 }
 
 func (r *ProjectRepository) AddTechLead(lead *model.ProjectTechLead) error {
-	return r.db.Create(lead).Error
+	return r.DB().Create(lead).Error
 }
 
 func (r *ProjectRepository) RemoveTechLead(projectID, userID uint) (int64, error) {
-	result := r.db.Where("project_id = ? AND user_id = ?", projectID, userID).Delete(&model.ProjectTechLead{})
+	result := r.DB().Where("project_id = ? AND user_id = ?", projectID, userID).Delete(&model.ProjectTechLead{})
 	if result.Error != nil {
 		return 0, result.Error
 	}
@@ -169,7 +159,7 @@ func (r *ProjectRepository) RemoveTechLead(projectID, userID uint) (int64, error
 
 func (r *ProjectRepository) ListTechLeads(projectID uint) ([]model.ProjectTechLead, error) {
 	var leads []model.ProjectTechLead
-	if err := r.db.Preload("User").Where("project_id = ?", projectID).Find(&leads).Error; err != nil {
+	if err := r.DB().Preload("User").Where("project_id = ?", projectID).Find(&leads).Error; err != nil {
 		return nil, err
 	}
 	return leads, nil
@@ -177,19 +167,19 @@ func (r *ProjectRepository) ListTechLeads(projectID uint) ([]model.ProjectTechLe
 
 func (r *ProjectRepository) GetOverview(projectID uint) (*model.Project, []model.ProjectMember, []model.UserStory, []model.Sprint, error) {
 	var project model.Project
-	if err := r.db.First(&project, projectID).Error; err != nil {
+	if err := r.DB().First(&project, projectID).Error; err != nil {
 		return nil, nil, nil, nil, err
 	}
 	var members []model.ProjectMember
-	if err := r.db.Preload("User").Where("project_id = ?", projectID).Find(&members).Error; err != nil {
+	if err := r.DB().Preload("User").Where("project_id = ?", projectID).Find(&members).Error; err != nil {
 		return nil, nil, nil, nil, err
 	}
 	var stories []model.UserStory
-	if err := r.db.Where("project_id = ? AND archived = ?", projectID, false).Find(&stories).Error; err != nil {
+	if err := r.DB().Where("project_id = ? AND archived = ?", projectID, false).Find(&stories).Error; err != nil {
 		return nil, nil, nil, nil, err
 	}
 	var sprints []model.Sprint
-	if err := r.db.Where("project_id = ?", projectID).Order("start_date ASC").Find(&sprints).Error; err != nil {
+	if err := r.DB().Where("project_id = ?", projectID).Order("start_date ASC").Find(&sprints).Error; err != nil {
 		return nil, nil, nil, nil, err
 	}
 	return &project, members, stories, sprints, nil

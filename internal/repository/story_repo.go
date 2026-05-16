@@ -7,27 +7,17 @@ import (
 
 type StoryRepository struct {
 	BaseRepository[model.UserStory]
-	db *gorm.DB
 }
 
 func NewStoryRepository(db *gorm.DB) *StoryRepository {
 	return &StoryRepository{
 		BaseRepository: NewBaseRepository[model.UserStory](db),
-		db:             db,
 	}
-}
-
-func (r *StoryRepository) FindByID(storyID uint) (*model.UserStory, error) {
-	var story model.UserStory
-	if err := r.db.First(&story, storyID).Error; err != nil {
-		return nil, err
-	}
-	return &story, nil
 }
 
 func (r *StoryRepository) FindByIDWithDetails(storyID uint) (*model.UserStory, error) {
 	var story model.UserStory
-	if err := r.db.
+	if err := r.DB().
 		Preload("Project").
 		Preload("Assignee").
 		Preload("Creator").
@@ -41,7 +31,7 @@ func (r *StoryRepository) FindByIDWithDetails(storyID uint) (*model.UserStory, e
 
 func (r *StoryRepository) ListByProject(projectID uint, opts ListOptions) ([]model.UserStory, int64, error) {
 	var total int64
-	tx := r.db.Model(&model.UserStory{}).Where("project_id = ? AND archived = ?", projectID, false)
+	tx := r.DB().Model(&model.UserStory{}).Where("project_id = ? AND archived = ?", projectID, false)
 
 	if opts.Status != "" {
 		tx = tx.Where("status = ?", opts.Status)
@@ -67,7 +57,7 @@ func (r *StoryRepository) ListByProject(projectID uint, opts ListOptions) ([]mod
 
 func (r *StoryRepository) ListBoardByProject(projectID uint) ([]model.UserStory, error) {
 	var stories []model.UserStory
-	if err := r.db.Where("project_id = ? AND archived = ?", projectID, false).Order("position ASC").Find(&stories).Error; err != nil {
+	if err := r.DB().Where("project_id = ? AND archived = ?", projectID, false).Order("position ASC").Find(&stories).Error; err != nil {
 		return nil, err
 	}
 	return stories, nil
@@ -75,7 +65,7 @@ func (r *StoryRepository) ListBoardByProject(projectID uint) ([]model.UserStory,
 
 func (r *StoryRepository) ListBoardByProjectWithAssignee(projectID uint) ([]model.UserStory, error) {
 	var stories []model.UserStory
-	if err := r.db.Where("project_id = ? AND archived = ?", projectID, false).Preload("Assignee").Order("position ASC, priority DESC").Find(&stories).Error; err != nil {
+	if err := r.DB().Where("project_id = ? AND archived = ?", projectID, false).Preload("Assignee").Order("position ASC, priority DESC").Find(&stories).Error; err != nil {
 		return nil, err
 	}
 	return stories, nil
@@ -83,7 +73,7 @@ func (r *StoryRepository) ListBoardByProjectWithAssignee(projectID uint) ([]mode
 
 func (r *StoryRepository) ListByIDs(storyIDs []uint) ([]model.UserStory, error) {
 	var stories []model.UserStory
-	if err := r.db.Where("id IN ?", storyIDs).Find(&stories).Error; err != nil {
+	if err := r.DB().Where("id IN ?", storyIDs).Find(&stories).Error; err != nil {
 		return nil, err
 	}
 	return stories, nil
@@ -91,7 +81,7 @@ func (r *StoryRepository) ListByIDs(storyIDs []uint) ([]model.UserStory, error) 
 
 func (r *StoryRepository) CountBySprint(sprintID uint) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.UserStory{}).Where("sprint_id = ? AND archived = ?", sprintID, false).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.UserStory{}).Where("sprint_id = ? AND archived = ?", sprintID, false).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -99,7 +89,7 @@ func (r *StoryRepository) CountBySprint(sprintID uint) (int64, error) {
 
 func (r *StoryRepository) CountBySprintAndStatus(sprintID uint, status string) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.UserStory{}).Where("sprint_id = ? AND status = ? AND archived = ?", sprintID, status, false).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.UserStory{}).Where("sprint_id = ? AND status = ? AND archived = ?", sprintID, status, false).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -107,7 +97,7 @@ func (r *StoryRepository) CountBySprintAndStatus(sprintID uint, status string) (
 
 func (r *StoryRepository) CountByProjectAndStatus(projectID uint, status string) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.UserStory{}).Where("project_id = ? AND status = ? AND archived = ?", projectID, status, false).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.UserStory{}).Where("project_id = ? AND status = ? AND archived = ?", projectID, status, false).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -115,7 +105,7 @@ func (r *StoryRepository) CountByProjectAndStatus(projectID uint, status string)
 
 func (r *StoryRepository) ListBySprint(sprintID uint) ([]model.UserStory, error) {
 	var stories []model.UserStory
-	if err := r.db.Where("sprint_id = ? AND archived = ?", sprintID, false).Find(&stories).Error; err != nil {
+	if err := r.DB().Where("sprint_id = ? AND archived = ?", sprintID, false).Find(&stories).Error; err != nil {
 		return nil, err
 	}
 	return stories, nil
@@ -123,7 +113,7 @@ func (r *StoryRepository) ListBySprint(sprintID uint) ([]model.UserStory, error)
 
 func (r *StoryRepository) ListByAssignee(userID uint, limit int) ([]model.UserStory, error) {
 	var stories []model.UserStory
-	if err := r.db.
+	if err := r.DB().
 		Preload("Project").
 		Where("assigned_to = ?", userID).
 		Order("updated_at DESC").
@@ -136,7 +126,7 @@ func (r *StoryRepository) ListByAssignee(userID uint, limit int) ([]model.UserSt
 
 func (r *StoryRepository) ListByCreator(userID uint, limit int) ([]model.UserStory, error) {
 	var stories []model.UserStory
-	if err := r.db.
+	if err := r.DB().
 		Preload("Project").
 		Where("created_by = ?", userID).
 		Order("created_at DESC").
@@ -149,7 +139,7 @@ func (r *StoryRepository) ListByCreator(userID uint, limit int) ([]model.UserSto
 
 func (r *StoryRepository) CountByAssignee(userID uint) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.UserStory{}).Where("assigned_to = ?", userID).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.UserStory{}).Where("assigned_to = ?", userID).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -157,7 +147,7 @@ func (r *StoryRepository) CountByAssignee(userID uint) (int64, error) {
 
 func (r *StoryRepository) CountByAssigneeAndStatus(userID uint, status string) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, status).Count(&count).Error; err != nil {
+	if err := r.DB().Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", userID, status).Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -166,7 +156,7 @@ func (r *StoryRepository) CountByAssigneeAndStatus(userID uint, status string) (
 // CountBySprintAndIDs counts how many of the given story IDs are attached to the sprint.
 func (r *StoryRepository) CountBySprintAndIDs(sprintID uint, storyIDs []uint) (int64, error) {
 	var count int64
-	if err := r.db.Model(&model.UserStory{}).
+	if err := r.DB().Model(&model.UserStory{}).
 		Where("id IN ? AND sprint_id = ?", storyIDs, sprintID).
 		Count(&count).Error; err != nil {
 		return 0, err
@@ -176,7 +166,7 @@ func (r *StoryRepository) CountBySprintAndIDs(sprintID uint, storyIDs []uint) (i
 
 // UpdatePositionsBatch updates positions for multiple stories within a sprint in a transaction.
 func (r *StoryRepository) UpdatePositionsBatch(sprintID uint, positions map[uint]float64) error {
-	return r.db.Transaction(func(tx *gorm.DB) error {
+	return r.DB().Transaction(func(tx *gorm.DB) error {
 		for storyID, position := range positions {
 			if err := tx.Model(&model.UserStory{}).
 				Where("id = ? AND sprint_id = ?", storyID, sprintID).
@@ -192,7 +182,7 @@ func (r *StoryRepository) ListPendingReview(projectIDs []uint, search string) ([
 	if len(projectIDs) == 0 {
 		return []model.UserStory{}, nil
 	}
-	tx := r.db.Where("project_id IN ? AND review_status = ? AND archived = ?", projectIDs, model.ReviewStatusPending, false)
+	tx := r.DB().Where("project_id IN ? AND review_status = ? AND archived = ?", projectIDs, model.ReviewStatusPending, false)
 	if search != "" {
 		tx = tx.Where("title LIKE ?", BuildLike(search))
 	}
@@ -204,14 +194,14 @@ func (r *StoryRepository) ListPendingReview(projectIDs []uint, search string) ([
 }
 
 func (r *StoryRepository) UpdateStatus(storyID uint, status string, position float64) error {
-	return r.db.Model(&model.UserStory{}).Where("id = ?", storyID).Updates(map[string]any{
+	return r.DB().Model(&model.UserStory{}).Where("id = ?", storyID).Updates(map[string]any{
 		"status":   status,
 		"position": position,
 	}).Error
 }
 
 func (r *StoryRepository) UpdateAssignee(storyID uint, assignedTo *uint) error {
-	return r.db.Model(&model.UserStory{}).Where("id = ?", storyID).Update("assigned_to", assignedTo).Error
+	return r.DB().Model(&model.UserStory{}).Where("id = ?", storyID).Update("assigned_to", assignedTo).Error
 }
 
 type ListOptions struct {
