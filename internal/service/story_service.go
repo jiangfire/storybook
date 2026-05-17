@@ -147,10 +147,17 @@ func (s *StoryService) Create(input CreateStoryInput) (*model.UserStory, error) 
 }
 
 func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateStoryInput) (bool, error) {
-	oldFields := map[string]any{}
-	newFields := map[string]any{}
-	changed := false
-	contentChanged := false
+	oldFields, newFields := map[string]any{}, map[string]any{}
+	changed, contentChanged := false, false
+
+	type patch struct {
+		name    string
+		content bool
+		oldVal  any
+		newVal  any
+		apply   func()
+	}
+	var patches []patch
 
 	if input.Title != nil {
 		title := strings.TrimSpace(*input.Title)
@@ -158,11 +165,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 			return false, NewValidationError(ValidationIssue{Field: "title", Message: "标题长度需在2-200之间"})
 		}
 		if story.Title != title {
-			oldFields["title"] = story.Title
-			newFields["title"] = title
-			story.Title = title
-			changed = true
-			contentChanged = true
+			patches = append(patches, patch{"title", true, story.Title, title, func() { story.Title = title }})
 		}
 	}
 
@@ -172,25 +175,17 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 			return false, NewValidationError(ValidationIssue{Field: "description", Message: "描述最多2000字符"})
 		}
 		if story.Description != desc {
-			oldFields["description"] = story.Description
-			newFields["description"] = desc
-			story.Description = desc
-			changed = true
-			contentChanged = true
+			patches = append(patches, patch{"description", true, story.Description, desc, func() { story.Description = desc }})
 		}
 	}
 
 	if input.StoryType != nil {
-		storyType := strings.TrimSpace(*input.StoryType)
-		if storyType != model.StoryTypeFeature && storyType != model.StoryTypeBug && storyType != model.StoryTypeChore {
+		st := strings.TrimSpace(*input.StoryType)
+		if st != model.StoryTypeFeature && st != model.StoryTypeBug && st != model.StoryTypeChore {
 			return false, NewValidationError(ValidationIssue{Field: "story_type", Message: "story_type仅支持feature/bug/chore"})
 		}
-		if story.StoryType != storyType {
-			oldFields["story_type"] = story.StoryType
-			newFields["story_type"] = storyType
-			story.StoryType = storyType
-			changed = true
-			contentChanged = true
+		if story.StoryType != st {
+			patches = append(patches, patch{"story_type", true, story.StoryType, st, func() { story.StoryType = st }})
 		}
 	}
 
@@ -199,10 +194,7 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 			return false, NewValidationError(ValidationIssue{Field: "priority", Message: "priority仅支持0-4"})
 		}
 		if story.Priority != *input.Priority {
-			oldFields["priority"] = story.Priority
-			newFields["priority"] = *input.Priority
-			story.Priority = *input.Priority
-			changed = true
+			patches = append(patches, patch{"priority", false, story.Priority, *input.Priority, func() { story.Priority = *input.Priority }})
 		}
 	}
 
@@ -210,34 +202,36 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 		if _, ok := validStoryPoints[*input.StoryPoints]; !ok {
 			return false, NewValidationError(ValidationIssue{Field: "story_points", Message: "故事点仅支持 1,2,3,5,8,13"})
 		}
+		oldSP := func() any {
+			if story.Points == nil {
+				return nil
+			}
+			return *story.Points
+		}()
 		if story.Points == nil || *story.Points != *input.StoryPoints {
-			oldFields["story_points"] = func() any {
-				if story.Points == nil {
-					return nil
-				}
-				return *story.Points
-			}()
-			newFields["story_points"] = *input.StoryPoints
 			p := *input.StoryPoints
-			story.Points = &p
-			changed = true
+			patches = append(patches, patch{"story_points", false, oldSP, p, func() { story.Points = &p }})
 		}
 	}
 
 	if input.Tags != nil {
-		oldFields["tags"] = story.Tags
-		newFields["tags"] = *input.Tags
-		story.Tags = model.MarshalJSON(*input.Tags)
-		changed = true
-		contentChanged = true
+		tags := *input.Tags
+		patches = append(patches, patch{"tags", true, story.Tags, tags, func() { story.Tags = model.MarshalJSON(tags) }})
 	}
 
 	if input.AcceptanceCriteria != nil {
-		oldFields["acceptance_criteria"] = story.AcceptanceCriteria
-		newFields["acceptance_criteria"] = *input.AcceptanceCriteria
-		story.AcceptanceCriteria = model.MarshalJSON(*input.AcceptanceCriteria)
+		ac := *input.AcceptanceCriteria
+		patches = append(patches, patch{"acceptance_criteria", true, story.AcceptanceCriteria, ac, func() { story.AcceptanceCriteria = model.MarshalJSON(ac) }})
+	}
+
+	for _, p := range patches {
+		oldFields[p.name] = p.oldVal
+		newFields[p.name] = p.newVal
+		p.apply()
 		changed = true
-		contentChanged = true
+		if p.content {
+			contentChanged = true
+		}
 	}
 
 	if !changed {
