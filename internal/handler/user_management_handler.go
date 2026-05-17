@@ -20,7 +20,7 @@ type UserManagementHandler struct {
 	db         *gorm.DB
 	userRepo   repository.UserRepo
 	storyRepo  *repository.StoryRepository
-	taskRepo   *repository.TaskRepository
+	taskRepo   repository.TaskRepo
 	activityRepo repository.ActivityRepo
 }
 

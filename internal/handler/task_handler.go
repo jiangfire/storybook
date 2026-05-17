@@ -17,7 +17,7 @@ type TaskHandler struct {
 	db       *gorm.DB
 	events   EventPublisher
 	taskSvc  *service.TaskService
-	taskRepo *repository.TaskRepository
+	taskRepo repository.TaskRepo
 	notifier service.Notifier
 }
 

@@ -42,3 +42,12 @@ type UserRepo interface {
 
 	DB() *gorm.DB
 }
+
+// TaskRepo 是 handler 包对 TaskRepository 的最小依赖。
+//
+// handler 层对 task 的写入大多走 service.TaskService,因此此处方法集很薄;
+// techlead / user_management 内的统计仍直接走 DB() 起手的 GORM 查询。
+type TaskRepo interface {
+	ListByStoryFiltered(storyID uint, status, assignee string) ([]model.Task, error)
+	DB() *gorm.DB
+}

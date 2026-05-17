@@ -21,7 +21,7 @@ type TechLeadHandler struct {
 	storyRepo   *repository.StoryRepository
 	projectRepo *repository.ProjectRepository
 	userRepo    repository.UserRepo
-	taskRepo    *repository.TaskRepository
+	taskRepo    repository.TaskRepo
 	activityRepo repository.ActivityRepo
 }
 

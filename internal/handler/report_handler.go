@@ -20,7 +20,7 @@ type ReportHandler struct {
 	db         *gorm.DB
 	storyRepo  *repository.StoryRepository
 	sprintRepo *repository.SprintRepository
-	taskRepo   *repository.TaskRepository
+	taskRepo   repository.TaskRepo
 	bugRepo    *repository.BugRepository
 	activityRepo repository.ActivityRepo
 }

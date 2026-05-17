@@ -13,7 +13,7 @@ import (
 type MeHandler struct {
 	userRepo  repository.UserRepo
 	storyRepo *repository.StoryRepository
-	taskRepo  *repository.TaskRepository
+	taskRepo  repository.TaskRepo
 }
 
 func NewMeHandler(db *gorm.DB) *MeHandler {
