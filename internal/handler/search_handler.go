@@ -233,22 +233,13 @@ func (h *SearchHandler) searchBugs(projectIDs []uint, like string, limit int, f 
 	if len(projectIDs) == 0 {
 		return []gin.H{}
 	}
-	q := h.bugRepo.DB().Model(&model.BugReport{}).
-		Where("project_id IN ? AND (title LIKE ? OR description LIKE ?)", projectIDs, like, like)
-	if f.CreatedFrom != nil {
-		q = q.Where("created_at >= ?", *f.CreatedFrom)
-	}
-	if f.CreatedTo != nil {
-		q = q.Where("created_at <= ?", *f.CreatedTo)
-	}
-	if len(f.Statuses) > 0 {
-		q = q.Where("status IN ?", f.Statuses)
-	}
-	if f.AssigneeID != nil {
-		q = q.Where("assigned_to = ?", *f.AssigneeID)
-	}
-	var rows []model.BugReport
-	if err := q.Order("bug_reports.updated_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+	rows, err := h.bugRepo.SearchByProjects(projectIDs, like, limit, repository.BugSearchFilter{
+		CreatedFrom: f.CreatedFrom,
+		CreatedTo:   f.CreatedTo,
+		Statuses:    f.Statuses,
+		AssigneeID:  f.AssigneeID,
+	})
+	if err != nil {
 		return []gin.H{}
 	}
 

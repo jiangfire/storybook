@@ -106,8 +106,8 @@ type StoryRepo interface {
 
 // BugRepo 是 handler 包对 BugRepository 的最小依赖。
 //
-// 覆盖 bug / bug_comment / report / search 调用面;report 与 search 内
-// 仍有少量 Count/LIKE 查询直接走 DB(),P1.2 落地具名方法后即可移除。
+// 覆盖 bug / bug_comment / report / search 调用面;P1.2 将 report 的状态/严重度
+// 计数与 search 的高级过滤下沉成具名方法后,此处不再暴露 DB() 逃逸口。
 type BugRepo interface {
 	// 来自 BaseRepository[model.BugReport]
 	FindByID(id uint) (*model.BugReport, error)
@@ -119,8 +119,9 @@ type BugRepo interface {
 	// bug_repo.go 自有方法
 	FindByIDWithDetails(bugID uint) (*model.BugReport, error)
 	ListByProjectUnpaged(projectID uint, opts BugListOptions) ([]model.BugReport, error)
-
-	DB() *gorm.DB
+	CountByProjectAndStatus(projectID uint, status string) (int64, error)
+	CountByProjectAndSeverity(projectID uint, severity string) (int64, error)
+	SearchByProjects(projectIDs []uint, like string, limit int, f BugSearchFilter) ([]model.BugReport, error)
 }
 
 // SprintRepo 是 handler 包对 SprintRepository 的最小依赖。

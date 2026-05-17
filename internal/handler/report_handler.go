@@ -101,15 +101,15 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 
 	statusBreakdown := map[string]int64{}
 	for _, st := range []string{model.BugStatusOpen, model.BugStatusInProgress, model.BugStatusResolved, model.BugStatusClosed} {
-		var n int64
-		logging.LogIfErr(h.bugRepo.DB().Model(&model.BugReport{}).Where("project_id = ? AND status = ?", projectID, st).Count(&n).Error, "count bugs by status failed", "project_id", projectID, "status", st)
+		n, err := h.bugRepo.CountByProjectAndStatus(projectID, st)
+		logging.LogIfErr(err, "count bugs by status failed", "project_id", projectID, "status", st)
 		statusBreakdown[st] = n
 	}
 
 	severityBreakdown := map[string]int64{}
 	for _, sv := range []string{model.BugSeverityLow, model.BugSeverityMedium, model.BugSeverityHigh, model.BugSeverityCritical} {
-		var n int64
-		logging.LogIfErr(h.bugRepo.DB().Model(&model.BugReport{}).Where("project_id = ? AND severity = ?", projectID, sv).Count(&n).Error, "count bugs by severity failed", "project_id", projectID, "severity", sv)
+		n, err := h.bugRepo.CountByProjectAndSeverity(projectID, sv)
+		logging.LogIfErr(err, "count bugs by severity failed", "project_id", projectID, "severity", sv)
 		severityBreakdown[sv] = n
 	}
 
@@ -139,8 +139,8 @@ func (h *ReportHandler) Quality(c *gin.Context) {
 		acCompletion = float64(acPassed) / float64(acTotal) * 100
 	}
 
-	var totalBugs int64
-	logging.LogIfErr(h.bugRepo.DB().Model(&model.BugReport{}).Where("project_id = ?", projectID).Count(&totalBugs).Error, "count project bugs failed", "project_id", projectID)
+	totalBugs, err := h.bugRepo.CountByProjectAndStatus(projectID, "")
+	logging.LogIfErr(err, "count project bugs failed", "project_id", projectID)
 
 	api.Success(c, "success", gin.H{
 		"project_id": projectID,
