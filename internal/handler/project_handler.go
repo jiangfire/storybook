@@ -22,7 +22,7 @@ type ProjectHandler struct {
 	db           *gorm.DB
 	projectRepo  repository.ProjectRepo
 	userRepo     repository.UserRepo
-	storyRepo    *repository.StoryRepository
+	storyRepo    repository.StoryRepo
 	activityRepo repository.ActivityRepo
 }
 

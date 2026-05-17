@@ -18,7 +18,7 @@ import (
 
 type ReportHandler struct {
 	db         *gorm.DB
-	storyRepo  *repository.StoryRepository
+	storyRepo  repository.StoryRepo
 	sprintRepo *repository.SprintRepository
 	taskRepo   repository.TaskRepo
 	bugRepo    *repository.BugRepository

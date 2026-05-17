@@ -12,7 +12,7 @@ import (
 
 type MeHandler struct {
 	userRepo  repository.UserRepo
-	storyRepo *repository.StoryRepository
+	storyRepo repository.StoryRepo
 	taskRepo  repository.TaskRepo
 }
 

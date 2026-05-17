@@ -19,7 +19,7 @@ type StoryHandler struct {
 	events         EventPublisher
 	storySvc       *service.StoryService
 	userRepo       repository.UserRepo
-	storyRepo      *repository.StoryRepository
+	storyRepo      repository.StoryRepo
 	projectRepo    repository.ProjectRepo
 	activityRepo   repository.ActivityRepo
 	boardColumnRepo *repository.BoardColumnRepository

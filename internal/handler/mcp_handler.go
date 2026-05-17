@@ -16,7 +16,7 @@ import (
 type MCPHandler struct {
 	svc       *service.MCPService
 	db        *gorm.DB
-	storyRepo *repository.StoryRepository
+	storyRepo repository.StoryRepo
 	projectRepo repository.ProjectRepo
 }
 

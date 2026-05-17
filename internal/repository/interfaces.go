@@ -78,3 +78,28 @@ type ProjectRepo interface {
 
 	DB() *gorm.DB
 }
+
+// StoryRepo 是 handler 包对 StoryRepository 的最小依赖。
+//
+// 覆盖 bug/me/sprint/story/report/user_management/story_assignment 调用面;
+// 大量 list 视图聚合 / report / techlead 报表仍走 DB() 起手的 GORM 查询。
+type StoryRepo interface {
+	// 来自 BaseRepository[model.UserStory]
+	FindByID(id uint) (*model.UserStory, error)
+	Save(item *model.UserStory) error
+
+	// story_repo.go 自有方法
+	ListByAssignee(userID uint, limit int) ([]model.UserStory, error)
+	ListByCreator(userID uint, limit int) ([]model.UserStory, error)
+	CountByAssignee(userID uint) (int64, error)
+	CountByAssigneeAndStatus(userID uint, status string) (int64, error)
+	CountBySprint(sprintID uint) (int64, error)
+	CountBySprintAndStatus(sprintID uint, status string) (int64, error)
+	CountBySprintAndIDs(sprintID uint, storyIDs []uint) (int64, error)
+	UpdatePositionsBatch(sprintID uint, positions map[uint]float64) error
+	ListBoardByProjectWithAssignee(projectID uint) ([]model.UserStory, error)
+	ListBySprint(sprintID uint) ([]model.UserStory, error)
+	AvgCompletionDaysForUser(userID uint, since time.Time) (float64, error)
+
+	DB() *gorm.DB
+}

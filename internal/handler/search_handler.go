@@ -21,7 +21,7 @@ import (
 type SearchHandler struct {
 	db        *gorm.DB
 	vectorSvc service.VectorService
-	storyRepo *repository.StoryRepository
+	storyRepo repository.StoryRepo
 	bugRepo   *repository.BugRepository
 	projectRepo repository.ProjectRepo
 }

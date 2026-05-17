@@ -19,7 +19,7 @@ import (
 type UserManagementHandler struct {
 	db         *gorm.DB
 	userRepo   repository.UserRepo
-	storyRepo  *repository.StoryRepository
+	storyRepo  repository.StoryRepo
 	taskRepo   repository.TaskRepo
 	activityRepo repository.ActivityRepo
 }
