@@ -171,24 +171,7 @@ func (h *TaskHandler) ListByStory(c *gin.Context) {
 }
 
 func (h *TaskHandler) Get(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-
-	task, _, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
-
+	task := middleware.MustTask(c)
 	api.Success(c, "success", h.taskPayload(task))
 }
 
@@ -199,17 +182,8 @@ func (h *TaskHandler) Update(c *gin.Context) {
 		return
 	}
 
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-
-	task, project, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
+	task := middleware.MustTask(c)
+	project := middleware.MustProject(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin && task.CreatedBy != userID {
@@ -250,16 +224,8 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 		api.Unauthorized(c, "未登录")
 		return
 	}
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-	task, project, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
+	task := middleware.MustTask(c)
+	project := middleware.MustProject(c)
 
 	role, _ := middleware.CurrentRole(c)
 
@@ -290,16 +256,8 @@ func (h *TaskHandler) UpdateProgress(c *gin.Context) {
 		api.Unauthorized(c, "未登录")
 		return
 	}
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-	task, project, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
+	task := middleware.MustTask(c)
+	project := middleware.MustProject(c)
 
 	role, _ := middleware.CurrentRole(c)
 
@@ -332,16 +290,8 @@ func (h *TaskHandler) Claim(c *gin.Context) {
 		return
 	}
 
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-	task, project, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
+	task := middleware.MustTask(c)
+	project := middleware.MustProject(c)
 
 	if err := h.taskSvc.Claim(task, project.ID, userID); err != nil {
 		if errors.Is(err, service.ErrAlreadyClaimed) {
@@ -362,16 +312,8 @@ func (h *TaskHandler) Release(c *gin.Context) {
 		return
 	}
 
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-	task, project, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
+	task := middleware.MustTask(c)
+	project := middleware.MustProject(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if err := h.taskSvc.Release(task, project.ID, userID, role); err != nil {
@@ -402,16 +344,8 @@ func (h *TaskHandler) AddCodeReference(c *gin.Context) {
 		return
 	}
 
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-	task, project, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
+	task := middleware.MustTask(c)
+	project := middleware.MustProject(c)
 
 	var req addTaskCodeRefRequest
 	if !middleware.BindJSON(c, &req) {
@@ -438,16 +372,8 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	taskID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "任务ID无效")
-		return
-	}
-	task, project, err := h.loadTaskWithAccess(taskID, userID)
-	if err != nil {
-		h.handleTaskAccessErr(c, err)
-		return
-	}
+	task := middleware.MustTask(c)
+	project := middleware.MustProject(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin && task.CreatedBy != userID {
@@ -460,17 +386,6 @@ func (h *TaskHandler) Delete(c *gin.Context) {
 		return
 	}
 	api.Success(c, "任务删除成功", gin.H{"id": task.ID})
-}
-
-func (h *TaskHandler) loadTaskWithAccess(taskID, userID uint) (*model.Task, *model.Project, error) {
-	task, project, err := h.taskSvc.GetWithAccess(taskID, userID)
-	if err != nil {
-		if errors.Is(err, service.ErrForbidden) {
-			return nil, nil, errForbidden
-		}
-		return nil, nil, err
-	}
-	return task, project, nil
 }
 
 func (h *TaskHandler) taskPayload(task *model.Task) gin.H {
@@ -500,8 +415,4 @@ func (h *TaskHandler) taskPayload(task *model.Task) gin.H {
 		payload["created_by"] = task.CreatedBy
 	}
 	return payload
-}
-
-func (h *TaskHandler) handleTaskAccessErr(c *gin.Context, err error) {
-	respondAccessError(c, err, "任务不存在")
 }

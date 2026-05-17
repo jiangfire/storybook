@@ -53,19 +53,6 @@ func (s *TaskService) WithNotifier(n Notifier) *TaskService {
 	return s
 }
 
-func (s *TaskService) GetWithAccess(taskID, userID uint) (*model.Task, *model.Project, error) {
-	task, err := s.taskRepo.FindByIDWithDetails(taskID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	project, _, err := EnsureProjectAccess(s.db, task.ProjectID, userID)
-	if err != nil {
-		return nil, nil, err
-	}
-	return task, project, nil
-}
-
 func (s *TaskService) Create(input CreateTaskInput) (*model.Task, error) {
 	title := strings.TrimSpace(input.Title)
 	if len(title) < 2 || len(title) > 255 {
