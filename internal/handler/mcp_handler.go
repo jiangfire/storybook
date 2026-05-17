@@ -14,10 +14,11 @@ import (
 )
 
 type MCPHandler struct {
-	svc       *service.MCPService
-	db        *gorm.DB
-	storyRepo repository.StoryRepo
+	svc         *service.MCPService
+	db          *gorm.DB
+	storyRepo   repository.StoryRepo
 	projectRepo repository.ProjectRepo
+	storySvc    *service.StoryService
 }
 
 type mcpValidateReq struct {
@@ -35,12 +36,26 @@ type mcpAnalyzeReq struct {
 }
 
 func NewMCPHandler(db *gorm.DB) *MCPHandler {
+	// 默认 StoryService 不携带 events,这样 NewMCPHandler 在测试里仍然零配置;
+	// wiring 阶段会通过 WithEvents 重新装配出带 Hub 的版本,保证生产环境的
+	// MCP AC 变更能广播到项目订阅者。
+	storySvc := service.NewStoryService(db, nil)
 	return &MCPHandler{
-		svc:       service.NewMCPService(db, ""),
-		db:        db,
-		storyRepo: repository.NewStoryRepository(db),
+		svc:         service.NewMCPService(db, "", storySvc),
+		db:          db,
+		storyRepo:   repository.NewStoryRepository(db),
 		projectRepo: repository.NewProjectRepository(db),
+		storySvc:    storySvc,
 	}
+}
+
+// WithEvents 在 wiring 阶段把 EventPublisher(通常是 *realtime.Hub)注入进
+// 内部的 StoryService,让 MCP 路径下的 AC 变更也能触发 story.ac_updated 广播。
+// 调用顺序与 bug.WithEvents / sprint.WithEvents 等保持一致,避免破坏单测。
+func (h *MCPHandler) WithEvents(events service.EventPublisher) *MCPHandler {
+	h.storySvc = service.NewStoryService(h.db, events)
+	h.svc = service.NewMCPService(h.db, "", h.storySvc)
+	return h
 }
 
 func (h *MCPHandler) Health(c *gin.Context) {
@@ -100,6 +115,9 @@ func (h *MCPHandler) ACCoverage(c *gin.Context) {
 
 func (h *MCPHandler) Validate(c *gin.Context) {
 	story := middleware.MustStory(c)
+	// MCP REST 路径已经过 AuthRequired,这里取到的 userID 用于 activity_log 与 VerifiedBy。
+	// 拿不到时退回 0,让 service 层走系统调用语义,避免阻塞协议级集成。
+	userID, _ := middleware.CurrentUserID(c)
 
 	var req mcpValidateReq
 	if !middleware.BindJSON(c, &req) {
@@ -114,7 +132,7 @@ func (h *MCPHandler) Validate(c *gin.Context) {
 		return
 	}
 
-	data, err := h.svc.ValidateAC(story.ID, req.ACID, req.Status, req.Evidence)
+	data, err := h.svc.ValidateAC(story.ID, userID, req.ACID, req.Status, req.Evidence)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrACNotFound):
@@ -134,6 +152,7 @@ func (h *MCPHandler) Validate(c *gin.Context) {
 
 func (h *MCPHandler) BatchUpdateACStatus(c *gin.Context) {
 	story := middleware.MustStory(c)
+	userID, _ := middleware.CurrentUserID(c)
 
 	var req mcpBatchUpdateReq
 	if !middleware.BindJSON(c, &req) {
@@ -144,7 +163,7 @@ func (h *MCPHandler) BatchUpdateACStatus(c *gin.Context) {
 		return
 	}
 
-	data, err := h.svc.BatchUpdateACStatus(story.ID, req.Updates)
+	data, err := h.svc.BatchUpdateACStatus(story.ID, userID, req.Updates)
 	if err != nil {
 		h.respondMCPError(c, err, "用户故事不存在")
 		return

@@ -313,7 +313,11 @@ func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID,
 			criteria[i].Status = status
 			criteria[i].Evidence = strings.TrimSpace(evidence)
 			criteria[i].Notes = strings.TrimSpace(notes)
-			criteria[i].VerifiedBy = &userID
+			// userID==0 表示无认证身份的系统调用(例如 MCP 协议入口),
+			// 此时保持 VerifiedBy 不变,避免出现 "user 0 验证" 的脏数据。
+			if userID != 0 {
+				criteria[i].VerifiedBy = &userID
+			}
 			criteria[i].VerifiedAt = &now
 			break
 		}

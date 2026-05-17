@@ -16,6 +16,7 @@ import (
 type MCPService struct {
 	db            *gorm.DB
 	workspaceRoot string
+	storySvc      *StoryService
 }
 
 type MCPAssignedUser struct {
@@ -155,14 +156,18 @@ type mcpCoverageSummary struct {
 	completion float64
 }
 
-func NewMCPService(db *gorm.DB, workspaceRoot string) *MCPService {
+func NewMCPService(db *gorm.DB, workspaceRoot string, storySvc *StoryService) *MCPService {
 	root := strings.TrimSpace(workspaceRoot)
 	if root == "" {
 		root, _ = os.Getwd()
 	}
+	if storySvc == nil {
+		storySvc = NewStoryService(db, nil)
+	}
 	return &MCPService{
 		db:            db,
 		workspaceRoot: root,
+		storySvc:      storySvc,
 	}
 }
 
@@ -274,7 +279,7 @@ func (s *MCPService) GetACCoverage(storyID uint) (*MCPACCoverageResult, error) {
 	}, nil
 }
 
-func (s *MCPService) ValidateAC(storyID uint, acID, status, evidence string) (*MCPValidateACResult, error) {
+func (s *MCPService) ValidateAC(storyID, userID uint, acID, status, evidence string) (*MCPValidateACResult, error) {
 	if strings.TrimSpace(acID) == "" {
 		return nil, ErrACNotFound
 	}
@@ -282,31 +287,23 @@ func (s *MCPService) ValidateAC(storyID uint, acID, status, evidence string) (*M
 		return nil, fmt.Errorf("status is invalid")
 	}
 
-	story, criteria, err := s.loadStoryAndCriteria(storyID)
+	story, _, err := s.loadStoryAndCriteria(storyID)
 	if err != nil {
 		return nil, err
 	}
 
-	found := false
-	now := time.Now()
-	for i := range criteria {
-		if criteria[i].ID == strings.TrimSpace(acID) {
-			criteria[i].Status = status
-			criteria[i].Evidence = strings.TrimSpace(evidence)
-			criteria[i].VerifiedAt = &now
-			found = true
-			break
-		}
-	}
-	if !found {
-		return nil, ErrACNotFound
-	}
-
-	story.AcceptanceCriteria = model.MarshalJSON(criteria)
-	if err := s.db.Save(story).Error; err != nil {
+	// 走 StoryService.UpdateACStatus 复用 activity_log + Hub 广播 + VerifiedBy/VerifiedAt 链路,
+	// 避免 MCP 路径下的 AC 变更绕过审计与实时事件。
+	now, err := s.storySvc.UpdateACStatus(story, userID, strings.TrimSpace(acID), status, evidence, "", mcpActor(userID))
+	if err != nil {
 		return nil, err
 	}
 
+	// 重新拉取最新 criteria 以生成 coverage 摘要,确保返回结果对前端是一致快照。
+	_, criteria, err := s.loadStoryAndCriteria(storyID)
+	if err != nil {
+		return nil, err
+	}
 	summary := calcMCPACCoverage(criteria)
 	return &MCPValidateACResult{
 		ACID:           strings.TrimSpace(acID),
@@ -316,36 +313,31 @@ func (s *MCPService) ValidateAC(storyID uint, acID, status, evidence string) (*M
 	}, nil
 }
 
-func (s *MCPService) BatchUpdateACStatus(storyID uint, updates []MCPACUpdateInput) (*MCPBatchUpdateACStatusResult, error) {
-	story, criteria, err := s.loadStoryAndCriteria(storyID)
+func (s *MCPService) BatchUpdateACStatus(storyID, userID uint, updates []MCPACUpdateInput) (*MCPBatchUpdateACStatusResult, error) {
+	story, _, err := s.loadStoryAndCriteria(storyID)
 	if err != nil {
 		return nil, err
 	}
 
 	updatedCount := 0
-	now := time.Now()
+	actor := mcpActor(userID)
 	for _, update := range updates {
 		acID := strings.TrimSpace(update.ACID)
 		if acID == "" || !isValidMCPACStatus(update.Status) {
 			continue
 		}
-
-		for i := range criteria {
-			if criteria[i].ID == acID {
-				criteria[i].Status = update.Status
-				criteria[i].Evidence = strings.TrimSpace(update.Evidence)
-				criteria[i].VerifiedAt = &now
-				updatedCount++
-				break
-			}
+		// 逐条走 StoryService.UpdateACStatus,每条单独写 activity_log + 推送 Hub,
+		// 这样 MCP 批量更新与单条更新在审计链路上保持一致。
+		if _, err := s.storySvc.UpdateACStatus(story, userID, acID, update.Status, update.Evidence, "", actor); err != nil {
+			return nil, err
 		}
+		updatedCount++
 	}
 
-	story.AcceptanceCriteria = model.MarshalJSON(criteria)
-	if err := s.db.Save(story).Error; err != nil {
+	_, criteria, err := s.loadStoryAndCriteria(storyID)
+	if err != nil {
 		return nil, err
 	}
-
 	summary := calcMCPACCoverage(criteria)
 	return &MCPBatchUpdateACStatusResult{
 		Success:      true,
@@ -610,4 +602,17 @@ func isValidMCPACStatus(status string) bool {
 	default:
 		return false
 	}
+}
+
+// mcpActor 拼出统一的 actor 标记,塞进 StoryService.UpdateACStatus 的 actor 字段:
+// - source=mcp 让前端/订阅者能区分这次变更来自 MCP 协议入口而非常规 REST
+// - 当 userID==0(无认证身份)时省略 user_id,避免传出 "user 0" 这种脏值
+func mcpActor(userID uint) map[string]any {
+	actor := map[string]any{
+		"source": "mcp",
+	}
+	if userID != 0 {
+		actor["user_id"] = userID
+	}
+	return actor
 }

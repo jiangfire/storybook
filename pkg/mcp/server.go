@@ -95,7 +95,7 @@ func NewServer(db *gorm.DB) *Server {
 		name:            "storybook-mcp",
 		version:         "1.1.0",
 		protocolVersion: protocolVersion2025,
-		service:         service.NewMCPService(db, root),
+		service:         service.NewMCPService(db, root, nil),
 		tools:           map[string]ToolDefinition{},
 		sessions:        map[string]*sessionState{},
 		rateLimit:       nil,            // 默认无限制
@@ -636,7 +636,9 @@ func (s *Server) handleValidateAC(_ context.Context, args map[string]any) (any, 
 	}
 	evidence := strings.TrimSpace(getOptionalString(args, "evidence"))
 
-	data, err := s.service.ValidateAC(storyID, acID, status, evidence)
+	// MCP 协议入口没有认证身份,userID 传 0 让 service 层走系统调用语义:
+	// VerifiedBy 保持 nil,activity_log 记录 user_id=0 + actor.source=mcp。
+	data, err := s.service.ValidateAC(storyID, 0, acID, status, evidence)
 	if err != nil {
 		return nil, err
 	}
@@ -707,7 +709,8 @@ func (s *Server) handleUpdateACStatus(_ context.Context, args map[string]any) (a
 		return nil, fmt.Errorf("updates is empty")
 	}
 
-	return s.service.BatchUpdateACStatus(storyID, updates)
+	// 协议入口同样以 userID=0 调用,服务层会跳过 VerifiedBy 写入。
+	return s.service.BatchUpdateACStatus(storyID, 0, updates)
 }
 
 func newResultResponse(id json.RawMessage, result any) jsonRPCResponse {

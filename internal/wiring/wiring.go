@@ -100,6 +100,9 @@ func Build(cfg *config.Config, db *gorm.DB, logger *slog.Logger, tokenManager *a
 	c.Bug.WithEvents(c.Hub)
 	c.Sprint.WithEvents(c.Hub)
 	c.BugComment.WithEvents(c.Hub)
+	// MCP AC 变更复用 StoryService.UpdateACStatus 的活动日志 + 实时事件链路,
+	// 这里把 Hub 注进去,让 mcp 调用的 ac 更新也能广播 story.ac_updated。
+	c.MCP.WithEvents(c.Hub)
 
 	return c, nil
 }
