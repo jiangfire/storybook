@@ -8,7 +8,6 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type TaskService struct {
@@ -265,60 +264,33 @@ func (s *TaskService) UpdateProgress(task *model.Task, projectID, userID uint, r
 }
 
 func (s *TaskService) Claim(task *model.Task, projectID, userID uint) error {
-	var claimedTask model.Task
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		var current model.Task
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, task.ID).Error; err != nil {
-			return err
-		}
-		if current.AssignedTo != nil && *current.AssignedTo != userID {
-			return ErrAlreadyClaimed
-		}
-
-		oldAssigned := current.AssignedTo
-		oldStatus := current.Status
-		current.AssignedTo = &userID
-		if current.Status == model.TaskStatusTodo {
-			current.Status = model.TaskStatusInProgress
-		}
-
-		if err := tx.Save(&current).Error; err != nil {
-			return err
-		}
-
-		logging.LogIfErr(WriteActivityLog(tx, &projectID, userID, "task", current.ID, "claimed", map[string]any{
-			"assigned_to": oldAssigned,
-			"status":      oldStatus,
-		}, map[string]any{
-			"assigned_to": userID,
-			"status":      current.Status,
-		}), "write task activity log", "task_id", current.ID, "action", "claimed")
-
-		claimedTask = current
-		return nil
-	})
+	claimed, err := executeClaim(s.db, task.ID, userID, "task",
+		nil,
+		func(current *model.Task) {
+			current.AssignedTo = &userID
+			if current.Status == model.TaskStatusTodo {
+				current.Status = model.TaskStatusInProgress
+			}
+		},
+	)
 	if err != nil {
 		return err
 	}
-
-	// Notify the task creator that someone picked it up. Skip the self-claim
-	// case (creator claims their own task) — the Notifier already filters
-	// self-targeted events, but checking here avoids enqueuing a no-op.
-	if claimedTask.CreatedBy != 0 && claimedTask.CreatedBy != userID {
+	if claimed.CreatedBy != 0 && claimed.CreatedBy != userID {
 		pid := projectID
-		s.notifier.Notify(context.Background(), claimedTask.CreatedBy, NotificationEvent{
+		s.notifier.Notify(context.Background(), claimed.CreatedBy, NotificationEvent{
 			Type:       model.NotificationTaskAssigned,
 			EntityType: model.NotificationEntityTask,
-			EntityID:   claimedTask.ID,
+			EntityID:   claimed.ID,
 			ProjectID:  &pid,
 			ActorID:    &userID,
 			Title:      "任务被领取",
-			Body:       claimedTask.Title,
+			Body:       claimed.Title,
 			Metadata: map[string]any{
-				"task_id":  claimedTask.ID,
-				"title":    claimedTask.Title,
-				"status":   claimedTask.Status,
-				"story_id": claimedTask.StoryID,
+				"task_id":  claimed.ID,
+				"title":    claimed.Title,
+				"status":   claimed.Status,
+				"story_id": claimed.StoryID,
 			},
 		})
 	}
@@ -326,41 +298,18 @@ func (s *TaskService) Claim(task *model.Task, projectID, userID uint) error {
 }
 
 func (s *TaskService) Release(task *model.Task, projectID, userID uint, role string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		var current model.Task
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, task.ID).Error; err != nil {
-			return err
-		}
-		if current.AssignedTo == nil {
-			return ErrNotClaimed
-		}
-		if *current.AssignedTo != userID && role != model.RoleProduct && role != model.RoleAdmin {
-			return ErrNoReleasePermission
-		}
-
-		oldAssigned := *current.AssignedTo
-		oldStatus := current.Status
-		current.AssignedTo = nil
-		if current.Progress == 0 {
-			current.Status = model.TaskStatusTodo
-		} else if current.Status == model.TaskStatusInProgress {
-			current.Status = model.TaskStatusBlocked
-		}
-
-		if err := tx.Save(&current).Error; err != nil {
-			return err
-		}
-
-		logging.LogIfErr(WriteActivityLog(tx, &projectID, userID, "task", current.ID, "released", map[string]any{
-			"assigned_to": oldAssigned,
-			"status":      oldStatus,
-		}, map[string]any{
-			"assigned_to": nil,
-			"status":      current.Status,
-		}), "write task activity log", "task_id", current.ID, "action", "released")
-
-		return nil
-	})
+	_, err := executeRelease(s.db, task.ID, userID, role, "task",
+		nil,
+		func(current *model.Task) {
+			current.AssignedTo = nil
+			if current.Progress == 0 {
+				current.Status = model.TaskStatusTodo
+			} else if current.Status == model.TaskStatusInProgress {
+				current.Status = model.TaskStatusBlocked
+			}
+		},
+	)
+	return err
 }
 
 func (s *TaskService) Delete(task *model.Task, projectID, userID uint) error {

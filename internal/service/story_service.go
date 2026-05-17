@@ -11,7 +11,6 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type StoryService struct {
@@ -490,56 +489,34 @@ func nextACID(items []model.AcceptanceCriterion) string {
 }
 
 func (s *StoryService) Claim(story *model.UserStory, userID uint) error {
-	var claimedStory model.UserStory
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		var current model.UserStory
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, story.ID).Error; err != nil {
-			return err
-		}
-		if current.AssignedTo != nil && *current.AssignedTo != userID {
-			return ErrAlreadyClaimed
-		}
-		if current.AssignedTo == nil && current.Status != model.StoryStatusBacklog && current.Status != model.StoryStatusReady {
-			return ErrClaimNotAllowed
-		}
-
-		oldStatus := current.Status
-		oldAssigned := current.AssignedTo
-		current.AssignedTo = &userID
-		current.Status = model.StoryStatusInProgress
-
-		if err := tx.Save(&current).Error; err != nil {
-			return err
-		}
-
-		logging.LogIfErr(WriteActivityLog(tx, &current.ProjectID, userID, "story", current.ID, "claimed", map[string]any{
-			"status":      oldStatus,
-			"assigned_to": oldAssigned,
-		}, map[string]any{
-			"status":      current.Status,
-			"assigned_to": userID,
-		}), "write story activity log", "story_id", current.ID, "action", "claimed")
-
-		claimedStory = current
-		return nil
-	})
+	claimed, err := executeClaim(s.db, story.ID, userID, "story",
+		func(current model.UserStory) error {
+			if current.Status != model.StoryStatusBacklog && current.Status != model.StoryStatusReady {
+				return ErrClaimNotAllowed
+			}
+			return nil
+		},
+		func(current *model.UserStory) {
+			current.AssignedTo = &userID
+			current.Status = model.StoryStatusInProgress
+		},
+	)
 	if err != nil {
 		return err
 	}
-
-	pid := claimedStory.ProjectID
-	s.notifier.Notify(context.Background(), claimedStory.CreatedBy, NotificationEvent{
+	pid := claimed.ProjectID
+	s.notifier.Notify(context.Background(), claimed.CreatedBy, NotificationEvent{
 		Type:       model.NotificationStoryClaimed,
 		EntityType: model.NotificationEntityStory,
-		EntityID:   claimedStory.ID,
+		EntityID:   claimed.ID,
 		ProjectID:  &pid,
 		ActorID:    &userID,
 		Title:      "故事已被领取",
-		Body:       claimedStory.Title,
+		Body:       claimed.Title,
 		Metadata: map[string]any{
-			"story_id":   claimedStory.ID,
-			"title":      claimedStory.Title,
-			"status":     claimedStory.Status,
+			"story_id":   claimed.ID,
+			"title":      claimed.Title,
+			"status":     claimed.Status,
 			"claimed_by": userID,
 		},
 	})
@@ -569,56 +546,29 @@ func (s *StoryService) AddCodeReference(story *model.UserStory, userID uint, ref
 }
 
 func (s *StoryService) Release(story *model.UserStory, userID uint, role string) error {
-	var releasedStory model.UserStory
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		var current model.UserStory
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&current, story.ID).Error; err != nil {
-			return err
-		}
-		if current.AssignedTo == nil {
-			return ErrNotClaimed
-		}
-		if *current.AssignedTo != userID && role != model.RoleProduct && role != model.RoleAdmin {
-			return ErrNoReleasePermission
-		}
-
-		oldAssigned := *current.AssignedTo
-		oldStatus := current.Status
-		current.AssignedTo = nil
-		current.Status = model.StoryStatusReady
-
-		if err := tx.Save(&current).Error; err != nil {
-			return err
-		}
-
-		logging.LogIfErr(WriteActivityLog(tx, &current.ProjectID, userID, "story", current.ID, "released", map[string]any{
-			"status":      oldStatus,
-			"assigned_to": oldAssigned,
-		}, map[string]any{
-			"status":      current.Status,
-			"assigned_to": nil,
-		}), "write story activity log", "story_id", current.ID, "action", "released")
-
-		releasedStory = current
-		return nil
-	})
+	released, err := executeRelease(s.db, story.ID, userID, role, "story",
+		nil,
+		func(current *model.UserStory) {
+			current.AssignedTo = nil
+			current.Status = model.StoryStatusReady
+		},
+	)
 	if err != nil {
 		return err
 	}
-
-	pid := releasedStory.ProjectID
-	s.notifier.Notify(context.Background(), releasedStory.CreatedBy, NotificationEvent{
+	pid := released.ProjectID
+	s.notifier.Notify(context.Background(), released.CreatedBy, NotificationEvent{
 		Type:       model.NotificationStoryReleased,
 		EntityType: model.NotificationEntityStory,
-		EntityID:   releasedStory.ID,
+		EntityID:   released.ID,
 		ProjectID:  &pid,
 		ActorID:    &userID,
 		Title:      "故事已被释放",
-		Body:       releasedStory.Title,
+		Body:       released.Title,
 		Metadata: map[string]any{
-			"story_id":    releasedStory.ID,
-			"title":       releasedStory.Title,
-			"status":      releasedStory.Status,
+			"story_id":    released.ID,
+			"title":       released.Title,
+			"status":      released.Status,
 			"released_by": userID,
 		},
 	})

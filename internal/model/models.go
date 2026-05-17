@@ -357,6 +357,17 @@ type ProjectTechLead struct {
 	Version    int             `gorm:"default:0" json:"version"`
 }
 
+// Claimable adapters for service-layer generic helpers.
+func (s UserStory) GetID() uint          { return s.ID }
+func (s UserStory) GetProjectID() uint   { return s.ProjectID }
+func (s UserStory) GetAssignedTo() *uint { return s.AssignedTo }
+func (s UserStory) GetStatus() string    { return s.Status }
+
+func (t Task) GetID() uint          { return t.ID }
+func (t Task) GetProjectID() uint   { return t.ProjectID }
+func (t Task) GetAssignedTo() *uint { return t.AssignedTo }
+func (t Task) GetStatus() string    { return t.Status }
+
 // Notification 站内通知。一条 Notification 表示一个用户应当看到的事件，
 // 实体类型/ID 用于跳转，Type 区分语义（story.assigned 等），Metadata 透传
 // 业务字段，前端可据此渲染不同图标 / 文案。
