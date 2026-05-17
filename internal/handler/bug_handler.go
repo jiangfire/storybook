@@ -204,23 +204,7 @@ func (h *BugHandler) List(c *gin.Context) {
 }
 
 func (h *BugHandler) Get(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
-	bugID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "缺陷ID无效")
-		return
-	}
-
-	bug, err := h.loadBugWithAccess(bugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
-		return
-	}
+	bug := middleware.MustBug(c)
 
 	data := gin.H{
 		"id":          bug.ID,
@@ -257,17 +241,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	bugID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "缺陷ID无效")
-		return
-	}
-
-	bug, err := h.loadBugWithAccess(bugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
-		return
-	}
+	bug := middleware.MustBug(c)
 
 	var req updateBugStatusRequest
 	if !middleware.BindJSON(c, &req) {
@@ -318,17 +292,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 		return
 	}
 
-	bugID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "缺陷ID无效")
-		return
-	}
-
-	bug, err := h.loadBugWithAccess(bugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
-		return
-	}
+	bug := middleware.MustBug(c)
 
 	var req assignBugRequest
 	if !middleware.BindJSON(c, &req) {
@@ -387,17 +351,7 @@ func (h *BugHandler) Update(c *gin.Context) {
 		return
 	}
 
-	bugID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "缺陷ID无效")
-		return
-	}
-
-	bug, err := h.loadBugWithAccess(bugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
-		return
-	}
+	bug := middleware.MustBug(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if bug.ReportedBy != userID && role != model.RoleAdmin && role != model.RoleProduct {
@@ -485,17 +439,7 @@ func (h *BugHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	bugID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "缺陷ID无效")
-		return
-	}
-
-	bug, err := h.loadBugWithAccess(bugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
-		return
-	}
+	bug := middleware.MustBug(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if bug.ReportedBy != userID && role != model.RoleAdmin {
@@ -523,20 +467,11 @@ func (h *BugHandler) Delete(c *gin.Context) {
 	api.Success(c, "缺陷删除成功", gin.H{"id": bug.ID})
 }
 
-func (h *BugHandler) loadBugWithAccess(bugID, userID uint) (*model.BugReport, error) {
-	bug, err := h.bugRepo.FindByIDWithDetails(bugID)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, bug.ProjectID, userID); err != nil {
-		return nil, err
-	}
-	return bug, nil
-}
-
 func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
+	// 这里走 service.EnsureProjectAccess 而非 handler 包的 ensureProjectAccess:
+	// 后者已随 P2.1 中间件改造被淘汰,只剩 access_helper.go 等待清理。
+	// 直查 service 层既能拿到原始 ErrForbidden,也省一次错误包装。
+	if _, _, err := service.EnsureProjectAccess(h.db, projectID, userID); err != nil {
 		return err
 	}
 
@@ -552,7 +487,7 @@ func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
 
 func (h *BugHandler) handleAssignUserErr(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, errForbidden):
+	case errors.Is(err, service.ErrForbidden):
 		api.BadRequest(c, "指派用户不是项目成员")
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		api.NotFound(c, "指派用户不存在")

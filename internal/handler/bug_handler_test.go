@@ -11,6 +11,7 @@ import (
 
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -62,7 +63,7 @@ func TestEnsureAssignableUserMatchesBugAssignRules(t *testing.T) {
 	if err := h.ensureAssignableUser(project.ID, tester.ID); !errors.Is(err, errBugAssigneeRole) {
 		t.Fatalf("expected tester to be rejected by role, got %v", err)
 	}
-	if err := h.ensureAssignableUser(project.ID, outsider.ID); !errors.Is(err, errForbidden) {
+	if err := h.ensureAssignableUser(project.ID, outsider.ID); !errors.Is(err, service.ErrForbidden) {
 		t.Fatalf("expected outsider to be rejected as non-member, got %v", err)
 	}
 }
@@ -132,7 +133,7 @@ func setupBugHandlerFixture(t *testing.T) bugHandlerFixture {
 	}
 }
 
-func newBugHandlerRouter(userID uint, role string, project *model.Project) *gin.Engine {
+func newBugHandlerRouter(userID uint, role string, project *model.Project, bug *model.BugReport) *gin.Engine {
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, userID)
@@ -140,6 +141,9 @@ func newBugHandlerRouter(userID uint, role string, project *model.Project) *gin.
 		if project != nil {
 			c.Set(middleware.CtxProjectKey, project)
 			c.Set(middleware.CtxIsOwnerKey, project.OwnerID == userID)
+		}
+		if bug != nil {
+			c.Set(middleware.CtxBugKey, bug)
 		}
 		c.Next()
 	})
@@ -149,7 +153,7 @@ func newBugHandlerRouter(userID uint, role string, project *model.Project) *gin.
 func TestCreateRejectsNonDeveloperInitialAssignee(t *testing.T) {
 	fixture := setupBugHandlerFixture(t)
 
-	r := newBugHandlerRouter(fixture.tester.ID, model.RoleTester, &fixture.project)
+	r := newBugHandlerRouter(fixture.tester.ID, model.RoleTester, &fixture.project, nil)
 	r.POST("/projects/:id/bugs", fixture.handler.Create)
 
 	body := bytes.NewBufferString(fmt.Sprintf(`{"title":"登录缺陷","severity":"high","assigned_to":%d}`, fixture.tester.ID))
@@ -189,7 +193,7 @@ func TestAssignRejectsNonDeveloperAssignee(t *testing.T) {
 		t.Fatalf("create bug: %v", err)
 	}
 
-	r := newBugHandlerRouter(fixture.owner.ID, model.RoleProduct, nil)
+	r := newBugHandlerRouter(fixture.owner.ID, model.RoleProduct, &fixture.project, &bug)
 	r.PATCH("/bugs/:id/assign", fixture.handler.Assign)
 
 	body := bytes.NewBufferString(fmt.Sprintf(`{"assigned_to":%d}`, fixture.tester.ID))
@@ -230,7 +234,7 @@ func TestUpdateStatusMaintainsResolvedAtLifecycle(t *testing.T) {
 		t.Fatalf("create bug: %v", err)
 	}
 
-	r := newBugHandlerRouter(fixture.developer.ID, model.RoleDeveloper, nil)
+	r := newBugHandlerRouter(fixture.developer.ID, model.RoleDeveloper, &fixture.project, &bug)
 	r.PATCH("/bugs/:id/status", fixture.handler.UpdateStatus)
 
 	resolveReq := httptest.NewRequest(
