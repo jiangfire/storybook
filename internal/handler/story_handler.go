@@ -20,7 +20,7 @@ type StoryHandler struct {
 	storySvc       *service.StoryService
 	userRepo       repository.UserRepo
 	storyRepo      *repository.StoryRepository
-	projectRepo    *repository.ProjectRepository
+	projectRepo    repository.ProjectRepo
 	activityRepo   repository.ActivityRepo
 	boardColumnRepo *repository.BoardColumnRepository
 	notifier       service.Notifier

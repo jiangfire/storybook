@@ -51,3 +51,30 @@ type TaskRepo interface {
 	ListByStoryFiltered(storyID uint, status, assignee string) ([]model.Task, error)
 	DB() *gorm.DB
 }
+
+// ProjectRepo 是 handler 包对 ProjectRepository 的最小依赖。
+//
+// 覆盖项目本体、成员关系、技术负责人三类调用面;Search/User-management 的
+// 复杂 join 仍走 DB() 起手。
+type ProjectRepo interface {
+	// 来自 BaseRepository[model.Project]
+	FindByID(id uint) (*model.Project, error)
+	Save(item *model.Project) error
+	Delete(id uint) error
+
+	// project_repo.go 自有方法
+	ExistsByOwnerAndName(ownerID uint, name string, excludeID ...uint) (bool, error)
+	CreateWithTransaction(project *model.Project, member *model.ProjectMember, columns []model.BoardColumn) error
+	CountMembers(projectID uint) (int64, error)
+	ListMembers(projectID uint) ([]model.ProjectMember, error)
+	IsMember(projectID, userID uint) (bool, error)
+	AddMember(member *model.ProjectMember) error
+	RemoveMember(projectID, userID uint) (int64, error)
+	GetMember(projectID, userID uint) (*model.ProjectMember, error)
+	HasTechLead(projectID, userID uint) (bool, error)
+	AddTechLead(lead *model.ProjectTechLead) error
+	RemoveTechLead(projectID, userID uint) (int64, error)
+	ListTechLeads(projectID uint) ([]model.ProjectTechLead, error)
+
+	DB() *gorm.DB
+}

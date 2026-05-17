@@ -17,7 +17,7 @@ type MCPHandler struct {
 	svc       *service.MCPService
 	db        *gorm.DB
 	storyRepo *repository.StoryRepository
-	projectRepo *repository.ProjectRepository
+	projectRepo repository.ProjectRepo
 }
 
 type mcpValidateReq struct {

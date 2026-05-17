@@ -23,7 +23,7 @@ type SearchHandler struct {
 	vectorSvc service.VectorService
 	storyRepo *repository.StoryRepository
 	bugRepo   *repository.BugRepository
-	projectRepo *repository.ProjectRepository
+	projectRepo repository.ProjectRepo
 }
 
 func NewSearchHandler(db *gorm.DB) *SearchHandler {

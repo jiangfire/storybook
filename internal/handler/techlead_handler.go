@@ -19,7 +19,7 @@ import (
 type TechLeadHandler struct {
 	db          *gorm.DB
 	storyRepo   *repository.StoryRepository
-	projectRepo *repository.ProjectRepository
+	projectRepo repository.ProjectRepo
 	userRepo    repository.UserRepo
 	taskRepo    repository.TaskRepo
 	activityRepo repository.ActivityRepo

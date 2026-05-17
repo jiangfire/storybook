@@ -20,7 +20,7 @@ type BugHandler struct {
 	bugRepo      *repository.BugRepository
 	storyRepo    *repository.StoryRepository
 	userRepo     repository.UserRepo
-	projectRepo  *repository.ProjectRepository
+	projectRepo  repository.ProjectRepo
 	activityRepo repository.ActivityRepo
 	notifier     service.Notifier
 	events       EventPublisher
