@@ -249,18 +249,6 @@ function setProjectStore(isOwner: boolean) {
   });
 }
 
-function getSelectByDefaultOption(optionName: string) {
-  const select = screen
-    .getAllByRole('combobox')
-    .find((element) => within(element).queryByRole('option', { name: optionName }));
-
-  if (!(select instanceof HTMLSelectElement)) {
-    throw new Error(`select with option "${optionName}" not found`);
-  }
-
-  return select;
-}
-
 function getSelectByDefaultOptionInSection(sectionName: string, optionName: string) {
   const section = getSectionByHeading(sectionName);
   const select = within(section)
