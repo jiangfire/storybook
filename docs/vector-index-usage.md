@@ -6,7 +6,7 @@
 
 - `scripts/migrate_vector.sql`
 - `internal/service/vector_service.go`
-- `internal/router/router.go`
+- `internal/wiring/wiring.go`（依据 `EmbeddingProvider` 等 cfg 字段决定是否注入 VectorService）
 
 > 更新说明：独立入口 `cmd/index-vector` 已删除，当前仓库不再提供单独的批量索引 CLI。下文涉及该命令的内容属于历史说明，执行时不要再直接使用。
 

@@ -28,8 +28,8 @@
   - 支持 `-batch`
   - 支持 `-force`
   - 支持 `-ollama-dimension`
-- `internal/router/router.go`
-  - 只有满足前置条件时才启用语义搜索
+- `internal/wiring/wiring.go`
+  - 只有满足前置条件（`EmbeddingProvider` 等 cfg 字段）时才实例化 `VectorService` 并注入相关 handler
 - `internal/service/story_service.go`
   - 故事创建/更新时自动触发增量索引
 

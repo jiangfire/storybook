@@ -71,7 +71,7 @@
 | `internal/service/vector_service.go` | 搜索与索引 |
 | `internal/service/story_service.go` | 故事写入后的增量索引 |
 | `internal/handler/search_handler.go` | 语义搜索 API |
-| `internal/router/router.go` | 运行时能力接入 |
+| `internal/wiring/wiring.go` | 运行时能力接入（依据 cfg 字段决定是否实例化 VectorService） |
 | 历史上的 `cmd/index-vector/main.go` | 旧的批量索引 CLI，当前已删除 |
 
 ## API 能力
