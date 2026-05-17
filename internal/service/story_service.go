@@ -293,23 +293,53 @@ func (s *StoryService) UpdateStatus(story *model.UserStory, userID uint, newStat
 	return nil
 }
 
-func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID, status, evidence, notes string, actor any) (time.Time, error) {
+// mutateAC executes the common AC mutation skeleton: parse → apply fn → marshal →
+// save → activity log. The caller supplies a closure that performs the actual
+// business logic and returns old/new values for auditing.
+func (s *StoryService) mutateAC(
+	story *model.UserStory, userID uint, action string,
+	fn func(criteria []model.AcceptanceCriterion) (newCriteria []model.AcceptanceCriterion, oldValue, newValue map[string]any, err error),
+) error {
 	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
 	if err != nil {
-		return time.Time{}, ErrACCorrupted
+		return ErrACCorrupted
 	}
 
-	found := false
-	var oldValue map[string]any
-	now := time.Now()
-	for i := range criteria {
-		if criteria[i].ID == acID {
-			found = true
-			oldValue = map[string]any{
-				"status":   criteria[i].Status,
-				"evidence": criteria[i].Evidence,
-				"notes":    criteria[i].Notes,
+	newCriteria, oldValue, newValue, err := fn(criteria)
+	if err != nil {
+		return err
+	}
+
+	story.AcceptanceCriteria = model.MarshalJSON(newCriteria)
+	if err := s.db.Save(story).Error; err != nil {
+		return err
+	}
+
+	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, action, oldValue, newValue),
+		"write story activity log", "story_id", story.ID, "action", action)
+	return nil
+}
+
+// broadcastAC sends a project-scoped WebSocket event when AC data changes.
+func (s *StoryService) broadcastAC(projectID uint, event string, storyID uint, acID string, actor any, extra map[string]any) {
+	if s.events == nil {
+		return
+	}
+	payload := map[string]any{"story_id": storyID, "ac_id": acID, "actor": actor}
+	for k, v := range extra {
+		payload[k] = v
+	}
+	s.events.BroadcastProject(projectID, event, payload)
+}
+
+func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID, status, evidence, notes string, actor any) (time.Time, error) {
+	var verifiedAt time.Time
+	err := s.mutateAC(story, userID, "ac_updated", func(criteria []model.AcceptanceCriterion) ([]model.AcceptanceCriterion, map[string]any, map[string]any, error) {
+		for i := range criteria {
+			if criteria[i].ID != acID {
+				continue
 			}
+			oldValue := map[string]any{"status": criteria[i].Status, "evidence": criteria[i].Evidence, "notes": criteria[i].Notes}
 			criteria[i].Status = status
 			criteria[i].Evidence = strings.TrimSpace(evidence)
 			criteria[i].Notes = strings.TrimSpace(notes)
@@ -318,36 +348,18 @@ func (s *StoryService) UpdateACStatus(story *model.UserStory, userID uint, acID,
 			if userID != 0 {
 				criteria[i].VerifiedBy = &userID
 			}
+			now := time.Now()
 			criteria[i].VerifiedAt = &now
-			break
+			verifiedAt = now
+			return criteria, oldValue, map[string]any{"ac_id": acID, "status": status, "evidence": evidence, "notes": notes}, nil
 		}
+		return nil, nil, nil, ErrACNotFound
+	})
+	if err != nil {
+		return verifiedAt, err
 	}
-	if !found {
-		return time.Time{}, ErrACNotFound
-	}
-
-	story.AcceptanceCriteria = model.MarshalJSON(criteria)
-	if err := s.db.Save(story).Error; err != nil {
-		return time.Time{}, err
-	}
-
-	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "ac_updated", oldValue, map[string]any{
-		"ac_id":    acID,
-		"status":   status,
-		"evidence": evidence,
-		"notes":    notes,
-	}), "write story activity log", "story_id", story.ID, "action", "ac_updated", "ac_id", acID)
-
-	if s.events != nil {
-		s.events.BroadcastProject(story.ProjectID, "story.ac_updated", map[string]any{
-			"story_id":  story.ID,
-			"ac_id":     acID,
-			"ac_status": status,
-			"actor":     actor,
-		})
-	}
-
-	return now, nil
+	s.broadcastAC(story.ProjectID, "story.ac_updated", story.ID, acID, actor, map[string]any{"ac_status": status})
+	return verifiedAt, nil
 }
 
 // AddAC appends a new acceptance criterion. ID is server-generated as "ac-<N>"
@@ -362,41 +374,18 @@ func (s *StoryService) AddAC(story *model.UserStory, userID uint, description, r
 		return model.AcceptanceCriterion{}, NewValidationError(ValidationIssue{Field: "description", Message: "description最多500字符"})
 	}
 
-	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
+	var ac model.AcceptanceCriterion
+	err := s.mutateAC(story, userID, "ac_added", func(criteria []model.AcceptanceCriterion) ([]model.AcceptanceCriterion, map[string]any, map[string]any, error) {
+		ac = model.AcceptanceCriterion{
+			ID: nextACID(criteria), Ref: strings.TrimSpace(ref), Description: desc,
+			Status: model.ACStatusPending, Notes: strings.TrimSpace(notes), Order: len(criteria) + 1,
+		}
+		return append(criteria, ac), nil, map[string]any{"ac_id": ac.ID, "description": ac.Description, "ref": ac.Ref, "order": ac.Order}, nil
+	})
 	if err != nil {
-		return model.AcceptanceCriterion{}, ErrACCorrupted
-	}
-
-	ac := model.AcceptanceCriterion{
-		ID:          nextACID(criteria),
-		Ref:         strings.TrimSpace(ref),
-		Description: desc,
-		Status:      model.ACStatusPending,
-		Notes:       strings.TrimSpace(notes),
-		Order:       len(criteria) + 1,
-	}
-	criteria = append(criteria, ac)
-
-	story.AcceptanceCriteria = model.MarshalJSON(criteria)
-	if err := s.db.Save(story).Error; err != nil {
 		return model.AcceptanceCriterion{}, err
 	}
-
-	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "ac_added", nil, map[string]any{
-		"ac_id":       ac.ID,
-		"description": ac.Description,
-		"ref":         ac.Ref,
-		"order":       ac.Order,
-	}), "write story activity log", "story_id", story.ID, "action", "ac_added", "ac_id", ac.ID)
-
-	if s.events != nil {
-		s.events.BroadcastProject(story.ProjectID, "story.ac_added", map[string]any{
-			"story_id": story.ID,
-			"ac_id":    ac.ID,
-			"actor":    actor,
-		})
-	}
-
+	s.broadcastAC(story.ProjectID, "story.ac_added", story.ID, ac.ID, actor, nil)
 	return ac, nil
 }
 
@@ -408,7 +397,6 @@ func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string
 	if err != nil {
 		return model.AcceptanceCriterion{}, ErrACCorrupted
 	}
-
 	idx := -1
 	for i := range criteria {
 		if criteria[i].ID == acID {
@@ -420,12 +408,7 @@ func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string
 		return model.AcceptanceCriterion{}, ErrACNotFound
 	}
 
-	oldValue := map[string]any{
-		"description": criteria[idx].Description,
-		"ref":         criteria[idx].Ref,
-		"notes":       criteria[idx].Notes,
-		"order":       criteria[idx].Order,
-	}
+	oldValue := map[string]any{"description": criteria[idx].Description, "ref": criteria[idx].Ref, "notes": criteria[idx].Notes, "order": criteria[idx].Order}
 	changed := false
 
 	if description != nil {
@@ -442,16 +425,14 @@ func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string
 		}
 	}
 	if ref != nil {
-		trimmed := strings.TrimSpace(*ref)
-		if criteria[idx].Ref != trimmed {
-			criteria[idx].Ref = trimmed
+		if v := strings.TrimSpace(*ref); criteria[idx].Ref != v {
+			criteria[idx].Ref = v
 			changed = true
 		}
 	}
 	if notes != nil {
-		trimmed := strings.TrimSpace(*notes)
-		if criteria[idx].Notes != trimmed {
-			criteria[idx].Notes = trimmed
+		if v := strings.TrimSpace(*notes); criteria[idx].Notes != v {
+			criteria[idx].Notes = v
 			changed = true
 		}
 	}
@@ -464,27 +445,12 @@ func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string
 		return criteria[idx], nil
 	}
 
-	story.AcceptanceCriteria = model.MarshalJSON(criteria)
-	if err := s.db.Save(story).Error; err != nil {
+	if err = s.mutateAC(story, userID, "ac_edited", func(_ []model.AcceptanceCriterion) ([]model.AcceptanceCriterion, map[string]any, map[string]any, error) {
+		return criteria, oldValue, map[string]any{"ac_id": acID, "description": criteria[idx].Description, "ref": criteria[idx].Ref, "notes": criteria[idx].Notes, "order": criteria[idx].Order}, nil
+	}); err != nil {
 		return model.AcceptanceCriterion{}, err
 	}
-
-	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "ac_edited", oldValue, map[string]any{
-		"ac_id":       criteria[idx].ID,
-		"description": criteria[idx].Description,
-		"ref":         criteria[idx].Ref,
-		"notes":       criteria[idx].Notes,
-		"order":       criteria[idx].Order,
-	}), "write story activity log", "story_id", story.ID, "action", "ac_edited", "ac_id", acID)
-
-	if s.events != nil {
-		s.events.BroadcastProject(story.ProjectID, "story.ac_edited", map[string]any{
-			"story_id": story.ID,
-			"ac_id":    acID,
-			"actor":    actor,
-		})
-	}
-
+	s.broadcastAC(story.ProjectID, "story.ac_edited", story.ID, acID, actor, nil)
 	return criteria[idx], nil
 }
 
@@ -492,44 +458,19 @@ func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string
 // preserved as-is; clients that want a compact 1..N sequence can re-issue
 // UpdateAC calls.
 func (s *StoryService) RemoveAC(story *model.UserStory, userID uint, acID string, actor any) error {
-	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
-	if err != nil {
-		return ErrACCorrupted
-	}
-
-	idx := -1
-	for i := range criteria {
-		if criteria[i].ID == acID {
-			idx = i
-			break
+	err := s.mutateAC(story, userID, "ac_removed", func(criteria []model.AcceptanceCriterion) ([]model.AcceptanceCriterion, map[string]any, map[string]any, error) {
+		for i := range criteria {
+			if criteria[i].ID == acID {
+				removed := criteria[i]
+				return append(criteria[:i], criteria[i+1:]...), map[string]any{"ac_id": removed.ID, "description": removed.Description, "ref": removed.Ref, "order": removed.Order}, nil, nil
+			}
 		}
-	}
-	if idx < 0 {
-		return ErrACNotFound
-	}
-
-	removed := criteria[idx]
-	criteria = append(criteria[:idx], criteria[idx+1:]...)
-	story.AcceptanceCriteria = model.MarshalJSON(criteria)
-	if err := s.db.Save(story).Error; err != nil {
+		return nil, nil, nil, ErrACNotFound
+	})
+	if err != nil {
 		return err
 	}
-
-	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "ac_removed", map[string]any{
-		"ac_id":       removed.ID,
-		"description": removed.Description,
-		"ref":         removed.Ref,
-		"order":       removed.Order,
-	}, nil), "write story activity log", "story_id", story.ID, "action", "ac_removed", "ac_id", acID)
-
-	if s.events != nil {
-		s.events.BroadcastProject(story.ProjectID, "story.ac_removed", map[string]any{
-			"story_id": story.ID,
-			"ac_id":    acID,
-			"actor":    actor,
-		})
-	}
-
+	s.broadcastAC(story.ProjectID, "story.ac_removed", story.ID, acID, actor, nil)
 	return nil
 }
 
