@@ -4,337 +4,275 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"git.neolidy.top/neo/storybook/internal/auth"
-	"git.neolidy.top/neo/storybook/internal/handler"
+	"git.neolidy.top/neo/storybook/internal/config"
 	"git.neolidy.top/neo/storybook/internal/metrics"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/realtime"
-	"git.neolidy.top/neo/storybook/internal/service"
 	"git.neolidy.top/neo/storybook/internal/webui"
+	"git.neolidy.top/neo/storybook/internal/wiring"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 )
 
+// New 是面向现存测试的薄包装：构造默认 logger 后转交 NewWithLogger。
+// 测试以 `router.New(db, tm)` 调用，P3.3.3 之后会被改造为接受 wiring.Container。
 func New(db *gorm.DB, tokenManager *auth.TokenManager) *gin.Engine {
 	return NewWithLogger(db, tokenManager, slog.Default())
 }
 
+// NewWithLogger 自加载 cfg、构造 wiring.Container，再生成 engine。
+// 仍保留 (db, tm, logger) 旧签名以保护 main.go 与所有 e2e 测试；
+// P3.3.3 会改为只接受 *wiring.Container 并删除本函数。
 func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Logger) *gin.Engine {
+	cfg, err := config.LoadForBootstrap()
+	if err != nil {
+		// LoadForBootstrap 不强校验 JWT，理论上只有 env 解析数字失败才会到这里。
+		// 留 logger 输出后退化到零值 cfg：保证测试不被 env 解析错误拖垮。
+		logger.Warn("router: config load failed, using zero cfg", "error", err)
+		cfg = &config.Config{}
+	}
+	container, err := wiring.Build(cfg, db, logger, tokenManager)
+	if err != nil {
+		// 现实现中 Build 不返回非 nil error；保留分支防止未来扩展时静默吞掉。
+		logger.Error("router: wiring build failed", "error", err)
+		panic(err)
+	}
+	return engineFromContainer(container)
+}
+
+// engineFromContainer 把全部路由声明集中在一处，仅依赖 Container 字段。
+// P3.3.3 重命名为 router.New(c *wiring.Container) 后将作为唯一公共入口。
+func engineFromContainer(c *wiring.Container) *gin.Engine {
 	// 统一启用严格JSON解码，避免未知字段静默吞掉。
 	gin.EnableJsonDecoderDisallowUnknownFields()
 	r := gin.New()
-	r.Use(middleware.RequestLogger(logger), middleware.Recovery(logger), middleware.CORS())
+	r.Use(middleware.RequestLogger(c.Logger), middleware.Recovery(c.Logger), middleware.CORS())
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	r.GET("/health", func(ctx *gin.Context) {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	// /metrics exposes Prometheus collectors. Skipped entirely when credentials
 	// are unset so a misconfigured deployment cannot silently leak histograms
 	// over an unauthenticated endpoint.
-	if metricsUser, metricsPass := strings.TrimSpace(os.Getenv("METRICS_USER")), strings.TrimSpace(os.Getenv("METRICS_PASS")); metricsUser != "" && metricsPass != "" {
+	if metricsUser, metricsPass := strings.TrimSpace(c.Cfg.MetricsUser), strings.TrimSpace(c.Cfg.MetricsPass); metricsUser != "" && metricsPass != "" {
 		r.GET("/metrics",
 			middleware.BasicAuth(metricsUser, metricsPass, "metrics"),
 			gin.WrapH(promhttp.HandlerFor(metrics.Registry, promhttp.HandlerOpts{})),
 		)
-		logger.Info("metrics endpoint registered", "path", "/metrics")
+		c.Logger.Info("metrics endpoint registered", "path", "/metrics")
 	} else {
-		logger.Info("metrics endpoint disabled: METRICS_USER/METRICS_PASS unset")
+		c.Logger.Info("metrics endpoint disabled: METRICS_USER/METRICS_PASS unset")
 	}
 
 	// /readyz performs a real DB ping with a short timeout. Returns 503 when the
 	// underlying connection cannot answer in time so orchestrators (k8s,
 	// load balancers) can route traffic away from a degraded instance.
-	r.GET("/readyz", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	r.GET("/readyz", func(ctx *gin.Context) {
+		reqCtx, cancel := context.WithTimeout(ctx.Request.Context(), 2*time.Second)
 		defer cancel()
 
-		sqlDB, err := db.DB()
+		sqlDB, err := c.DB.DB()
 		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "error": "db handle: " + err.Error()})
+			ctx.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "error": "db handle: " + err.Error()})
 			return
 		}
-		if err := sqlDB.PingContext(ctx); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "error": "db ping: " + err.Error()})
+		if err := sqlDB.PingContext(reqCtx); err != nil {
+			ctx.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable", "error": "db ping: " + err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+		ctx.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
-
-	authHandler := handler.NewAuthHandler(db, tokenManager)
-	projectHandler := handler.NewProjectHandler(db)
-	hub := realtime.NewHub(db)
-	vectorSvc := buildVectorService(db, logger)
-	storyHandler := handler.NewStoryHandlerWithVector(db, hub, vectorSvc)
-	meHandler := handler.NewMeHandler(db)
-	aiHandler := handler.NewAIHandler(db)
-	testCaseHandler := handler.NewTestCaseHandler(db)
-	taskHandler := handler.NewTaskHandler(db, hub)
-	sprintHandler := handler.NewSprintHandler(db)
-	bugHandler := handler.NewBugHandler(db)
-	bugCommentHandler := handler.NewBugCommentHandler(db)
-	reportHandler := handler.NewReportHandler(db)
-	searchHandler := handler.NewSearchHandlerWithVector(db, vectorSvc)
-	if vectorSvc == nil {
-		searchHandler = handler.NewSearchHandler(db)
-	}
-	mcpHandler := handler.NewMCPHandler(db)
-	wsHandler := handler.NewWSHandler(tokenManager, hub)
-	techLeadHandler := handler.NewTechLeadHandler(db)
-	userManagementHandler := handler.NewUserManagementHandler(db)
-	notificationHandler := handler.NewNotificationHandler(db)
-
-	// Wire the in-app notifier into every handler that emits user-facing events.
-	// Constructed after the handlers so we can keep their constructor signatures
-	// stable (existing tests pass *gorm.DB + Hub only); WithNotifier mutates the
-	// already-built instances in place.
-	notifier := service.NewNotificationService(db, hub, logger)
-	storyHandler.WithNotifier(notifier)
-	taskHandler.WithNotifier(notifier)
-	sprintHandler.WithNotifier(notifier)
-	bugHandler.WithNotifier(notifier)
-
-	// Bug & Sprint emit project-scope WebSocket events (bug.updated/deleted,
-	// sprint.closed/cancelled/deleted) — wire the Hub the same way as Notifier
-	// so the constructors stay db-only for tests.
-	bugHandler.WithEvents(hub)
-	sprintHandler.WithEvents(hub)
-	bugCommentHandler.WithEvents(hub)
 
 	api := r.Group("/api")
 
 	authLimiter := middleware.NewIPLimiter(3, 1)
 	authGroup := api.Group("/auth")
 	{
-		authGroup.POST("/register", authLimiter.Middleware(), authHandler.Register)
-		authGroup.POST("/login", authLimiter.Middleware(), authHandler.Login)
-		authGroup.POST("/refresh", authLimiter.Middleware(), authHandler.Refresh)
+		authGroup.POST("/register", authLimiter.Middleware(), c.Auth.Register)
+		authGroup.POST("/login", authLimiter.Middleware(), c.Auth.Login)
+		authGroup.POST("/refresh", authLimiter.Middleware(), c.Auth.Refresh)
 	}
 
 	userLimiter := middleware.NewUserRateLimiter(100)
-	aiLimiter := middleware.NewNamedUserRateLimiter("ai", aiUserRateLimitPerMin())
+	aiRate := c.Cfg.AIUserRateLimitPerMin
+	if aiRate <= 0 {
+		aiRate = 10
+	}
+	aiLimiter := middleware.NewNamedUserRateLimiter("ai", aiRate)
 	protected := api.Group("")
-	protected.Use(middleware.AuthRequired(tokenManager))
+	protected.Use(middleware.AuthRequired(c.TokenManager))
 	protected.Use(userLimiter.Middleware())
 	{
-		protected.POST("/projects", projectHandler.CreateProject)
-		protected.GET("/projects", projectHandler.ListProjects)
-		projectAccess := middleware.RequireProjectAccess(db, "id")
+		protected.POST("/projects", c.Project.CreateProject)
+		protected.GET("/projects", c.Project.ListProjects)
+		projectAccess := middleware.RequireProjectAccess(c.DB, "id")
 
-		protected.GET("/projects/:id", projectAccess, projectHandler.GetProject)
-		protected.PUT("/projects/:id", projectAccess, projectHandler.UpdateProject)
-		protected.GET("/projects/:id/overview", projectAccess, projectHandler.GetOverview)
-		protected.DELETE("/projects/:id", projectAccess, projectHandler.DeleteProject)
-		protected.POST("/projects/:id/archive", projectAccess, projectHandler.ArchiveProject)
-		protected.POST("/projects/:id/unarchive", projectAccess, projectHandler.UnarchiveProject)
-		protected.GET("/projects/:id/export", projectAccess, projectHandler.ExportProject)
-		protected.GET("/projects/:id/members", projectAccess, projectHandler.ListMembers)
-		protected.GET("/projects/:id/member-candidates", projectAccess, projectHandler.ListMemberCandidates)
-		protected.POST("/projects/:id/members", projectAccess, projectHandler.AddMember)
-		protected.DELETE("/projects/:id/members/:userID", projectAccess, projectHandler.RemoveMember)
+		protected.GET("/projects/:id", projectAccess, c.Project.GetProject)
+		protected.PUT("/projects/:id", projectAccess, c.Project.UpdateProject)
+		protected.GET("/projects/:id/overview", projectAccess, c.Project.GetOverview)
+		protected.DELETE("/projects/:id", projectAccess, c.Project.DeleteProject)
+		protected.POST("/projects/:id/archive", projectAccess, c.Project.ArchiveProject)
+		protected.POST("/projects/:id/unarchive", projectAccess, c.Project.UnarchiveProject)
+		protected.GET("/projects/:id/export", projectAccess, c.Project.ExportProject)
+		protected.GET("/projects/:id/members", projectAccess, c.Project.ListMembers)
+		protected.GET("/projects/:id/member-candidates", projectAccess, c.Project.ListMemberCandidates)
+		protected.POST("/projects/:id/members", projectAccess, c.Project.AddMember)
+		protected.DELETE("/projects/:id/members/:userID", projectAccess, c.Project.RemoveMember)
 
-		protected.POST("/projects/:id/stories", projectAccess, storyHandler.CreateStory)
-		protected.GET("/projects/:id/stories", projectAccess, storyHandler.ListStories)
-		protected.GET("/projects/:id/board", projectAccess, storyHandler.GetBoard)
-		protected.POST("/projects/:id/sprints", projectAccess, sprintHandler.Create)
-		protected.GET("/projects/:id/sprints", projectAccess, sprintHandler.List)
-		protected.POST("/projects/:id/bugs", projectAccess, bugHandler.Create)
-		protected.GET("/projects/:id/bugs", projectAccess, bugHandler.List)
-		protected.GET("/projects/:id/reports/velocity", projectAccess, reportHandler.Velocity)
-		protected.GET("/projects/:id/reports/quality", projectAccess, reportHandler.Quality)
-		protected.GET("/projects/:id/reports/burndown", projectAccess, reportHandler.Burndown)
-		protected.GET("/projects/:id/reports/cumulative-flow", projectAccess, reportHandler.CumulativeFlow)
-		protected.GET("/projects/:id/reports/cycle-time", projectAccess, reportHandler.CycleTime)
-		protected.GET("/projects/:id/reports/lead-time", projectAccess, reportHandler.LeadTime)
-		protected.GET("/projects/:id/reports/throughput", projectAccess, reportHandler.Throughput)
+		protected.POST("/projects/:id/stories", projectAccess, c.Story.CreateStory)
+		protected.GET("/projects/:id/stories", projectAccess, c.Story.ListStories)
+		protected.GET("/projects/:id/board", projectAccess, c.Story.GetBoard)
+		protected.POST("/projects/:id/sprints", projectAccess, c.Sprint.Create)
+		protected.GET("/projects/:id/sprints", projectAccess, c.Sprint.List)
+		protected.POST("/projects/:id/bugs", projectAccess, c.Bug.Create)
+		protected.GET("/projects/:id/bugs", projectAccess, c.Bug.List)
+		protected.GET("/projects/:id/reports/velocity", projectAccess, c.Report.Velocity)
+		protected.GET("/projects/:id/reports/quality", projectAccess, c.Report.Quality)
+		protected.GET("/projects/:id/reports/burndown", projectAccess, c.Report.Burndown)
+		protected.GET("/projects/:id/reports/cumulative-flow", projectAccess, c.Report.CumulativeFlow)
+		protected.GET("/projects/:id/reports/cycle-time", projectAccess, c.Report.CycleTime)
+		protected.GET("/projects/:id/reports/lead-time", projectAccess, c.Report.LeadTime)
+		protected.GET("/projects/:id/reports/throughput", projectAccess, c.Report.Throughput)
 
-		protected.GET("/me/dashboard", meHandler.Dashboard)
-		protected.GET("/notifications", notificationHandler.List)
-		protected.GET("/notifications/unread-count", notificationHandler.UnreadCount)
-		protected.POST("/notifications/:id/read", notificationHandler.MarkRead)
-		protected.POST("/notifications/mark-all-read", notificationHandler.MarkAllRead)
-		protected.GET("/search", searchHandler.Search)
-		protected.GET("/search/capabilities", searchHandler.Capabilities)
+		protected.GET("/me/dashboard", c.Me.Dashboard)
+		protected.GET("/notifications", c.Notification.List)
+		protected.GET("/notifications/unread-count", c.Notification.UnreadCount)
+		protected.POST("/notifications/:id/read", c.Notification.MarkRead)
+		protected.POST("/notifications/mark-all-read", c.Notification.MarkAllRead)
+		protected.GET("/search", c.Search.Search)
+		protected.GET("/search/capabilities", c.Search.Capabilities)
 
 		// 语义搜索（向量搜索）
-		protected.GET("/search/semantic", searchHandler.SearchSemantic)
-		protected.GET("/search/projects", searchHandler.SearchProjectsSemantic)
-		protected.POST("/stories/similar", searchHandler.SimilarStories)
-		protected.POST("/tags/suggest", searchHandler.SuggestTags)
+		protected.GET("/search/semantic", c.Search.SearchSemantic)
+		protected.GET("/search/projects", c.Search.SearchProjectsSemantic)
+		protected.POST("/stories/similar", c.Search.SimilarStories)
+		protected.POST("/tags/suggest", c.Search.SuggestTags)
 
-		storyAccess := middleware.RequireStoryAccess(db, "id")
+		storyAccess := middleware.RequireStoryAccess(c.DB, "id")
 
-		protected.GET("/stories/:id", storyAccess, storyHandler.GetStory)
-		protected.PUT("/stories/:id", storyAccess, storyHandler.UpdateStory)
-		protected.DELETE("/stories/:id", storyAccess, storyHandler.DeleteStory)
-		protected.PATCH("/stories/:id/archive", storyAccess, storyHandler.ArchiveStory)
-		protected.PATCH("/stories/:id/restore", storyAccess, storyHandler.RestoreStory)
-		protected.PATCH("/stories/:id/status", storyAccess, storyHandler.UpdateStatus)
-		protected.POST("/stories/:id/claim", storyAccess, storyHandler.ClaimStory)
-		protected.DELETE("/stories/:id/claim", storyAccess, storyHandler.ReleaseStory)
-		protected.PATCH("/stories/:id/acceptance-criteria/:acID", storyAccess, storyHandler.UpdateACStatus)
-		protected.POST("/stories/:id/ac", storyAccess, storyHandler.AddAC)
-		protected.PUT("/stories/:id/ac/:acID", storyAccess, storyHandler.UpdateAC)
-		protected.DELETE("/stories/:id/ac/:acID", storyAccess, storyHandler.DeleteAC)
-		protected.POST("/stories/:id/code-refs", storyAccess, storyHandler.AddCodeReference)
-		protected.GET("/stories/:id/activities", storyAccess, storyHandler.GetActivities)
-		protected.PATCH("/stories/:id/assignee", storyAccess, storyHandler.AssignStory)
-		protected.POST("/stories/:id/review", storyAccess, storyHandler.ReviewStory)
-		protected.PATCH("/stories/:id/sprint", storyAccess, sprintHandler.AssignStory)
-		protected.POST("/stories/:id/tasks", storyAccess, taskHandler.Create)
-		protected.POST("/stories/:id/tasks/split-from-ac", storyAccess, taskHandler.SplitFromAC)
-		protected.GET("/stories/:id/tasks", storyAccess, taskHandler.ListByStory)
-		protected.POST("/stories/:id/test-cases", storyAccess, testCaseHandler.Create)
-		protected.GET("/stories/:id/test-cases", storyAccess, testCaseHandler.ListByStory)
-		protected.PATCH("/test-cases/:id/status", testCaseHandler.UpdateStatus)
-		protected.PUT("/test-cases/:id", testCaseHandler.Update)
-		protected.DELETE("/test-cases/:id", testCaseHandler.Delete)
-		protected.GET("/tasks/:id", taskHandler.Get)
-		protected.PUT("/tasks/:id", taskHandler.Update)
-		protected.DELETE("/tasks/:id", taskHandler.Delete)
-		protected.PATCH("/tasks/:id/status", taskHandler.UpdateStatus)
-		protected.PATCH("/tasks/:id/progress", taskHandler.UpdateProgress)
-		protected.POST("/tasks/:id/claim", taskHandler.Claim)
-		protected.DELETE("/tasks/:id/claim", taskHandler.Release)
-		protected.POST("/tasks/:id/code-refs", taskHandler.AddCodeReference)
-		protected.PATCH("/sprints/:id/status", sprintHandler.UpdateStatus)
-		protected.POST("/sprints/:id/close", sprintHandler.Close)
-		protected.POST("/sprints/:id/cancel", sprintHandler.Cancel)
-		protected.POST("/sprints/:id/reorder", sprintHandler.Reorder)
-		protected.DELETE("/sprints/:id", sprintHandler.Delete)
-		protected.GET("/bugs/:id", bugHandler.Get)
-		protected.PUT("/bugs/:id", bugHandler.Update)
-		protected.DELETE("/bugs/:id", bugHandler.Delete)
-		protected.PATCH("/bugs/:id/status", bugHandler.UpdateStatus)
-		protected.PATCH("/bugs/:id/assign", bugHandler.Assign)
-		protected.POST("/bugs/:id/comments", bugCommentHandler.Create)
-		protected.GET("/bugs/:id/comments", bugCommentHandler.List)
-		protected.PUT("/bugs/:id/comments/:commentID", bugCommentHandler.Update)
-		protected.DELETE("/bugs/:id/comments/:commentID", bugCommentHandler.Delete)
+		protected.GET("/stories/:id", storyAccess, c.Story.GetStory)
+		protected.PUT("/stories/:id", storyAccess, c.Story.UpdateStory)
+		protected.DELETE("/stories/:id", storyAccess, c.Story.DeleteStory)
+		protected.PATCH("/stories/:id/archive", storyAccess, c.Story.ArchiveStory)
+		protected.PATCH("/stories/:id/restore", storyAccess, c.Story.RestoreStory)
+		protected.PATCH("/stories/:id/status", storyAccess, c.Story.UpdateStatus)
+		protected.POST("/stories/:id/claim", storyAccess, c.Story.ClaimStory)
+		protected.DELETE("/stories/:id/claim", storyAccess, c.Story.ReleaseStory)
+		protected.PATCH("/stories/:id/acceptance-criteria/:acID", storyAccess, c.Story.UpdateACStatus)
+		protected.POST("/stories/:id/ac", storyAccess, c.Story.AddAC)
+		protected.PUT("/stories/:id/ac/:acID", storyAccess, c.Story.UpdateAC)
+		protected.DELETE("/stories/:id/ac/:acID", storyAccess, c.Story.DeleteAC)
+		protected.POST("/stories/:id/code-refs", storyAccess, c.Story.AddCodeReference)
+		protected.GET("/stories/:id/activities", storyAccess, c.Story.GetActivities)
+		protected.PATCH("/stories/:id/assignee", storyAccess, c.Story.AssignStory)
+		protected.POST("/stories/:id/review", storyAccess, c.Story.ReviewStory)
+		protected.PATCH("/stories/:id/sprint", storyAccess, c.Sprint.AssignStory)
+		protected.POST("/stories/:id/tasks", storyAccess, c.Task.Create)
+		protected.POST("/stories/:id/tasks/split-from-ac", storyAccess, c.Task.SplitFromAC)
+		protected.GET("/stories/:id/tasks", storyAccess, c.Task.ListByStory)
+		protected.POST("/stories/:id/test-cases", storyAccess, c.TestCase.Create)
+		protected.GET("/stories/:id/test-cases", storyAccess, c.TestCase.ListByStory)
+		protected.PATCH("/test-cases/:id/status", c.TestCase.UpdateStatus)
+		protected.PUT("/test-cases/:id", c.TestCase.Update)
+		protected.DELETE("/test-cases/:id", c.TestCase.Delete)
+		protected.GET("/tasks/:id", c.Task.Get)
+		protected.PUT("/tasks/:id", c.Task.Update)
+		protected.DELETE("/tasks/:id", c.Task.Delete)
+		protected.PATCH("/tasks/:id/status", c.Task.UpdateStatus)
+		protected.PATCH("/tasks/:id/progress", c.Task.UpdateProgress)
+		protected.POST("/tasks/:id/claim", c.Task.Claim)
+		protected.DELETE("/tasks/:id/claim", c.Task.Release)
+		protected.POST("/tasks/:id/code-refs", c.Task.AddCodeReference)
+		protected.PATCH("/sprints/:id/status", c.Sprint.UpdateStatus)
+		protected.POST("/sprints/:id/close", c.Sprint.Close)
+		protected.POST("/sprints/:id/cancel", c.Sprint.Cancel)
+		protected.POST("/sprints/:id/reorder", c.Sprint.Reorder)
+		protected.DELETE("/sprints/:id", c.Sprint.Delete)
+		protected.GET("/bugs/:id", c.Bug.Get)
+		protected.PUT("/bugs/:id", c.Bug.Update)
+		protected.DELETE("/bugs/:id", c.Bug.Delete)
+		protected.PATCH("/bugs/:id/status", c.Bug.UpdateStatus)
+		protected.PATCH("/bugs/:id/assign", c.Bug.Assign)
+		protected.POST("/bugs/:id/comments", c.BugComment.Create)
+		protected.GET("/bugs/:id/comments", c.BugComment.List)
+		protected.PUT("/bugs/:id/comments/:commentID", c.BugComment.Update)
+		protected.DELETE("/bugs/:id/comments/:commentID", c.BugComment.Delete)
 
-		protected.POST("/ai/generate-story", aiLimiter.Middleware(), aiHandler.GenerateStory)
-		protected.POST("/ai/stories/:id/split", aiLimiter.Middleware(), storyAccess, aiHandler.SplitStory)
-		protected.GET("/ai/stories/:id/invest-check", aiLimiter.Middleware(), storyAccess, aiHandler.INVESTCheck)
-		protected.POST("/ai/stories/:id/refine-ac", aiLimiter.Middleware(), storyAccess, aiHandler.RefineAC)
-		protected.GET("/ai/stories/:id/summary", aiLimiter.Middleware(), storyAccess, aiHandler.SummarizeStory)
-		protected.POST("/ai/stories/:id/translate", aiLimiter.Middleware(), storyAccess, aiHandler.TranslateStory)
-		protected.GET("/ai/stories/:id/dor-check", aiLimiter.Middleware(), storyAccess, aiHandler.DoRCheck)
+		protected.POST("/ai/generate-story", aiLimiter.Middleware(), c.AI.GenerateStory)
+		protected.POST("/ai/stories/:id/split", aiLimiter.Middleware(), storyAccess, c.AI.SplitStory)
+		protected.GET("/ai/stories/:id/invest-check", aiLimiter.Middleware(), storyAccess, c.AI.INVESTCheck)
+		protected.POST("/ai/stories/:id/refine-ac", aiLimiter.Middleware(), storyAccess, c.AI.RefineAC)
+		protected.GET("/ai/stories/:id/summary", aiLimiter.Middleware(), storyAccess, c.AI.SummarizeStory)
+		protected.POST("/ai/stories/:id/translate", aiLimiter.Middleware(), storyAccess, c.AI.TranslateStory)
+		protected.GET("/ai/stories/:id/dor-check", aiLimiter.Middleware(), storyAccess, c.AI.DoRCheck)
 
 		// 技术负责人专用接口
 		techlead := protected.Group("/techlead")
 		techlead.Use(middleware.RequireRoles(model.RoleTechLead, model.RoleAdmin))
 		{
-			techlead.GET("/pending-stories", techLeadHandler.ListPendingStories)
-			techlead.GET("/workload", techLeadHandler.ListWorkload)
-			techlead.GET("/projects", techLeadHandler.ListMyProjects)
+			techlead.GET("/pending-stories", c.TechLead.ListPendingStories)
+			techlead.GET("/workload", c.TechLead.ListWorkload)
+			techlead.GET("/projects", c.TechLead.ListMyProjects)
 		}
 
 		// 项目技术负责人管理（仅admin）
-		protected.POST("/projects/:id/techleads", projectAccess, techLeadHandler.AddTechLead)
-		protected.DELETE("/projects/:id/techleads/:userID", projectAccess, techLeadHandler.RemoveTechLead)
-		protected.GET("/projects/:id/techleads", projectAccess, techLeadHandler.ListProjectTechLeads)
+		protected.POST("/projects/:id/techleads", projectAccess, c.TechLead.AddTechLead)
+		protected.DELETE("/projects/:id/techleads/:userID", projectAccess, c.TechLead.RemoveTechLead)
+		protected.GET("/projects/:id/techleads", projectAccess, c.TechLead.ListProjectTechLeads)
 
 		// 管理员配置
 		admin := protected.Group("/admin")
 		admin.Use(middleware.RequireRoles(model.RoleTechLead, model.RoleAdmin))
 		{
-			admin.GET("/ai/config", aiHandler.GetConfig)
-			admin.PUT("/ai/config", aiHandler.UpsertConfig)
-			admin.POST("/ai/config/test", aiHandler.TestConfig)
+			admin.GET("/ai/config", c.AI.GetConfig)
+			admin.PUT("/ai/config", c.AI.UpsertConfig)
+			admin.POST("/ai/config/test", c.AI.TestConfig)
 		}
 
 		userAdmin := protected.Group("/admin/users")
 		userAdmin.Use(middleware.RequireRoles(model.RoleAdmin))
 		{
-			userAdmin.GET("", userManagementHandler.ListUsers)
-			userAdmin.POST("", userManagementHandler.CreateUser)
-			userAdmin.PUT("/:id", userManagementHandler.UpdateUser)
-			userAdmin.GET("/:id/workload", userManagementHandler.GetUserWorkload)
-			userAdmin.DELETE("/:id", userManagementHandler.DeleteUser)
+			userAdmin.GET("", c.UserManagement.ListUsers)
+			userAdmin.POST("", c.UserManagement.CreateUser)
+			userAdmin.PUT("/:id", c.UserManagement.UpdateUser)
+			userAdmin.GET("/:id/workload", c.UserManagement.GetUserWorkload)
+			userAdmin.DELETE("/:id", c.UserManagement.DeleteUser)
 		}
 	}
 
-	r.GET("/ws", wsHandler.Connect)
+	r.GET("/ws", c.WS.Connect)
 
 	mcpPublic := r.Group("/mcp")
 	{
-		mcpPublic.GET("/health", mcpHandler.Health)
+		mcpPublic.GET("/health", c.MCP.Health)
 	}
 
 	mcp := r.Group("/mcp")
-	mcp.Use(middleware.AuthRequired(tokenManager))
+	mcp.Use(middleware.AuthRequired(c.TokenManager))
 	mcp.Use(userLimiter.Middleware())
 	{
-		mcpStoryAccess := middleware.RequireStoryAccess(db, "id")
-		mcpProjectAccess := middleware.RequireProjectAccess(db, "id")
+		mcpStoryAccess := middleware.RequireStoryAccess(c.DB, "id")
+		mcpProjectAccess := middleware.RequireProjectAccess(c.DB, "id")
 
-		mcp.GET("/stories/:id/acceptance-criteria", mcpStoryAccess, mcpHandler.GetStoryAC)
-		mcp.GET("/stories/:id/ac-coverage", mcpStoryAccess, mcpHandler.ACCoverage)
-		mcp.POST("/stories/:id/acceptance-criteria/:acID/status", mcpStoryAccess, mcpHandler.Validate)
-		mcp.POST("/v1/stories/:id/validate", mcpStoryAccess, mcpHandler.Validate)
-		mcp.GET("/v1/stories/:id", mcpStoryAccess, mcpHandler.GetStory)
-		mcp.GET("/v1/projects/:id/stories", mcpProjectAccess, mcpHandler.ListStories)
-		mcp.POST("/v1/stories/:id/update-ac-status", mcpStoryAccess, mcpHandler.BatchUpdateACStatus)
-		mcp.POST("/v1/stories/:id/generate-ac-tests", mcpStoryAccess, mcpHandler.GenerateACTests)
-		mcp.POST("/v1/stories/:id/analyze-code-ac", mcpStoryAccess, mcpHandler.AnalyzeCodeAC)
-		mcp.GET("/v1/stats/ac-completion", mcpHandler.ACCompletionStats)
+		mcp.GET("/stories/:id/acceptance-criteria", mcpStoryAccess, c.MCP.GetStoryAC)
+		mcp.GET("/stories/:id/ac-coverage", mcpStoryAccess, c.MCP.ACCoverage)
+		mcp.POST("/stories/:id/acceptance-criteria/:acID/status", mcpStoryAccess, c.MCP.Validate)
+		mcp.POST("/v1/stories/:id/validate", mcpStoryAccess, c.MCP.Validate)
+		mcp.GET("/v1/stories/:id", mcpStoryAccess, c.MCP.GetStory)
+		mcp.GET("/v1/projects/:id/stories", mcpProjectAccess, c.MCP.ListStories)
+		mcp.POST("/v1/stories/:id/update-ac-status", mcpStoryAccess, c.MCP.BatchUpdateACStatus)
+		mcp.POST("/v1/stories/:id/generate-ac-tests", mcpStoryAccess, c.MCP.GenerateACTests)
+		mcp.POST("/v1/stories/:id/analyze-code-ac", mcpStoryAccess, c.MCP.AnalyzeCodeAC)
+		mcp.GET("/v1/stats/ac-completion", c.MCP.ACCompletionStats)
 	}
 
 	webui.Register(r)
 
 	return r
-}
-
-func buildVectorService(db *gorm.DB, logger *slog.Logger) service.VectorService {
-	provider := strings.TrimSpace(os.Getenv("EMBEDDING_PROVIDER"))
-	if provider == "" {
-		return nil
-	}
-
-	if db == nil || db.Dialector.Name() != "postgres" {
-		logger.Warn("vector search disabled: postgres + pgvector is required", "provider", provider)
-		return nil
-	}
-
-	embeddingSvc, err := service.NewEmbeddingServiceFromConfig(service.EmbeddingConfig{
-		Provider:        provider,
-		OpenAIKey:       strings.TrimSpace(os.Getenv("OPENAI_API_KEY")),
-		OllamaURL:       strings.TrimSpace(os.Getenv("OLLAMA_URL")),
-		OllamaModel:     strings.TrimSpace(os.Getenv("OLLAMA_MODEL")),
-		OllamaDimension: service.ReadPositiveIntEnv("OLLAMA_DIMENSION"),
-	})
-	if err != nil {
-		logger.Warn("vector search disabled: failed to init embedding service", "provider", provider, "error", err)
-		return nil
-	}
-
-	if err := service.ValidateStoryEmbeddingDimension(db, embeddingSvc); err != nil {
-		logger.Warn("vector search disabled: invalid vector schema", "provider", provider, "error", err, "service_dimension", embeddingSvc.GetDimension())
-		return nil
-	}
-
-	logger.Info("vector search enabled", "provider", provider, "dimension", embeddingSvc.GetDimension())
-	return service.NewVectorService(db, embeddingSvc)
-}
-
-// aiUserRateLimitPerMin reads AI_USER_RATE_LIMIT_PER_MIN with a 10 req/min/user
-// default. router is the single consumer of this env var (Config does not hold
-// it), keeping router.New / NewWithLogger signature unchanged for tests.
-func aiUserRateLimitPerMin() int {
-	v := strings.TrimSpace(os.Getenv("AI_USER_RATE_LIMIT_PER_MIN"))
-	if v == "" {
-		return 10
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil || n <= 0 {
-		return 10
-	}
-	return n
 }
