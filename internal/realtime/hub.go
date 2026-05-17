@@ -86,7 +86,7 @@ func (h *Hub) HandleWS(c *gin.Context, userID uint, selectedProtocol string) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				// prevent a single malformed message from crashing the hub goroutine
+				_ = r
 			}
 			close(done)
 		}()

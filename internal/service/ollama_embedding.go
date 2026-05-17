@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -68,18 +70,24 @@ func (s *OllamaEmbedding) EmbedText(ctx context.Context, text string) ([]float32
 	}
 
 	// 发送 HTTP 请求
-	url := fmt.Sprintf("%s/api/embeddings", s.baseURL)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	endpointURL, err := s.embeddingsEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", endpointURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	// #nosec G107 G704 -- endpointURL restricts Ollama requests to local loopback hosts.
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("ollama api: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -127,4 +135,27 @@ func (s *OllamaEmbedding) EmbedBatch(ctx context.Context, texts []string) ([][]f
 // GetDimension 返回向量维度
 func (s *OllamaEmbedding) GetDimension() int {
 	return s.dimension
+}
+
+func (s *OllamaEmbedding) embeddingsEndpoint() (string, error) {
+	baseURL := strings.TrimSpace(s.baseURL)
+	if baseURL == "" {
+		return "", fmt.Errorf("ollama base URL is empty")
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid ollama base URL: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", fmt.Errorf("invalid ollama base URL scheme: %s", parsed.Scheme)
+	}
+
+	switch strings.ToLower(parsed.Hostname()) {
+	case "localhost", "127.0.0.1", "::1":
+	default:
+		return "", fmt.Errorf("ollama base URL must use a local loopback host")
+	}
+
+	return strings.TrimRight(baseURL, "/") + "/api/embeddings", nil
 }

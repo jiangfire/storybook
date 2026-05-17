@@ -30,7 +30,7 @@ func BasicAuth(user, pass, realm string) gin.HandlerFunc {
 
 		userMatch := subtle.ConstantTimeCompare([]byte(gotUser), expectedUser) == 1
 		passMatch := subtle.ConstantTimeCompare([]byte(gotPass), expectedPass) == 1
-		if !(userMatch && passMatch) {
+		if !userMatch || !passMatch {
 			c.Header("WWW-Authenticate", wwwAuth)
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return

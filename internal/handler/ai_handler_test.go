@@ -247,11 +247,10 @@ func TestGenerateStoryWithFallbackOnConfiguredServiceError(t *testing.T) {
 	if resolvedService == nil || resolvedService.IsConfigured() {
 		t.Fatalf("expected heuristic fallback service")
 	}
-	if result == nil {
-		t.Fatalf("expected fallback result")
-	}
-	if len(result.Warnings) == 0 || result.Warnings[0] != "OpenAI 调用失败，已自动回退到规则草稿，请检查 AI 配置或稍后重试" {
-		t.Fatalf("expected fallback warning, got %#v", result.Warnings)
+	fallbackResult := requireStoryResult(t, result)
+	warnings := fallbackResult.Warnings
+	if len(warnings) == 0 || warnings[0] != "OpenAI 调用失败，已自动回退到规则草稿，请检查 AI 配置或稍后重试" {
+		t.Fatalf("expected fallback warning, got %#v", warnings)
 	}
 }
 
@@ -278,4 +277,13 @@ func ptrBool(value bool) *bool {
 
 func ptrInt(value int) *int {
 	return &value
+}
+
+func requireStoryResult(t *testing.T, result *service.StoryResult) service.StoryResult {
+	t.Helper()
+	if result != nil {
+		return *result
+	}
+	t.Fatalf("expected fallback result")
+	return service.StoryResult{}
 }

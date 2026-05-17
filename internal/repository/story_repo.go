@@ -212,7 +212,7 @@ func (r *StoryRepository) UpdateAssignee(storyID uint, assignedTo *uint) error {
 func (r *StoryRepository) AvgCompletionDaysForUser(userID uint, since time.Time) (float64, error) {
 	var avg float64
 	dateDiffExpr := "JULIANDAY(updated_at) - JULIANDAY(created_at)"
-	if r.DB().Dialector.Name() == "postgres" {
+	if r.DB().Name() == "postgres" {
 		dateDiffExpr = "EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400.0"
 	}
 	err := r.DB().Raw("SELECT COALESCE(AVG("+dateDiffExpr+"), 0) FROM user_stories WHERE assigned_to = ? AND status = ? AND updated_at >= ?", userID, model.StoryStatusDone, since).Scan(&avg).Error

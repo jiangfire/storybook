@@ -346,14 +346,16 @@ func (s *Server) handleHTTPPost(w http.ResponseWriter, r *http.Request) {
 	if !created && !s.checkRateLimit(resolvedSessionID) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
-		json.NewEncoder(w).Encode(map[string]any{
+		if err := json.NewEncoder(w).Encode(map[string]any{
 			"jsonrpc": jsonRPCVersion,
 			"id":      nil,
 			"error": map[string]any{
 				"code":    -32000,
 				"message": "rate limit exceeded",
 			},
-		})
+		}); err != nil {
+			return
+		}
 		return
 	}
 
@@ -369,10 +371,14 @@ func (s *Server) handleHTTPPost(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if isBatch {
-		_ = json.NewEncoder(w).Encode(responses)
+		if err := json.NewEncoder(w).Encode(responses); err != nil {
+			http.Error(w, "write response failed", http.StatusInternalServerError)
+		}
 		return
 	}
-	_ = json.NewEncoder(w).Encode(responses[0])
+	if err := json.NewEncoder(w).Encode(responses[0]); err != nil {
+		http.Error(w, "write response failed", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleHTTPDelete(w http.ResponseWriter, r *http.Request) {

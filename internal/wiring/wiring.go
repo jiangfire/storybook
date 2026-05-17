@@ -129,7 +129,7 @@ func buildVectorService(cfg *config.Config, db *gorm.DB, logger *slog.Logger) se
 		return nil
 	}
 
-	if db == nil || db.Dialector.Name() != "postgres" {
+	if db == nil || db.Name() != "postgres" {
 		logger.Warn("vector search disabled: postgres + pgvector is required", "provider", provider)
 		return nil
 	}

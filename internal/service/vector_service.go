@@ -40,7 +40,7 @@ func NewVectorServiceWithBatchSize(db *gorm.DB, embeddingSvc EmbeddingService, b
 
 // SearchSimilarStories 搜索相似故事
 func (s *vectorService) SearchSimilarStories(ctx context.Context, query string, projectIDs []uint, limit int) ([]SimilarStory, error) {
-	if s.db.Dialector.Name() != "postgres" {
+	if s.db.Name() != "postgres" {
 		return nil, fmt.Errorf("vector search requires postgres with pgvector")
 	}
 	// 安全检查：空 projectIDs
@@ -93,7 +93,7 @@ func (s *vectorService) SearchSimilarStories(ctx context.Context, query string, 
 
 // IndexStory 为单个故事生成并存储向量
 func (s *vectorService) IndexStory(ctx context.Context, story *model.UserStory) error {
-	if s.db.Dialector.Name() != "postgres" {
+	if s.db.Name() != "postgres" {
 		return fmt.Errorf("vector indexing requires postgres with pgvector")
 	}
 	// 1. 准备文本内容
@@ -201,8 +201,7 @@ func (s *vectorService) PrepareStoryContent(story *model.UserStory) string {
 	// 验收标准
 	acs, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
 	if err != nil {
-		// 记录警告但继续执行（验收标准解析失败不影响索引）
-		// 可以考虑使用日志库记录
+		slog.Warn("parse acceptance criteria failed during vector indexing", "story_id", story.ID, "error", err)
 	}
 	for _, ac := range acs {
 		parts = append(parts, fmt.Sprintf("验收：%s", ac.Description))

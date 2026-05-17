@@ -38,13 +38,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 func runServer(stderr io.Writer) int {
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Fprintf(stderr, "load config failed: %v\n", err)
+		if _, writeErr := fmt.Fprintf(stderr, "load config failed: %v\n", err); writeErr != nil {
+			return 1
+		}
 		return 1
 	}
 
 	logger, err := logging.New(cfg.LogLevel, cfg.LogFormat, os.Stdout)
 	if err != nil {
-		fmt.Fprintf(stderr, "create logger failed: %v\n", err)
+		if _, writeErr := fmt.Fprintf(stderr, "create logger failed: %v\n", err); writeErr != nil {
+			return 1
+		}
 		return 1
 	}
 	slog.SetDefault(logger)
@@ -64,8 +68,9 @@ func runServer(stderr io.Writer) int {
 	r := router.New(container)
 
 	srv := &http.Server{
-		Addr:    cfg.ServerAddr,
-		Handler: r,
+		Addr:              cfg.ServerAddr,
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	logger.Info(
@@ -122,20 +127,26 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if *email == "" {
-		fmt.Fprintln(stderr, "缺少必填参数: --email")
+		if _, writeErr := fmt.Fprintln(stderr, "缺少必填参数: --email"); writeErr != nil {
+			return 2
+		}
 		fs.Usage()
 		return 2
 	}
 
 	cfg, err := config.LoadForBootstrap()
 	if err != nil {
-		fmt.Fprintf(stderr, "load config failed: %v\n", err)
+		if _, writeErr := fmt.Fprintf(stderr, "load config failed: %v\n", err); writeErr != nil {
+			return 1
+		}
 		return 1
 	}
 
 	db, err := database.Connect(cfg)
 	if err != nil {
-		fmt.Fprintf(stderr, "connect database failed: %v\n", err)
+		if _, writeErr := fmt.Fprintf(stderr, "connect database failed: %v\n", err); writeErr != nil {
+			return 1
+		}
 		return 1
 	}
 
@@ -145,7 +156,9 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 		Password: *password,
 	})
 	if err != nil {
-		fmt.Fprintf(stderr, "bootstrap admin failed: %v\n", err)
+		if _, writeErr := fmt.Fprintf(stderr, "bootstrap admin failed: %v\n", err); writeErr != nil {
+			return 1
+		}
 		return 1
 	}
 
@@ -154,7 +167,7 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 		action = "created"
 	}
 
-	fmt.Fprintf(
+	if _, err := fmt.Fprintf(
 		stdout,
 		"admin %s: id=%d email=%s username=%s role_changed=%t password_changed=%t\n",
 		action,
@@ -163,6 +176,8 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 		result.Username,
 		result.RoleChanged,
 		result.PasswordChanged,
-	)
+	); err != nil {
+		return 1
+	}
 	return 0
 }
