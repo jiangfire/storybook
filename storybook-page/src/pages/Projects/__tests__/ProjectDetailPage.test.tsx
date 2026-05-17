@@ -261,6 +261,19 @@ function getSelectByDefaultOption(optionName: string) {
   return select;
 }
 
+function getSelectByDefaultOptionInSection(sectionName: string, optionName: string) {
+  const section = getSectionByHeading(sectionName);
+  const select = within(section)
+    .getAllByRole('combobox')
+    .find((element) => within(element).queryByRole('option', { name: optionName }));
+
+  if (!(select instanceof HTMLSelectElement)) {
+    throw new Error(`select with option "${optionName}" not found in section "${sectionName}"`);
+  }
+
+  return select;
+}
+
 function getSectionByHeading(name: string) {
   const heading = screen.getByRole('heading', { name });
   const section = heading.closest('.section-card');
@@ -339,9 +352,13 @@ describe('ProjectDetailPage', () => {
       expect(mockedProjectService.getProjectMemberCandidates).toHaveBeenCalledWith(1);
     });
 
-    expect(screen.getByRole('button', { name: '添加成员' })).toBeInTheDocument();
-    const userSelect = getSelectByDefaultOption('选择用户');
-    expect(within(userSelect).getByRole('option', { name: /newdev@example.com/ })).toBeInTheDocument();
+    const memberSection = getSectionByHeading('项目成员');
+    expect(within(memberSection).getByRole('button', { name: '添加成员' })).toBeInTheDocument();
+
+    await waitFor(() => {
+      const userSelect = getSelectByDefaultOptionInSection('项目成员', '选择用户');
+      expect(within(userSelect).getByRole('option', { name: /newdev@example.com/ })).toBeInTheDocument();
+    });
   });
 
   it('非 owner 不显示成员管理入口，也不会请求候选列表', async () => {
@@ -353,9 +370,10 @@ describe('ProjectDetailPage', () => {
       expect(mockedProjectService.getProjectMembers).toHaveBeenCalledWith(1);
     });
 
+    const memberSection = getSectionByHeading('项目成员');
     expect(mockedProjectService.getProjectMemberCandidates).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: '添加成员' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: /newdev@example.com/ })).not.toBeInTheDocument();
+    expect(within(memberSection).queryByRole('button', { name: '添加成员' })).not.toBeInTheDocument();
+    expect(within(memberSection).queryByRole('option', { name: /newdev@example.com/ })).not.toBeInTheDocument();
   });
 
   it('添加成员后会刷新成员列表和候选列表', async () => {
@@ -400,12 +418,16 @@ describe('ProjectDetailPage', () => {
 
     renderPage();
 
-    const userSelect = await waitFor(() => getSelectByDefaultOption('选择用户'));
-    const roleSelect = getSelectByDefaultOption('产品经理');
+    const userSelect = await waitFor(() => {
+      const select = getSelectByDefaultOptionInSection('项目成员', '选择用户');
+      expect(within(select).getByRole('option', { name: /newdev@example.com/ })).toBeInTheDocument();
+      return select;
+    });
+    const roleSelect = getSelectByDefaultOptionInSection('项目成员', '产品经理');
 
     await user.selectOptions(userSelect, '3');
     await user.selectOptions(roleSelect, 'developer');
-    await user.click(screen.getByRole('button', { name: '添加成员' }));
+    await user.click(within(getSectionByHeading('项目成员')).getByRole('button', { name: '添加成员' }));
 
     await waitFor(() => {
       expect(mockedProjectService.addProjectMember).toHaveBeenCalledWith(1, {
@@ -417,7 +439,7 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => {
       expect(mockedProjectService.getProjectMembers).toHaveBeenCalledTimes(2);
       expect(mockedProjectService.getProjectMemberCandidates).toHaveBeenCalledTimes(2);
-      expect(screen.getByText('newdev@example.com')).toBeInTheDocument();
+      expect(within(getSectionByHeading('项目成员')).getByText('newdev@example.com')).toBeInTheDocument();
     });
 
     expect(showSuccess).toHaveBeenCalledWith('项目成员添加成功');
@@ -479,7 +501,7 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => {
       expect(mockedProjectService.getProjectMembers).toHaveBeenCalledTimes(2);
       expect(mockedProjectService.getProjectMemberCandidates).toHaveBeenCalledTimes(2);
-      expect(screen.queryByText('newdev@example.com')).not.toBeInTheDocument();
+      expect(within(getSectionByHeading('项目成员')).queryByText('newdev@example.com')).not.toBeInTheDocument();
     });
 
     expect(showSuccess).toHaveBeenCalledWith('成员移除成功');
