@@ -17,7 +17,7 @@ import (
 
 type BugHandler struct {
 	db           *gorm.DB
-	bugRepo      *repository.BugRepository
+	bugRepo      repository.BugRepo
 	storyRepo    repository.StoryRepo
 	userRepo     repository.UserRepo
 	projectRepo  repository.ProjectRepo

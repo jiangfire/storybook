@@ -22,7 +22,7 @@ type AIHandler struct {
 	db           *gorm.DB
 	userRepo     repository.UserRepo
 	storyRepo    repository.StoryRepo
-	aiConfigRepo *repository.AIConfigRepository
+	aiConfigRepo repository.AIConfigRepo
 }
 
 func NewAIHandler(db *gorm.DB) *AIHandler {

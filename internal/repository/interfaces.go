@@ -103,3 +103,65 @@ type StoryRepo interface {
 
 	DB() *gorm.DB
 }
+
+// BugRepo 是 handler 包对 BugRepository 的最小依赖。
+//
+// 覆盖 bug / bug_comment / report / search 调用面;report 与 search 内
+// 仍有少量 Count/LIKE 查询直接走 DB(),P1.2 落地具名方法后即可移除。
+type BugRepo interface {
+	// 来自 BaseRepository[model.BugReport]
+	FindByID(id uint) (*model.BugReport, error)
+	Create(item *model.BugReport) error
+	Save(item *model.BugReport) error
+	Delete(id uint) error
+	UpdateWithVersion(id uint, version int, fields map[string]any) error
+
+	// bug_repo.go 自有方法
+	FindByIDWithDetails(bugID uint) (*model.BugReport, error)
+	ListByProjectUnpaged(projectID uint, opts BugListOptions) ([]model.BugReport, error)
+
+	DB() *gorm.DB
+}
+
+// SprintRepo 是 handler 包对 SprintRepository 的最小依赖。
+//
+// 覆盖 sprint / report 调用面;无 handler 走 DB() 起手,故不含 DB()。
+type SprintRepo interface {
+	// 来自 BaseRepository[model.Sprint]
+	FindByID(id uint) (*model.Sprint, error)
+	Create(item *model.Sprint) error
+	Save(item *model.Sprint) error
+
+	// sprint_repo.go 自有方法
+	ListByProject(projectID uint) ([]model.Sprint, error)
+	ListByProjectDesc(projectID uint) ([]model.Sprint, error)
+	DeleteWithClearStories(sprintID uint) error
+	CloseOrCancel(sprintID uint, newStatus string, excludeDone bool) error
+}
+
+// BugCommentRepo 是 handler 包对 BugCommentRepository 的最小依赖。
+//
+// 仅 bug_comment_handler 使用,接口化主要为方便测试桩与未来 cache 注入。
+type BugCommentRepo interface {
+	// 来自 BaseRepository[model.BugComment]
+	FindByID(id uint) (*model.BugComment, error)
+	Create(item *model.BugComment) error
+	Delete(id uint) error
+	UpdateWithVersion(id uint, version int, fields map[string]any) error
+
+	// bug_comment_repo.go 自有方法
+	FindByIDWithAuthor(id uint) (*model.BugComment, error)
+	ListByBug(bugID uint) ([]model.BugComment, error)
+}
+
+// AIConfigRepo 是 handler 包对 AIConfigRepository 的最小依赖。
+//
+// ai_handler 通过此接口读写 AI 配置,后续 InvalidateAIServiceCache 失效
+// 注入也走该接口,便于 service 层共享同一抽象。
+type AIConfigRepo interface {
+	// 来自 BaseRepository[model.AIConfig]
+	Save(item *model.AIConfig) error
+
+	// ai_config_repo.go 自有方法
+	FindLatestEnabled() (*model.AIConfig, error)
+}

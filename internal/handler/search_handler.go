@@ -22,7 +22,7 @@ type SearchHandler struct {
 	db        *gorm.DB
 	vectorSvc service.VectorService
 	storyRepo repository.StoryRepo
-	bugRepo   *repository.BugRepository
+	bugRepo   repository.BugRepo
 	projectRepo repository.ProjectRepo
 }
 

@@ -17,7 +17,7 @@ import (
 
 type SprintHandler struct {
 	db          *gorm.DB
-	sprintRepo  *repository.SprintRepository
+	sprintRepo  repository.SprintRepo
 	storyRepo   repository.StoryRepo
 	activityRepo repository.ActivityRepo
 	notifier    service.Notifier
