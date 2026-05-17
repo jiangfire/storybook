@@ -100,7 +100,7 @@ func (h *AIHandler) GenerateStory(c *gin.Context) {
 	})
 }
 
-func generateStoryWithFallback(ctx context.Context, requirement string, primary service.AIService) (*service.StoryResult, service.AIService, error) {
+func generateStoryWithFallback(ctx context.Context, requirement string, primary service.StoryGenerator) (*service.StoryResult, service.StoryGenerator, error) {
 	if primary == nil {
 		primary = service.NewAIServiceFromConfig(service.RuntimeAIConfig{})
 	}

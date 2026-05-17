@@ -807,14 +807,14 @@ func SanitizeRequirement(raw string) string {
 	return strings.TrimSpace(spaceRegexp.ReplaceAllString(trimmed, " "))
 }
 
-func ResolveAIResponseSource(svc AIService) string {
+func ResolveAIResponseSource(svc StoryGenerator) string {
 	if svc != nil && svc.IsConfigured() {
 		return AIResponseSourceOpenAI
 	}
 	return AIResponseSourceHeuristic
 }
 
-func ResolveStoryResultSource(result *StoryResult, fallbackSvc AIService) string {
+func ResolveStoryResultSource(result *StoryResult, fallbackSvc StoryGenerator) string {
 	if result != nil && strings.TrimSpace(result.Source) != "" {
 		return result.Source
 	}
