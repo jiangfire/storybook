@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -9,17 +8,8 @@ import (
 	"git.neolidy.top/neo/storybook/internal/api"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
 )
-
-func (h *StoryHandler) ensureProjectMember(projectID, userID uint) error {
-	err := h.storySvc.EnsureProjectMember(projectID, userID)
-	if errors.Is(err, service.ErrForbidden) {
-		return errForbidden
-	}
-	return err
-}
 
 func normalizeAC(items []createStoryACItem) []model.AcceptanceCriterion {
 	if len(items) == 0 {

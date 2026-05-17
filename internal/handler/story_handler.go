@@ -127,7 +127,7 @@ func (h *StoryHandler) CreateStory(c *gin.Context) {
 		return
 	}
 
-	if err := h.ensureProjectMember(projectID, userID); err != nil {
+	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
 		respondAccessError(c, err, "项目不存在")
 		return
 	}
@@ -198,7 +198,7 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 		return
 	}
 
-	if err := h.ensureProjectMember(projectID, userID); err != nil {
+	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
 		respondAccessError(c, err, "项目不存在")
 		return
 	}
@@ -316,7 +316,7 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 		return
 	}
 
-	if err := h.ensureProjectMember(projectID, userID); err != nil {
+	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
 		respondAccessError(c, err, "项目不存在")
 		return
 	}

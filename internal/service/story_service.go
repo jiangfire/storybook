@@ -70,11 +70,6 @@ func (s *StoryService) WithNotifier(n Notifier) *StoryService {
 	return s
 }
 
-func (s *StoryService) EnsureProjectMember(projectID, userID uint) error {
-	_, _, err := EnsureProjectAccess(s.db, projectID, userID)
-	return err
-}
-
 func (s *StoryService) GetWithAccess(storyID, userID uint) (*model.UserStory, error) {
 	story, err := s.storyRepo.FindByIDWithDetails(storyID)
 	if err != nil {
