@@ -9,7 +9,6 @@ import (
 	"git.neolidy.top/neo/storybook/internal/config"
 	"git.neolidy.top/neo/storybook/internal/database"
 	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/router"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -23,7 +22,7 @@ func TestTechLeadScopedAccessAssignAndReviewE2E(t *testing.T) {
 		t.Fatalf("connect db: %v", err)
 	}
 	tm := auth.NewTokenManager("e2e-secret-techlead-read", 24, 24*7)
-	r := router.New(db, tm)
+	r := newTestEngine(t, db, tm)
 
 	pm1ID := seedUserOnly(t, db, "pm1-techlead-e2e@example.com", model.RoleProduct)
 	pm2ID := seedUserOnly(t, db, "pm2-techlead-e2e@example.com", model.RoleProduct)
@@ -145,7 +144,7 @@ func TestTechLeadRejectReviewRulesE2E(t *testing.T) {
 		t.Fatalf("connect db: %v", err)
 	}
 	tm := auth.NewTokenManager("e2e-secret-techlead-review", 24, 24*7)
-	r := router.New(db, tm)
+	r := newTestEngine(t, db, tm)
 
 	pmID := seedUserOnly(t, db, "pm-review-e2e@example.com", model.RoleProduct)
 	techLeadID := seedUserOnly(t, db, "techlead-review-e2e@example.com", model.RoleTechLead)

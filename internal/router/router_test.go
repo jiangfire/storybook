@@ -1,13 +1,16 @@
 package router
 
 import (
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"git.neolidy.top/neo/storybook/internal/auth"
+	"git.neolidy.top/neo/storybook/internal/config"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/wiring"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -24,7 +27,11 @@ func newTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 		t.Fatalf("migrate: %v", err)
 	}
 	tm := auth.NewTokenManager("router-test-secret", 1, 1)
-	r := New(db, tm)
+	container, err := wiring.Build(&config.Config{}, db, slog.Default(), tm)
+	if err != nil {
+		t.Fatalf("wiring build: %v", err)
+	}
+	r := New(container)
 	return r, db
 }
 

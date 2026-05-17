@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/database"
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/router"
+	"git.neolidy.top/neo/storybook/internal/wiring"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -30,7 +32,7 @@ func TestAPIMainFlowE2E(t *testing.T) {
 	}
 
 	tm := auth.NewTokenManager("e2e-secret", 24, 24*7)
-	r := router.New(db, tm)
+	r := newTestEngine(t, db, tm)
 
 	// 1) 注册产品经理并拿token
 	regResp := doJSON(t, r, http.MethodPost, "/api/auth/register", "", map[string]any{
@@ -166,6 +168,18 @@ type httpResult struct {
 	Code int
 	Body string
 	JSON map[string]any
+}
+
+// newTestEngine 用零值 cfg + 测试 tokenManager 构造 wiring.Container 并交给
+// router.New。e2e 测试既不需要 metrics 凭据，也不依赖 AI 限流字段，零值 cfg
+// 在 router 内部会自动兜底（AIUserRateLimitPerMin <=0 时退化为默认 10）。
+func newTestEngine(t *testing.T, db *gorm.DB, tm *auth.TokenManager) *gin.Engine {
+	t.Helper()
+	container, err := wiring.Build(&config.Config{}, db, slog.Default(), tm)
+	if err != nil {
+		t.Fatalf("wiring build: %v", err)
+	}
+	return router.New(container)
 }
 
 func doJSON(t *testing.T, r http.Handler, method, path, token string, body any) httpResult {

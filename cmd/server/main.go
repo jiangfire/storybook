@@ -19,6 +19,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/database"
 	"git.neolidy.top/neo/storybook/internal/logging"
 	"git.neolidy.top/neo/storybook/internal/router"
+	"git.neolidy.top/neo/storybook/internal/wiring"
 )
 
 const bootstrapAdminCommand = "bootstrap-admin"
@@ -55,7 +56,12 @@ func runServer(stderr io.Writer) int {
 	}
 
 	tokenManager := auth.NewTokenManager(cfg.JWTSecret, cfg.AccessTokenTTL, cfg.RefreshTokenTTL)
-	r := router.NewWithLogger(db, tokenManager, logger)
+	container, err := wiring.Build(cfg, db, logger, tokenManager)
+	if err != nil {
+		logger.Error("wiring build failed", "error", err)
+		return 1
+	}
+	r := router.New(container)
 
 	srv := &http.Server{
 		Addr:    cfg.ServerAddr,

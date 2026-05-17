@@ -2,13 +2,10 @@ package router
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/auth"
-	"git.neolidy.top/neo/storybook/internal/config"
 	"git.neolidy.top/neo/storybook/internal/metrics"
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/model"
@@ -16,38 +13,12 @@ import (
 	"git.neolidy.top/neo/storybook/internal/wiring"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"gorm.io/gorm"
 )
 
-// New 是面向现存测试的薄包装：构造默认 logger 后转交 NewWithLogger。
-// 测试以 `router.New(db, tm)` 调用，P3.3.3 之后会被改造为接受 wiring.Container。
-func New(db *gorm.DB, tokenManager *auth.TokenManager) *gin.Engine {
-	return NewWithLogger(db, tokenManager, slog.Default())
-}
-
-// NewWithLogger 自加载 cfg、构造 wiring.Container，再生成 engine。
-// 仍保留 (db, tm, logger) 旧签名以保护 main.go 与所有 e2e 测试；
-// P3.3.3 会改为只接受 *wiring.Container 并删除本函数。
-func NewWithLogger(db *gorm.DB, tokenManager *auth.TokenManager, logger *slog.Logger) *gin.Engine {
-	cfg, err := config.LoadForBootstrap()
-	if err != nil {
-		// LoadForBootstrap 不强校验 JWT，理论上只有 env 解析数字失败才会到这里。
-		// 留 logger 输出后退化到零值 cfg：保证测试不被 env 解析错误拖垮。
-		logger.Warn("router: config load failed, using zero cfg", "error", err)
-		cfg = &config.Config{}
-	}
-	container, err := wiring.Build(cfg, db, logger, tokenManager)
-	if err != nil {
-		// 现实现中 Build 不返回非 nil error；保留分支防止未来扩展时静默吞掉。
-		logger.Error("router: wiring build failed", "error", err)
-		panic(err)
-	}
-	return engineFromContainer(container)
-}
-
-// engineFromContainer 把全部路由声明集中在一处，仅依赖 Container 字段。
-// P3.3.3 重命名为 router.New(c *wiring.Container) 后将作为唯一公共入口。
-func engineFromContainer(c *wiring.Container) *gin.Engine {
+// New 把 wiring.Container 装配成 Gin engine。
+// main.go 与所有测试都通过 wiring.Build 拿到 Container 后再传入本函数，
+// router 不再持有任何 env 读取逻辑，专心做 HTTP 路由声明。
+func New(c *wiring.Container) *gin.Engine {
 	// 统一启用严格JSON解码，避免未知字段静默吞掉。
 	gin.EnableJsonDecoderDisallowUnknownFields()
 	r := gin.New()
