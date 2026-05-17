@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   package:
-    name: Build Release Tarball
+    name: Build Multi-Platform Release Bundles
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "0"
@@ -50,25 +50,52 @@ jobs:
           pnpm run test
           pnpm run build:embed
 
-      - name: Build release bundle
+      - name: Build release bundles
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(git describe --tags --always)"
-          DIST_DIR="release/storybook-${VERSION}-linux-amd64"
+          RELEASE_ROOT="release"
 
-          mkdir -p "${DIST_DIR}"
-          go build -trimpath -o "${DIST_DIR}/storybook-server" ./cmd/server
-          cp .env.sample "${DIST_DIR}/.env.sample"
-          cp README.md "${DIST_DIR}/README.md"
+          mkdir -p "${RELEASE_ROOT}"
 
-          tar -czf "release/storybook-${VERSION}-linux-amd64.tar.gz" -C release "storybook-${VERSION}-linux-amd64"
+          build_bundle() {
+            local goos="$1"
+            local goarch="$2"
+            local ext="$3"
+            local archive="$4"
+            local dir_name="storybook-${VERSION}-${goos}-${goarch}"
+            local dist_dir="${RELEASE_ROOT}/${dir_name}"
+            local binary_name="storybook-server${ext}"
+
+            rm -rf "${dist_dir}"
+            mkdir -p "${dist_dir}"
+
+            GOOS="${goos}" GOARCH="${goarch}" go build -trimpath -o "${dist_dir}/${binary_name}" ./cmd/server
+            cp .env.sample "${dist_dir}/.env.sample"
+            cp README.md "${dist_dir}/README.md"
+
+            if [[ "${archive}" == "zip" ]]; then
+              (
+                cd "${RELEASE_ROOT}"
+                zip -qr "${dir_name}.zip" "${dir_name}"
+              )
+            else
+              tar -czf "${RELEASE_ROOT}/${dir_name}.tar.gz" -C "${RELEASE_ROOT}" "${dir_name}"
+            fi
+          }
+
+          build_bundle linux amd64 "" tar.gz
+          build_bundle darwin amd64 "" tar.gz
+          build_bundle windows amd64 ".exe" zip
 
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: storybook-release-linux-amd64
-          path: release/*.tar.gz
+          name: storybook-release-bundles
+          path: |
+            release/*.tar.gz
+            release/*.zip
 
       - name: Publish GitHub release
         shell: bash
@@ -79,9 +106,9 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
 
           if gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release upload "${TAG}" release/*.tar.gz --clobber
+            gh release upload "${TAG}" release/*.tar.gz release/*.zip --clobber
           else
-            gh release create "${TAG}" release/*.tar.gz \
+            gh release create "${TAG}" release/*.tar.gz release/*.zip \
               --title "${TAG}" \
               --generate-notes
           fi

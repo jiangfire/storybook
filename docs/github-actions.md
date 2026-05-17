@@ -5,7 +5,7 @@
 | 文件 | 触发时机 | 作用 |
 |---|---|---|
 | `.github/workflows/ci.yml` | 任意 `push`、`pull_request` | 后端测试、前端 `lint`、前端单测、嵌入式构建校验、单体构建校验 |
-| `.github/workflows/release.yml` | 推送 `v*` tag | 在通过测试后打包嵌入式单体发布包，并上传为 GitHub Actions artifact |
+| `.github/workflows/release.yml` | 推送 `v*` tag | 在通过测试后打包嵌入式单体发布包，上传为 GitHub Actions artifact，并同步发布到 GitHub Releases |
 
 ## 当前 CI 门禁
 
@@ -44,13 +44,23 @@
 
 ## Release 产物
 
-当你推送类似 `v1.0.0` 的 tag 时，`release.yml` 会生成一个 tarball，内容包括：
+当你推送类似 `v1.0.0` 的 tag 时，`release.yml` 会生成以下发布包：
 
-- `storybook-server`
+| 平台 | 架构 | 格式 | 可执行文件 |
+|---|---|---|---|
+| Linux | `amd64` | `.tar.gz` | `storybook-server` |
+| macOS | `amd64` | `.tar.gz` | `storybook-server` |
+| Windows | `amd64` | `.zip` | `storybook-server.exe` |
+
+每个发布包内都包含：
+
+- 对应平台的 `storybook-server` 可执行文件
 - `.env.sample`
 - `README.md`
 
 前端静态资源会先通过 `pnpm run build:embed` 嵌入到 `internal/webui/dist`，然后再参与后端单体构建。
+
+当前工作流明确以 `CGO_ENABLED=0` 构建，目的是保证跨平台单体发布不依赖本地 C 工具链；这也是当前能稳定产出 Linux / macOS / Windows 可执行程序的前提。
 
 ## 建议的启用顺序
 
