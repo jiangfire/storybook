@@ -103,6 +103,129 @@ type reviewStoryRequest struct {
 	Comment  string `json:"comment"`
 }
 
+// ---------------------------------------------------------------------------
+// Story helpers
+// ---------------------------------------------------------------------------
+
+func normalizeReviewStatus(rs string) string {
+	if strings.TrimSpace(rs) == "" {
+		return model.ReviewStatusPending
+	}
+	return rs
+}
+
+func nullablePoints(p *int) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+func assigneeInfo(u *model.User) gin.H {
+	if u == nil {
+		return nil
+	}
+	return gin.H{"id": u.ID, "email": u.Email}
+}
+
+func buildACSummary(criteria []model.AcceptanceCriterion) gin.H {
+	total, passed, pending, _ := summarizeAC(criteria)
+	completion := 0.0
+	if total > 0 {
+		completion = float64(passed) / float64(total) * 100
+	}
+	return gin.H{
+		"total":                 total,
+		"passed":                passed,
+		"pending":               pending,
+		"completion_percentage": completion,
+	}
+}
+
+func buildStoryListItem(story model.UserStory) gin.H {
+	criteria, _ := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
+	item := gin.H{
+		"id":                          story.ID,
+		"title":                       story.Title,
+		"story_type":                  story.StoryType,
+		"status":                      story.Status,
+		"review_status":               normalizeReviewStatus(story.ReviewStatus),
+		"review_comment":              story.ReviewComment,
+		"priority":                    story.Priority,
+		"story_points":                nullablePoints(story.Points),
+		"position":                    story.Position,
+		"acceptance_criteria_summary": buildACSummary(criteria),
+	}
+	if info := assigneeInfo(story.Assignee); info != nil {
+		item["assigned_to"] = info
+	}
+	return item
+}
+
+func buildBoardItem(s model.UserStory) gin.H {
+	criteria, _ := model.ParseAcceptanceCriteria(s.AcceptanceCriteria)
+	item := gin.H{
+		"id":                          s.ID,
+		"project_id":                  s.ProjectID,
+		"title":                       s.Title,
+		"story_type":                  s.StoryType,
+		"status":                      s.Status,
+		"review_status":               normalizeReviewStatus(s.ReviewStatus),
+		"review_comment":              s.ReviewComment,
+		"priority":                    s.Priority,
+		"position":                    s.Position,
+		"created_by":                  s.CreatedBy,
+		"created_at":                  s.CreatedAt,
+		"updated_at":                  s.UpdatedAt,
+		"acceptance_criteria_summary": buildACSummary(criteria),
+		"story_points":                nullablePoints(s.Points),
+	}
+	if info := assigneeInfo(s.Assignee); info != nil {
+		item["assignee"] = info
+		item["assigned_to"] = info
+	}
+	return item
+}
+
+func buildBoardColumns(columns []model.BoardColumn, byStatus map[string][]gin.H) []gin.H {
+	type statusMapping struct {
+		Pos    int
+		Status string
+	}
+	mapping := []statusMapping{
+		{Pos: 0, Status: model.StoryStatusPending},
+		{Pos: 1, Status: model.StoryStatusBacklog},
+		{Pos: 2, Status: model.StoryStatusReady},
+		{Pos: 3, Status: model.StoryStatusInProgress},
+		{Pos: 4, Status: model.StoryStatusTest},
+		{Pos: 5, Status: model.StoryStatusDone},
+	}
+
+	result := make([]gin.H, 0, len(mapping))
+	for _, m := range mapping {
+		name := defaultColumnName(m.Pos)
+		for _, c := range columns {
+			if c.Position == m.Pos {
+				name = c.Name
+				break
+			}
+		}
+		storiesInCol := byStatus[m.Status]
+		result = append(result, gin.H{
+			"position": m.Pos,
+			"name":     name,
+			"status":   m.Status,
+			"stories":  storiesInCol,
+			"count":    len(storiesInCol),
+		})
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
+// Story handler
+// ---------------------------------------------------------------------------
+
 func (h *StoryHandler) CreateStory(c *gin.Context) {
 	userID := middleware.MustUserID(c)
 
@@ -175,14 +298,10 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 	if !includeArchived {
 		query = query.Where("archived = ?", false)
 	}
-
-	status := strings.TrimSpace(c.Query("status"))
-	if status != "" {
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
 		query = query.Where("status = ?", status)
 	}
-
-	assignee := strings.TrimSpace(c.Query("assignee"))
-	if assignee != "" {
+	if assignee := strings.TrimSpace(c.Query("assignee")); assignee != "" {
 		query = query.Where("assigned_to = ?", assignee)
 	}
 
@@ -198,7 +317,6 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 		return
 	}
 
-	var stories []model.UserStory
 	query = query.Preload("Assignee")
 	switch sortBy {
 	case "assignee":
@@ -209,6 +327,7 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 		query = query.Order("priority " + order).Order("position ASC")
 	}
 
+	var stories []model.UserStory
 	if err := query.Find(&stories).Error; err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
@@ -216,49 +335,7 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 
 	items := make([]gin.H, 0, len(stories))
 	for _, story := range stories {
-		criteria, _ := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
-		totalAC, passedAC, pendingAC, _ := summarizeAC(criteria)
-		completion := 0.0
-		if totalAC > 0 {
-			completion = float64(passedAC) / float64(totalAC) * 100
-		}
-
-		row := gin.H{
-			"id":         story.ID,
-			"title":      story.Title,
-			"story_type": story.StoryType,
-			"status":     story.Status,
-			"review_status": func() string {
-				if strings.TrimSpace(story.ReviewStatus) == "" {
-					return model.ReviewStatusPending
-				}
-				return story.ReviewStatus
-			}(),
-			"review_comment": story.ReviewComment,
-			"priority":       story.Priority,
-			"story_points": func() any {
-				if story.Points == nil {
-					return nil
-				}
-				return *story.Points
-			}(),
-			"position": story.Position,
-			"acceptance_criteria_summary": gin.H{
-				"total":                 totalAC,
-				"passed":                passedAC,
-				"pending":               pendingAC,
-				"completion_percentage": completion,
-			},
-		}
-
-		if story.Assignee != nil {
-			row["assigned_to"] = gin.H{
-				"id":    story.Assignee.ID,
-				"email": story.Assignee.Email,
-			}
-		}
-
-		items = append(items, row)
+		items = append(items, buildStoryListItem(story))
 	}
 
 	api.Success(c, "success", gin.H{
@@ -295,84 +372,10 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 	}
 
 	for _, s := range stories {
-		criteria, _ := model.ParseAcceptanceCriteria(s.AcceptanceCriteria)
-		totalAC, passedAC, pendingAC, _ := summarizeAC(criteria)
-		completion := 0.0
-		if totalAC > 0 {
-			completion = float64(passedAC) / float64(totalAC) * 100
-		}
-
-		item := gin.H{
-			"id":         s.ID,
-			"project_id": s.ProjectID,
-			"title":      s.Title,
-			"story_type": s.StoryType,
-			"status":     s.Status,
-			"review_status": func() string {
-				if strings.TrimSpace(s.ReviewStatus) == "" {
-					return model.ReviewStatusPending
-				}
-				return s.ReviewStatus
-			}(),
-			"review_comment": s.ReviewComment,
-			"priority":       s.Priority,
-			"position":       s.Position,
-			"created_by":     s.CreatedBy,
-			"created_at":     s.CreatedAt,
-			"updated_at":     s.UpdatedAt,
-			"acceptance_criteria_summary": gin.H{
-				"total":                 totalAC,
-				"passed":                passedAC,
-				"pending":               pendingAC,
-				"completion_percentage": completion,
-			},
-			"story_points": func() any {
-				if s.Points == nil {
-					return nil
-				}
-				return *s.Points
-			}(),
-		}
-		if s.Assignee != nil {
-			assignee := gin.H{"id": s.Assignee.ID, "email": s.Assignee.Email}
-			item["assignee"] = assignee
-			item["assigned_to"] = assignee
-		}
-		byStatus[s.Status] = append(byStatus[s.Status], item)
+		byStatus[s.Status] = append(byStatus[s.Status], buildBoardItem(s))
 	}
 
-	type statusMapping struct {
-		Pos    int
-		Status string
-	}
-	mapping := []statusMapping{
-		{Pos: 0, Status: model.StoryStatusPending},
-		{Pos: 1, Status: model.StoryStatusBacklog},
-		{Pos: 2, Status: model.StoryStatusReady},
-		{Pos: 3, Status: model.StoryStatusInProgress},
-		{Pos: 4, Status: model.StoryStatusTest},
-		{Pos: 5, Status: model.StoryStatusDone},
-	}
-
-	result := make([]gin.H, 0, len(mapping))
-	for _, m := range mapping {
-		name := defaultColumnName(m.Pos)
-		for _, c := range columns {
-			if c.Position == m.Pos {
-				name = c.Name
-				break
-			}
-		}
-
-		storiesInCol := byStatus[m.Status]
-		result = append(result, gin.H{
-			"position": m.Pos,
-			"name":     name,
-			"status":   m.Status,
-			"stories":  storiesInCol,
-			"count":    len(storiesInCol),
-		})
-	}
+	result := buildBoardColumns(columns, byStatus)
 
 	api.Success(c, "success", gin.H{
 		"project_id": project.ID,
