@@ -173,6 +173,65 @@ func TestAdminCanSaveAIConfig(t *testing.T) {
 	}
 }
 
+// Upsert 写入 AI 配置后,handler 显式调用 InvalidateAIServiceCache;
+// 紧随其后的 NewAIService 应当立即反映新配置,而不是命中旧缓存继续返回 heuristic。
+func TestUpsertConfigInvalidatesAIServiceCache(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	key := base64.StdEncoding.EncodeToString([]byte("0123456789abcdef0123456789abcdef"))
+	if err := os.Setenv("AI_CONFIG_ENCRYPTION_KEY", key); err != nil {
+		t.Fatalf("set env: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Unsetenv("AI_CONFIG_ENCRYPTION_KEY")
+	})
+	t.Cleanup(service.InvalidateAIServiceCache)
+	service.InvalidateAIServiceCache()
+
+	db, err := gorm.Open(sqlite.Open("file:ai_handler_invalidate_test?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.AIConfig{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	// 起点:无配置 → heuristic,缓存层第一次冷查询。
+	if svc := service.NewAIService(db); svc.IsConfigured() {
+		t.Fatalf("expected heuristic before upsert, got configured")
+	}
+
+	h := NewAIHandler(db)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set(middleware.CtxUserIDKey, uint(7))
+		c.Set(middleware.CtxRoleKey, model.RoleAdmin)
+		c.Next()
+	})
+	r.PUT("/api/admin/ai/config", h.UpsertConfig)
+
+	body, _ := json.Marshal(map[string]any{
+		"api_key":     "sk-test-1234567890",
+		"model":       "gpt-4o-mini",
+		"temperature": 0.3,
+		"max_tokens":  1024,
+		"enabled":     true,
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/admin/ai/config", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("upsert failed: %d body=%s", w.Code, w.Body.String())
+	}
+
+	// upsert 完成之后立即查询应当看到 openAI 实现,而不是上一轮缓存里的 heuristic。
+	if svc := service.NewAIService(db); !svc.IsConfigured() {
+		t.Fatalf("expected configured AI service after upsert, got heuristic")
+	}
+}
+
 func TestGenerateStoryWithFallbackOnConfiguredServiceError(t *testing.T) {
 	result, resolvedService, err := generateStoryWithFallback(
 		context.Background(),

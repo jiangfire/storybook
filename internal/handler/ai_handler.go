@@ -200,6 +200,10 @@ func (h *AIHandler) UpsertConfig(c *gin.Context) {
 		return
 	}
 
+	// 显式失效 service 层缓存,保证下一次 NewAIService 立刻读到新值,
+	// 不再依赖 updated_at 在并发场景下的自然兜底。
+	service.InvalidateAIServiceCache()
+
 	api.Success(c, "success", gin.H{
 		"config": h.serializeConfig(*config),
 	})
