@@ -219,6 +219,14 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 			continue
 		}
 
+		// 任务统计走 repository 具名方法;空切片表示不限项目(admin 跨项目视图)。
+		var scopeProjects []uint
+		if projectID > 0 {
+			scopeProjects = []uint{projectID}
+		} else if role == model.RoleTechLead {
+			scopeProjects = visibleProjectIDs
+		}
+
 		// 统计活跃故事数
 		var activeStories int64
 		storyQuery := h.storyRepo.DB().Model(&model.UserStory{}).
@@ -234,18 +242,10 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 		storyQuery.Count(&activeStories)
 
 		// 统计活跃任务数
-		var activeTasks int64
-		taskQuery := h.taskRepo.DB().Model(&model.Task{}).
-			Where("assigned_to = ? AND status IN ?", devID, []string{
-				model.TaskStatusTodo,
-				model.TaskStatusInProgress,
-			})
-		if projectID > 0 {
-			taskQuery = taskQuery.Where("project_id = ?", projectID)
-		} else if role == model.RoleTechLead {
-			taskQuery = taskQuery.Where("project_id IN ?", visibleProjectIDs)
-		}
-		taskQuery.Count(&activeTasks)
+		activeTasks, _ := h.taskRepo.CountTasksByAssignee(devID, []string{
+			model.TaskStatusTodo,
+			model.TaskStatusInProgress,
+		}, scopeProjects, time.Time{})
 
 		// 统计故事点
 		var totalPoints float64
@@ -259,15 +259,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 		pointsQuery.Select("COALESCE(SUM(points), 0)").Scan(&totalPoints)
 
 		// 统计预估工时
-		var estimatedHours float64
-		taskHoursQuery := h.taskRepo.DB().Model(&model.Task{}).
-			Where("assigned_to = ? AND status != ?", devID, model.TaskStatusDone)
-		if projectID > 0 {
-			taskHoursQuery = taskHoursQuery.Where("project_id = ?", projectID)
-		} else if role == model.RoleTechLead {
-			taskHoursQuery = taskHoursQuery.Where("project_id IN ?", visibleProjectIDs)
-		}
-		taskHoursQuery.Select("COALESCE(SUM(estimated_hours), 0)").Scan(&estimatedHours)
+		estimatedHours, _ := h.taskRepo.SumEstimatedHoursByAssignee(devID, model.TaskStatusDone, scopeProjects)
 
 		// 计算完成率（最近30天）
 		var completedStories, totalAssigned int64

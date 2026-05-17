@@ -436,13 +436,8 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 		Where("assigned_to = ? AND status = ?", targetUserID, model.StoryStatusInProgress).
 		Count(&stats.StoriesInProgress)
 
-	h.taskRepo.DB().Model(&model.Task{}).
-		Where("assigned_to = ? AND status = ? AND updated_at >= ?", targetUserID, model.TaskStatusDone, thirtyDaysAgo).
-		Count(&stats.TasksCompleted)
-
-	h.taskRepo.DB().Model(&model.Task{}).
-		Where("assigned_to = ? AND status = ?", targetUserID, model.TaskStatusInProgress).
-		Count(&stats.TasksInProgress)
+	stats.TasksCompleted, _ = h.taskRepo.CountTasksByAssignee(targetUserID, []string{model.TaskStatusDone}, nil, thirtyDaysAgo)
+	stats.TasksInProgress, _ = h.taskRepo.CountTasksByAssignee(targetUserID, []string{model.TaskStatusInProgress}, nil, time.Time{})
 
 		// 计算平均完成时间
 		avgCompletionDays, err := h.storyRepo.AvgCompletionDaysForUser(targetUserID, thirtyDaysAgo)

@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"git.neolidy.top/neo/storybook/internal/model"
 	"gorm.io/gorm"
 )
@@ -88,4 +90,42 @@ func (r *TaskRepository) UpdateProgress(taskID uint, progress int) error {
 
 func (r *TaskRepository) UpdateAssignee(taskID uint, assignedTo *uint) error {
 	return r.DB().Model(&model.Task{}).Where("id = ?", taskID).Update("assigned_to", assignedTo).Error
+}
+
+// CountTasksByAssignee 统计某经办人的任务数,可叠加状态多选 / 项目范围 / 起始更新时间。
+// 空切片表示不过滤,since 零值表示不过滤时间。techlead 工作负载视图 + user_management
+// 个人统计共用此方法,避免 handler 手攒一段 GORM 链。
+func (r *TaskRepository) CountTasksByAssignee(userID uint, statuses []string, projectIDs []uint, since time.Time) (int64, error) {
+	tx := r.DB().Model(&model.Task{}).Where("assigned_to = ?", userID)
+	if len(statuses) > 0 {
+		tx = tx.Where("status IN ?", statuses)
+	}
+	if len(projectIDs) > 0 {
+		tx = tx.Where("project_id IN ?", projectIDs)
+	}
+	if !since.IsZero() {
+		tx = tx.Where("updated_at >= ?", since)
+	}
+	var n int64
+	if err := tx.Count(&n).Error; err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
+// SumEstimatedHoursByAssignee 汇总某经办人在指定项目范围内、排除指定状态的任务 estimated_hours。
+// projectIDs / excludeStatus 都允许零值表示不过滤,供 techlead 工作负载视图的预估工时汇总使用。
+func (r *TaskRepository) SumEstimatedHoursByAssignee(userID uint, excludeStatus string, projectIDs []uint) (float64, error) {
+	tx := r.DB().Model(&model.Task{}).Where("assigned_to = ?", userID)
+	if excludeStatus != "" {
+		tx = tx.Where("status != ?", excludeStatus)
+	}
+	if len(projectIDs) > 0 {
+		tx = tx.Where("project_id IN ?", projectIDs)
+	}
+	var hours float64
+	if err := tx.Select("COALESCE(SUM(estimated_hours), 0)").Scan(&hours).Error; err != nil {
+		return 0, err
+	}
+	return hours, nil
 }
