@@ -12,20 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// VectorService 向量搜索服务接口
-type VectorService interface {
-	// SearchSimilarStories 搜索相似故事
-	SearchSimilarStories(ctx context.Context, query string, projectIDs []uint, limit int) ([]SimilarStory, error)
-
-	// IndexStory 为单个故事生成并存储向量
-	IndexStory(ctx context.Context, story *model.UserStory) error
-
-	// BatchIndexStories 批量为故事生成并存储向量
-	BatchIndexStories(ctx context.Context, stories []model.UserStory) error
-
-	// PrepareStoryContent 准备用于向量化的文本内容
-	PrepareStoryContent(story *model.UserStory) string
-}
+// VectorService 接口集中声明在 interfaces.go。
 
 // vectorService 向量搜索服务实现
 type vectorService struct {

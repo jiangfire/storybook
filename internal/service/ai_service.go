@@ -51,32 +51,7 @@ type RuntimeAIConfig struct {
 	Enabled     bool
 }
 
-// StoryGenerator covers user-story-flavored AI operations: decomposition,
-// streaming, refine, and batch variants. Handlers that only need to produce
-// stories should depend on this narrower interface instead of AIService.
-type StoryGenerator interface {
-	GenerateStory(ctx context.Context, requirement string) (*StoryResult, error)
-	StreamGenerateStory(ctx context.Context, requirement string, cb StreamCallback) (*StoryResult, error)
-	ChatRefine(ctx context.Context, original *StoryResult, feedback string) (*StoryResult, error)
-	BatchGenerate(ctx context.Context, requirement string, count int) ([]*StoryResult, error)
-	IsConfigured() bool
-}
-
-// ChatCompleter is the free-form chat contract used by §8.6 helpers (AC
-// refine, summary, translate). Handlers that only call Chat should depend on
-// this rather than the full AIService.
-type ChatCompleter interface {
-	Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error)
-	IsConfigured() bool
-}
-
-// AIService is the aggregate contract preserved for back-compat. NewAIService
-// keeps returning it so the construction-time cache and existing callers do
-// not need to choose between the two narrower interfaces.
-type AIService interface {
-	StoryGenerator
-	ChatCompleter
-}
+// StoryGenerator / ChatCompleter / AIService 接口集中声明在 interfaces.go。
 
 // ---------------------------------------------------------------------------
 // Factory

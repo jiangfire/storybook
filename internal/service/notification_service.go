@@ -22,18 +22,7 @@ type NotificationEvent struct {
 	Metadata   any
 }
 
-// Notifier writes notifications into the database and pushes a real-time
-// signal to the recipients' WebSocket connections. Implementations should
-// never propagate failure to the caller — notifications are best-effort and
-// must not abort the originating business transaction.
-type Notifier interface {
-	Notify(ctx context.Context, userID uint, ev NotificationEvent)
-	NotifyMany(ctx context.Context, userIDs []uint, ev NotificationEvent)
-	// NotifyProjectMembers fans out to every user with read access to the
-	// project (owner, members, tech leads, admins). Used for project-wide
-	// announcements such as sprint started / sprint completed.
-	NotifyProjectMembers(ctx context.Context, projectID uint, ev NotificationEvent)
-}
+// Notifier 接口集中声明在 interfaces.go。
 
 // NoopNotifier is the safe default when DI hasn't supplied a real notifier
 // (e.g. unit tests).
