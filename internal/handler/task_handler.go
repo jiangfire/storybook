@@ -68,7 +68,7 @@ type addTaskCodeRefRequest struct {
 func (h *TaskHandler) Create(c *gin.Context) {
 	story := middleware.MustStory(c)
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleDeveloper && role != model.RoleAdmin {
@@ -105,7 +105,7 @@ func (h *TaskHandler) Create(c *gin.Context) {
 func (h *TaskHandler) SplitFromAC(c *gin.Context) {
 	story := middleware.MustStory(c)
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -176,11 +176,7 @@ func (h *TaskHandler) Get(c *gin.Context) {
 }
 
 func (h *TaskHandler) Update(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	task := middleware.MustTask(c)
 	project := middleware.MustProject(c)
@@ -219,11 +215,7 @@ func (h *TaskHandler) Update(c *gin.Context) {
 }
 
 func (h *TaskHandler) UpdateStatus(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	task := middleware.MustTask(c)
 	project := middleware.MustProject(c)
 
@@ -251,11 +243,7 @@ func (h *TaskHandler) UpdateStatus(c *gin.Context) {
 }
 
 func (h *TaskHandler) UpdateProgress(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	task := middleware.MustTask(c)
 	project := middleware.MustProject(c)
 
@@ -279,11 +267,7 @@ func (h *TaskHandler) UpdateProgress(c *gin.Context) {
 }
 
 func (h *TaskHandler) Claim(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleDeveloper && role != model.RoleAdmin {
 		api.Forbidden(c, "仅开发人员可领取任务")
@@ -306,11 +290,7 @@ func (h *TaskHandler) Claim(c *gin.Context) {
 }
 
 func (h *TaskHandler) Release(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	task := middleware.MustTask(c)
 	project := middleware.MustProject(c)
@@ -333,11 +313,7 @@ func (h *TaskHandler) Release(c *gin.Context) {
 }
 
 func (h *TaskHandler) AddCodeReference(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleDeveloper && role != model.RoleAdmin {
 		api.Forbidden(c, "仅开发人员可关联代码")
@@ -366,11 +342,7 @@ func (h *TaskHandler) AddCodeReference(c *gin.Context) {
 }
 
 func (h *TaskHandler) Delete(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	task := middleware.MustTask(c)
 	project := middleware.MustProject(c)

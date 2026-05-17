@@ -36,12 +36,6 @@ func NewUserManagementHandler(db *gorm.DB) *UserManagementHandler {
 
 // ListUsers 获取所有用户列表
 func (h *UserManagementHandler) ListUsers(c *gin.Context) {
-	_, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")
@@ -87,11 +81,7 @@ func (h *UserManagementHandler) ListUsers(c *gin.Context) {
 
 // CreateUser 创建用户（admin/tech_lead）
 func (h *UserManagementHandler) CreateUser(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {
@@ -191,11 +181,7 @@ func (h *UserManagementHandler) CreateUser(c *gin.Context) {
 
 // UpdateUser 更新用户信息
 func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {
@@ -330,12 +316,6 @@ func (h *UserManagementHandler) UpdateUser(c *gin.Context) {
 
 // GetUserWorkload 获取用户工作负载详情
 func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
-	_, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")
@@ -469,11 +449,7 @@ func (h *UserManagementHandler) GetUserWorkload(c *gin.Context) {
 
 // DeleteUser 删除用户（仅admin）
 func (h *UserManagementHandler) DeleteUser(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {

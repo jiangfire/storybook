@@ -116,8 +116,7 @@ func (h *MCPHandler) ACCoverage(c *gin.Context) {
 func (h *MCPHandler) Validate(c *gin.Context) {
 	story := middleware.MustStory(c)
 	// MCP REST 路径已经过 AuthRequired,这里取到的 userID 用于 activity_log 与 VerifiedBy。
-	// 拿不到时退回 0,让 service 层走系统调用语义,避免阻塞协议级集成。
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	var req mcpValidateReq
 	if !middleware.BindJSON(c, &req) {
@@ -152,7 +151,7 @@ func (h *MCPHandler) Validate(c *gin.Context) {
 
 func (h *MCPHandler) BatchUpdateACStatus(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	var req mcpBatchUpdateReq
 	if !middleware.BindJSON(c, &req) {
@@ -173,11 +172,7 @@ func (h *MCPHandler) BatchUpdateACStatus(c *gin.Context) {
 }
 
 func (h *MCPHandler) ACCompletionStats(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
 		api.Forbidden(c, "权限不足")

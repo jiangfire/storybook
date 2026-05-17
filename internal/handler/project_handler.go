@@ -77,11 +77,7 @@ type projectItem struct {
 }
 
 func (h *ProjectHandler) CreateProject(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	var req createProjectRequest
 	if !middleware.BindJSON(c, &req) {
@@ -149,11 +145,7 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 }
 
 func (h *ProjectHandler) ListProjects(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 
 	page := parseIntQuery(c, "page", 1)
@@ -310,7 +302,7 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 
 func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	if !middleware.IsProjectOwner(c) {
 		api.Forbidden(c, "仅项目Owner可更新项目")
@@ -610,7 +602,7 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 // or archived_only is set.
 func (h *ProjectHandler) ArchiveProject(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	if !middleware.IsProjectOwner(c) {
 		role, _ := middleware.CurrentRole(c)
@@ -648,7 +640,7 @@ func (h *ProjectHandler) ArchiveProject(c *gin.Context) {
 // listings again. Owner or admin only.
 func (h *ProjectHandler) UnarchiveProject(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	if !middleware.IsProjectOwner(c) {
 		role, _ := middleware.CurrentRole(c)
@@ -685,7 +677,7 @@ func (h *ProjectHandler) UnarchiveProject(c *gin.Context) {
 // or migrate it elsewhere. Only the project owner / admin can export.
 func (h *ProjectHandler) ExportProject(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	if !middleware.IsProjectOwner(c) {
 		role, _ := middleware.CurrentRole(c)

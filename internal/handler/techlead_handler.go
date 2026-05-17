@@ -38,11 +38,7 @@ func NewTechLeadHandler(db *gorm.DB) *TechLeadHandler {
 
 // ListPendingStories 获取待审批故事列表（技术负责人）
 func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTechLead && role != model.RoleAdmin {
@@ -145,11 +141,7 @@ func (h *TechLeadHandler) ListPendingStories(c *gin.Context) {
 
 // ListWorkload 获取开发人员工作负载
 func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTechLead && role != model.RoleAdmin {
@@ -301,11 +293,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 
 // ListMyProjects 获取技术负责人负责的项目列表
 func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTechLead && role != model.RoleAdmin {
@@ -353,7 +341,7 @@ func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
 // AddTechLead 为项目指定技术负责人（admin）
 func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {
@@ -421,7 +409,7 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 // RemoveTechLead 移除项目技术负责人（admin）
 func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {

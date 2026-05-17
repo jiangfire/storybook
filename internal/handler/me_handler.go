@@ -25,11 +25,7 @@ func NewMeHandler(db *gorm.DB) *MeHandler {
 }
 
 func (h *MeHandler) Dashboard(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	user, err := h.userRepo.FindByID(userID)
 	if err != nil {

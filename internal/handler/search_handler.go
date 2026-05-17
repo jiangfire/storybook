@@ -53,11 +53,7 @@ func (h *SearchHandler) Capabilities(c *gin.Context) {
 }
 
 func (h *SearchHandler) Search(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	q := strings.TrimSpace(c.Query("q"))
 	if q == "" {
@@ -296,11 +292,7 @@ func (h *SearchHandler) SearchSemantic(c *gin.Context) {
 		return
 	}
 
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	var req SemanticSearchRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -367,11 +359,7 @@ func (h *SearchHandler) SimilarStories(c *gin.Context) {
 		return
 	}
 
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	var req SimilarStoriesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -454,7 +442,7 @@ func (h *SearchHandler) SuggestTags(c *gin.Context) {
 	content := h.buildTagSuggestionContent(req.Title, req.Description, req.Content)
 
 	// 获取用户有权限的项目
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	accessibleIDs, err := service.AccessibleProjectIDs(h.db, userID, role)
 	if err != nil {
@@ -645,11 +633,7 @@ func (h *SearchHandler) SearchProjectsSemantic(c *gin.Context) {
 		return
 	}
 
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	query := c.Query("q")
 	if query == "" {

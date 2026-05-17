@@ -95,6 +95,22 @@ func CurrentUserID(c *gin.Context) (uint, bool) {
 	return userID, ok
 }
 
+// MustUserID returns the user ID injected by AuthRequired. It panics if the
+// middleware was not applied — this is a programmer error, not a runtime user
+// error. Use this in handlers where the route already has auth middleware.
+func MustUserID(c *gin.Context) uint {
+	raw, ok := c.Get(CtxUserIDKey)
+	if !ok {
+		panic("middleware.MustUserID: no user_id in context; forgot AuthRequired?")
+	}
+
+	userID, ok := raw.(uint)
+	if !ok {
+		panic("middleware.MustUserID: user_id in context has wrong type")
+	}
+	return userID
+}
+
 func CurrentRole(c *gin.Context) (string, bool) {
 	raw, ok := c.Get(CtxRoleKey)
 	if !ok {

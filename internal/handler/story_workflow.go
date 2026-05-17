@@ -14,7 +14,7 @@ import (
 
 func (h *StoryHandler) UpdateStatus(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
 		return
@@ -44,7 +44,7 @@ func (h *StoryHandler) UpdateStatus(c *gin.Context) {
 
 func (h *StoryHandler) ClaimStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleDeveloper && role != model.RoleAdmin {
@@ -82,7 +82,7 @@ func (h *StoryHandler) ClaimStory(c *gin.Context) {
 
 func (h *StoryHandler) ReleaseStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
 		return
@@ -111,7 +111,7 @@ func (h *StoryHandler) ReleaseStory(c *gin.Context) {
 
 func (h *StoryHandler) UpdateACStatus(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
 		return
@@ -152,7 +152,7 @@ func (h *StoryHandler) UpdateACStatus(c *gin.Context) {
 
 func (h *StoryHandler) AddCodeReference(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleDeveloper && role != model.RoleAdmin {
 		api.Forbidden(c, "仅开发人员可关联代码")
@@ -193,7 +193,7 @@ type updateACRequest struct {
 // AddAC appends a new acceptance criterion to a story.
 func (h *StoryHandler) AddAC(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
 		return
@@ -225,7 +225,7 @@ func (h *StoryHandler) AddAC(c *gin.Context) {
 // changes still go through UpdateACStatus.
 func (h *StoryHandler) UpdateAC(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
 		return
@@ -270,7 +270,7 @@ func (h *StoryHandler) UpdateAC(c *gin.Context) {
 // DeleteAC removes a single criterion by ID.
 func (h *StoryHandler) DeleteAC(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
 		return

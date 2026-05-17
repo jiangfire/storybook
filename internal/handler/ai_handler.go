@@ -166,11 +166,7 @@ func (h *AIHandler) GetConfig(c *gin.Context) {
 }
 
 func (h *AIHandler) UpsertConfig(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleAdmin {

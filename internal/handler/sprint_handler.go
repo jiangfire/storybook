@@ -67,7 +67,7 @@ type assignStorySprintRequest struct {
 
 func (h *SprintHandler) Create(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -151,11 +151,7 @@ func (h *SprintHandler) List(c *gin.Context) {
 }
 
 func (h *SprintHandler) UpdateStatus(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -219,7 +215,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 func (h *SprintHandler) AssignStory(c *gin.Context) {
 	story := middleware.MustStory(c)
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -285,11 +281,7 @@ func (h *SprintHandler) Cancel(c *gin.Context) {
 // Delete soft-deletes a planned (draft) sprint. Refuses anything other than
 // planned so callers must explicitly cancel/close active sprints first.
 func (h *SprintHandler) Delete(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -328,11 +320,7 @@ func (h *SprintHandler) Delete(c *gin.Context) {
 // associated stories' sprint_id within the same transaction so a partial
 // failure leaves the sprint+stories consistent.
 func (h *SprintHandler) terminate(c *gin.Context, action string) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -431,11 +419,7 @@ type reorderRequest struct {
 // belongs to this sprint before any UPDATE fires so a malicious payload can't
 // touch unrelated rows; the entire batch runs in one transaction.
 func (h *SprintHandler) Reorder(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {

@@ -49,7 +49,7 @@ type updateTestCaseRequest struct {
 
 func (h *TestCaseHandler) Create(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTester && role != model.RoleAdmin {
 		api.Forbidden(c, "仅测试人员可创建测试用例")
@@ -138,11 +138,7 @@ func (h *TestCaseHandler) ListByStory(c *gin.Context) {
 }
 
 func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTester && role != model.RoleAdmin {
 		api.Forbidden(c, "仅测试人员可更新测试用例状态")
@@ -180,11 +176,7 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 // optimistic locking. Status changes still go through UpdateStatus so verify
 // audit fields stay aligned.
 func (h *TestCaseHandler) Update(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	tc := middleware.MustTestCase(c)
 	story := middleware.MustStory(c)
@@ -282,11 +274,7 @@ func (h *TestCaseHandler) Update(c *gin.Context) {
 
 // Delete soft-deletes a test case. Creator or admin only.
 func (h *TestCaseHandler) Delete(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	tc := middleware.MustTestCase(c)
 	story := middleware.MustStory(c)

@@ -85,7 +85,7 @@ var errBugAssigneeRole = errors.New("bug_assignee_role")
 
 func (h *BugHandler) Create(c *gin.Context) {
 	project := middleware.MustProject(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTester && role != model.RoleAdmin {
@@ -229,11 +229,7 @@ func (h *BugHandler) Get(c *gin.Context) {
 }
 
 func (h *BugHandler) UpdateStatus(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleDeveloper && role != model.RoleTester && role != model.RoleAdmin {
@@ -280,11 +276,7 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 }
 
 func (h *BugHandler) Assign(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -345,11 +337,7 @@ func (h *BugHandler) Assign(c *gin.Context) {
 // optimistic locking on Version. status/assignee/reporter/projectID are NOT
 // mutable here — UpdateStatus and Assign cover those paths.
 func (h *BugHandler) Update(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	bug := middleware.MustBug(c)
 
@@ -433,11 +421,7 @@ func (h *BugHandler) Update(c *gin.Context) {
 
 // Delete soft-deletes a bug. Reporter or admin only.
 func (h *BugHandler) Delete(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	bug := middleware.MustBug(c)
 

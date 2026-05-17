@@ -22,11 +22,7 @@ func NewNotificationHandler(db *gorm.DB) *NotificationHandler {
 }
 
 func (h *NotificationHandler) List(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	unreadOnly := strings.EqualFold(strings.TrimSpace(c.DefaultQuery("unread_only", "false")), "true")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -71,11 +67,7 @@ func (h *NotificationHandler) List(c *gin.Context) {
 }
 
 func (h *NotificationHandler) UnreadCount(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	count, err := h.repo.UnreadCount(userID)
 	if err != nil {
@@ -86,11 +78,7 @@ func (h *NotificationHandler) UnreadCount(c *gin.Context) {
 }
 
 func (h *NotificationHandler) MarkRead(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	notifID, ok := parseUintParam(c, "id")
 	if !ok {
@@ -114,11 +102,7 @@ func (h *NotificationHandler) MarkRead(c *gin.Context) {
 }
 
 func (h *NotificationHandler) MarkAllRead(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	count, err := h.repo.MarkAllRead(userID)
 	if err != nil {

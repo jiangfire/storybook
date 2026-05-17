@@ -104,11 +104,7 @@ type reviewStoryRequest struct {
 }
 
 func (h *StoryHandler) CreateStory(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleAdmin {
@@ -435,7 +431,7 @@ func (h *StoryHandler) GetStory(c *gin.Context) {
 
 func (h *StoryHandler) UpdateStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
@@ -502,7 +498,7 @@ func (h *StoryHandler) UpdateStory(c *gin.Context) {
 
 func (h *StoryHandler) DeleteStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {

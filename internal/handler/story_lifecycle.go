@@ -11,7 +11,7 @@ import (
 
 func (h *StoryHandler) ArchiveStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {
@@ -36,7 +36,7 @@ func (h *StoryHandler) ArchiveStory(c *gin.Context) {
 
 func (h *StoryHandler) RestoreStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if denyTechLeadStoryMutation(c, role) {

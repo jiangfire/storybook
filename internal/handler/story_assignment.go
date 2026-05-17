@@ -15,7 +15,7 @@ import (
 
 func (h *StoryHandler) AssignStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleProduct && role != model.RoleTechLead && role != model.RoleAdmin {
@@ -95,7 +95,7 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 // ReviewStory 审批故事（技术负责人）
 func (h *StoryHandler) ReviewStory(c *gin.Context) {
 	story := middleware.MustStory(c)
-	userID, _ := middleware.CurrentUserID(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if role != model.RoleTechLead && role != model.RoleAdmin {

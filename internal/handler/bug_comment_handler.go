@@ -48,11 +48,7 @@ type updateBugCommentRequest struct {
 }
 
 func (h *BugCommentHandler) Create(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	bug := middleware.MustBug(c)
 
 	var req createBugCommentRequest
@@ -112,11 +108,7 @@ func (h *BugCommentHandler) List(c *gin.Context) {
 }
 
 func (h *BugCommentHandler) Update(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	bug := middleware.MustBug(c)
 
 	commentID, ok := parseUintParam(c, "commentID")
@@ -186,11 +178,7 @@ func (h *BugCommentHandler) Update(c *gin.Context) {
 }
 
 func (h *BugCommentHandler) Delete(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	userID := middleware.MustUserID(c)
 	bug := middleware.MustBug(c)
 
 	commentID, ok := parseUintParam(c, "commentID")
