@@ -468,9 +468,7 @@ func (h *BugHandler) Delete(c *gin.Context) {
 }
 
 func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
-	// 这里走 service.EnsureProjectAccess 而非 handler 包的 ensureProjectAccess:
-	// 后者已随 P2.1 中间件改造被淘汰,只剩 access_helper.go 等待清理。
-	// 直查 service 层既能拿到原始 ErrForbidden,也省一次错误包装。
+	// 直查 service.EnsureProjectAccess 以校验目标用户是否属于项目。
 	if _, _, err := service.EnsureProjectAccess(h.db, projectID, userID); err != nil {
 		return err
 	}
