@@ -15,13 +15,13 @@ import (
 
 type TaskHandler struct {
 	db       *gorm.DB
-	events   EventPublisher
+	events   service.EventPublisher
 	taskSvc  *service.TaskService
 	taskRepo repository.TaskRepo
 	notifier service.Notifier
 }
 
-func NewTaskHandler(db *gorm.DB, events EventPublisher) *TaskHandler {
+func NewTaskHandler(db *gorm.DB, events service.EventPublisher) *TaskHandler {
 	return &TaskHandler{
 		db:       db,
 		events:   events,

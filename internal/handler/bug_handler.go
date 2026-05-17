@@ -23,7 +23,7 @@ type BugHandler struct {
 	projectRepo  repository.ProjectRepo
 	activityRepo repository.ActivityRepo
 	notifier     service.Notifier
-	events       EventPublisher
+	events       service.EventPublisher
 }
 
 func NewBugHandler(db *gorm.DB) *BugHandler {
@@ -51,7 +51,7 @@ func (h *BugHandler) WithNotifier(n service.Notifier) *BugHandler {
 // WithEvents wires a WebSocket broadcaster after construction so project-level
 // bug events can fan out without changing the existing NewBugHandler signature
 // (preserves the *gorm.DB-only constructor used by tests).
-func (h *BugHandler) WithEvents(p EventPublisher) *BugHandler {
+func (h *BugHandler) WithEvents(p service.EventPublisher) *BugHandler {
 	if p != nil {
 		h.events = p
 	}

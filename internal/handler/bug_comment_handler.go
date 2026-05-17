@@ -19,7 +19,7 @@ type BugCommentHandler struct {
 	commentRepo  *repository.BugCommentRepository
 	bugRepo      *repository.BugRepository
 	activityRepo repository.ActivityRepo
-	events       EventPublisher
+	events       service.EventPublisher
 }
 
 func NewBugCommentHandler(db *gorm.DB) *BugCommentHandler {
@@ -33,7 +33,7 @@ func NewBugCommentHandler(db *gorm.DB) *BugCommentHandler {
 
 // WithEvents wires the WebSocket broadcaster post-construction so we can keep
 // the constructor signature trivial for tests that don't need realtime fan-out.
-func (h *BugCommentHandler) WithEvents(p EventPublisher) *BugCommentHandler {
+func (h *BugCommentHandler) WithEvents(p service.EventPublisher) *BugCommentHandler {
 	if p != nil {
 		h.events = p
 	}

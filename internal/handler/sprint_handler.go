@@ -21,7 +21,7 @@ type SprintHandler struct {
 	storyRepo   repository.StoryRepo
 	activityRepo repository.ActivityRepo
 	notifier    service.Notifier
-	events      EventPublisher
+	events      service.EventPublisher
 }
 
 func NewSprintHandler(db *gorm.DB) *SprintHandler {
@@ -43,7 +43,7 @@ func (h *SprintHandler) WithNotifier(n service.Notifier) *SprintHandler {
 
 // WithEvents wires the project-scope broadcaster post-construction so existing
 // callers that only have *gorm.DB stay green.
-func (h *SprintHandler) WithEvents(p EventPublisher) *SprintHandler {
+func (h *SprintHandler) WithEvents(p service.EventPublisher) *SprintHandler {
 	if p != nil {
 		h.events = p
 	}

@@ -16,7 +16,7 @@ import (
 
 type StoryHandler struct {
 	db             *gorm.DB
-	events         EventPublisher
+	events         service.EventPublisher
 	storySvc       *service.StoryService
 	userRepo       repository.UserRepo
 	storyRepo      repository.StoryRepo
@@ -26,16 +26,11 @@ type StoryHandler struct {
 	notifier       service.Notifier
 }
 
-type EventPublisher interface {
-	BroadcastProject(projectID uint, eventType string, data any)
-	BroadcastUser(userID uint, eventType string, data any)
-}
-
-func NewStoryHandler(db *gorm.DB, events EventPublisher) *StoryHandler {
+func NewStoryHandler(db *gorm.DB, events service.EventPublisher) *StoryHandler {
 	return NewStoryHandlerWithVector(db, events, nil)
 }
 
-func NewStoryHandlerWithVector(db *gorm.DB, events EventPublisher, vectorSvc service.VectorService) *StoryHandler {
+func NewStoryHandlerWithVector(db *gorm.DB, events service.EventPublisher, vectorSvc service.VectorService) *StoryHandler {
 	return &StoryHandler{
 		db:              db,
 		events:          events,
