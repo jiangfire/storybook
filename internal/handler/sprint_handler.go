@@ -163,26 +163,7 @@ func (h *SprintHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	sprintID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "冲刺ID无效")
-		return
-	}
-
-	sprint, err := h.sprintRepo.FindByID(sprintID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "冲刺不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	sprint := middleware.MustSprint(c)
 
 	var req updateSprintStatusRequest
 	if !middleware.BindJSON(c, &req) {
@@ -316,26 +297,7 @@ func (h *SprintHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	sprintID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "冲刺ID无效")
-		return
-	}
-
-	sprint, err := h.sprintRepo.FindByID(sprintID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "冲刺不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	sprint := middleware.MustSprint(c)
 
 	if sprint.Status != model.SprintStatusPlanned {
 		api.BadRequest(c, "仅未启动的冲刺可删除，请先取消或完成")
@@ -378,26 +340,7 @@ func (h *SprintHandler) terminate(c *gin.Context, action string) {
 		return
 	}
 
-	sprintID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "冲刺ID无效")
-		return
-	}
-
-	sprint, err := h.sprintRepo.FindByID(sprintID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "冲刺不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	sprint := middleware.MustSprint(c)
 
 	var (
 		newStatus  string
@@ -500,26 +443,7 @@ func (h *SprintHandler) Reorder(c *gin.Context) {
 		return
 	}
 
-	sprintID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "冲刺ID无效")
-		return
-	}
-
-	sprint, err := h.sprintRepo.FindByID(sprintID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "冲刺不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, sprint.ProjectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	sprint := middleware.MustSprint(c)
 
 	var req reorderRequest
 	if !middleware.BindJSON(c, &req) {
