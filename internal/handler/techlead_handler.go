@@ -203,92 +203,82 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 		return
 	}
 
-	// 计算每个开发人员的工作负载
 	workloads := make([]gin.H, 0, len(developerIDs))
 	for _, devID := range developerIDs {
-		user, err := h.userRepo.FindByID(devID)
-		if err != nil {
-			continue
+		if wl := h.buildDeveloperWorkload(devID, projectID, visibleProjectIDs, role); wl != nil {
+			workloads = append(workloads, wl)
 		}
-
-		// 任务统计走 repository 具名方法;空切片表示不限项目(admin 跨项目视图)。
-		var scopeProjects []uint
-		if projectID > 0 {
-			scopeProjects = []uint{projectID}
-		} else if role == model.RoleTechLead {
-			scopeProjects = visibleProjectIDs
-		}
-
-		// 统计活跃故事数
-		var activeStories int64
-		storyQuery := h.storyRepo.DB().Model(&model.UserStory{}).
-			Where("assigned_to = ? AND status IN ?", devID, []string{
-				model.StoryStatusInProgress,
-				model.StoryStatusReady,
-			})
-		if projectID > 0 {
-			storyQuery = storyQuery.Where("project_id = ?", projectID)
-		} else if role == model.RoleTechLead {
-			storyQuery = storyQuery.Where("project_id IN ?", visibleProjectIDs)
-		}
-		storyQuery.Count(&activeStories)
-
-		// 统计活跃任务数
-		activeTasks, _ := h.taskRepo.CountTasksByAssignee(devID, []string{
-			model.TaskStatusTodo,
-			model.TaskStatusInProgress,
-		}, scopeProjects, time.Time{})
-
-		// 统计故事点
-		var totalPoints float64
-		pointsQuery := h.storyRepo.DB().Model(&model.UserStory{}).
-			Where("assigned_to = ? AND points IS NOT NULL AND status != ?", devID, model.StoryStatusDone)
-		if projectID > 0 {
-			pointsQuery = pointsQuery.Where("project_id = ?", projectID)
-		} else if role == model.RoleTechLead {
-			pointsQuery = pointsQuery.Where("project_id IN ?", visibleProjectIDs)
-		}
-		pointsQuery.Select("COALESCE(SUM(points), 0)").Scan(&totalPoints)
-
-		// 统计预估工时
-		estimatedHours, _ := h.taskRepo.SumEstimatedHoursByAssignee(devID, model.TaskStatusDone, scopeProjects)
-
-		// 计算完成率（最近30天）
-		var completedStories, totalAssigned int64
-		completedQuery := h.storyRepo.DB().Model(&model.UserStory{}).
-			Where("assigned_to = ? AND status = ?", devID, model.StoryStatusDone)
-		totalAssignedQuery := h.storyRepo.DB().Model(&model.UserStory{}).Where("assigned_to = ?", devID)
-		if projectID > 0 {
-			completedQuery = completedQuery.Where("project_id = ?", projectID)
-			totalAssignedQuery = totalAssignedQuery.Where("project_id = ?", projectID)
-		} else if role == model.RoleTechLead {
-			completedQuery = completedQuery.Where("project_id IN ?", visibleProjectIDs)
-			totalAssignedQuery = totalAssignedQuery.Where("project_id IN ?", visibleProjectIDs)
-		}
-		completedQuery.Count(&completedStories)
-		totalAssignedQuery.Count(&totalAssigned)
-
-		completionRate := 0.0
-		if totalAssigned > 0 {
-			completionRate = float64(completedStories) / float64(totalAssigned) * 100
-		}
-
-		workloads = append(workloads, gin.H{
-			"user": gin.H{
-				"id":    user.ID,
-				"email": user.Email,
-			},
-			"active_stories":     activeStories,
-			"active_tasks":       activeTasks,
-			"total_story_points": totalPoints,
-			"estimated_hours":    estimatedHours,
-			"completion_rate":    completionRate,
-		})
 	}
 
 	api.Success(c, "success", gin.H{
 		"workloads": workloads,
 	})
+}
+
+// applyProjectFilter adds project_id scope to a GORM query when projectID or
+// visibleProjectIDs / role are present. It mutates and returns the query chain.
+func applyProjectFilter(q *gorm.DB, projectID uint, visibleProjectIDs []uint, role string) *gorm.DB {
+	if projectID > 0 {
+		return q.Where("project_id = ?", projectID)
+	}
+	if role == model.RoleTechLead {
+		return q.Where("project_id IN ?", visibleProjectIDs)
+	}
+	return q
+}
+
+// buildDeveloperWorkload aggregates metrics for a single developer.
+func (h *TechLeadHandler) buildDeveloperWorkload(devID, projectID uint, visibleProjectIDs []uint, role string) gin.H {
+	user, err := h.userRepo.FindByID(devID)
+	if err != nil {
+		return nil
+	}
+
+	var scopeProjects []uint
+	if projectID > 0 {
+		scopeProjects = []uint{projectID}
+	} else if role == model.RoleTechLead {
+		scopeProjects = visibleProjectIDs
+	}
+
+	var activeStories int64
+	q := h.storyRepo.DB().Model(&model.UserStory{}).
+		Where("assigned_to = ? AND status IN ?", devID, []string{model.StoryStatusInProgress, model.StoryStatusReady})
+	q = applyProjectFilter(q, projectID, visibleProjectIDs, role)
+	q.Count(&activeStories)
+
+	activeTasks, _ := h.taskRepo.CountTasksByAssignee(devID, []string{model.TaskStatusTodo, model.TaskStatusInProgress}, scopeProjects, time.Time{})
+
+	var totalPoints float64
+	q = h.storyRepo.DB().Model(&model.UserStory{}).
+		Where("assigned_to = ? AND points IS NOT NULL AND status != ?", devID, model.StoryStatusDone)
+	q = applyProjectFilter(q, projectID, visibleProjectIDs, role)
+	q.Select("COALESCE(SUM(points), 0)").Scan(&totalPoints)
+
+	estimatedHours, _ := h.taskRepo.SumEstimatedHoursByAssignee(devID, model.TaskStatusDone, scopeProjects)
+
+	var completedStories, totalAssigned int64
+	q1 := h.storyRepo.DB().Model(&model.UserStory{}).Where("assigned_to = ? AND status = ?", devID, model.StoryStatusDone)
+	q1 = applyProjectFilter(q1, projectID, visibleProjectIDs, role)
+	q1.Count(&completedStories)
+
+	q2 := h.storyRepo.DB().Model(&model.UserStory{}).Where("assigned_to = ?", devID)
+	q2 = applyProjectFilter(q2, projectID, visibleProjectIDs, role)
+	q2.Count(&totalAssigned)
+
+	completionRate := 0.0
+	if totalAssigned > 0 {
+		completionRate = float64(completedStories) / float64(totalAssigned) * 100
+	}
+
+	return gin.H{
+		"user":               gin.H{"id": user.ID, "email": user.Email},
+		"active_stories":     activeStories,
+		"active_tasks":       activeTasks,
+		"total_story_points": totalPoints,
+		"estimated_hours":    estimatedHours,
+		"completion_rate":    completionRate,
+	}
 }
 
 // ListMyProjects 获取技术负责人负责的项目列表
