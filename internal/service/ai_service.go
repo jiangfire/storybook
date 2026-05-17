@@ -51,27 +51,31 @@ type RuntimeAIConfig struct {
 	Enabled     bool
 }
 
-// AIService defines the contract for AI-powered story generation.
-type AIService interface {
-	// GenerateStory decomposes a requirement into a user story.
+// StoryGenerator covers user-story-flavored AI operations: decomposition,
+// streaming, refine, and batch variants. Handlers that only need to produce
+// stories should depend on this narrower interface instead of AIService.
+type StoryGenerator interface {
 	GenerateStory(ctx context.Context, requirement string) (*StoryResult, error)
-
-	// StreamGenerateStory streams the story generation, calling cb for each chunk.
 	StreamGenerateStory(ctx context.Context, requirement string, cb StreamCallback) (*StoryResult, error)
-
-	// ChatRefine refines an existing story based on feedback.
 	ChatRefine(ctx context.Context, original *StoryResult, feedback string) (*StoryResult, error)
-
-	// BatchGenerate generates multiple story variants (max 5).
 	BatchGenerate(ctx context.Context, requirement string, count int) ([]*StoryResult, error)
-
-	// Chat issues a plain chat completion with the given system+user prompts and
-	// returns the assistant message content. Used by §8.6 helpers (AC refine,
-	// summary, translate) that need free-form text rather than a StoryResult.
-	Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error)
-
-	// IsConfigured returns true when the service can make real API calls.
 	IsConfigured() bool
+}
+
+// ChatCompleter is the free-form chat contract used by §8.6 helpers (AC
+// refine, summary, translate). Handlers that only call Chat should depend on
+// this rather than the full AIService.
+type ChatCompleter interface {
+	Chat(ctx context.Context, systemPrompt, userPrompt string) (string, error)
+	IsConfigured() bool
+}
+
+// AIService is the aggregate contract preserved for back-compat. NewAIService
+// keeps returning it so the construction-time cache and existing callers do
+// not need to choose between the two narrower interfaces.
+type AIService interface {
+	StoryGenerator
+	ChatCompleter
 }
 
 // ---------------------------------------------------------------------------
