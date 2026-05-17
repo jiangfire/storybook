@@ -3,8 +3,8 @@ package service
 import (
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/repository"
 	"gorm.io/gorm"
 )
 
@@ -12,15 +12,15 @@ import (
 // entities. It is intentionally plain so that callers can JSON-serialise it
 // or transform it however they need.
 type ProjectSnapshot struct {
-	FormatVersion string              `json:"format_version"`
-	ExportedAt    time.Time           `json:"exported_at"`
-	Project       model.Project       `json:"project"`
+	FormatVersion string                `json:"format_version"`
+	ExportedAt    time.Time             `json:"exported_at"`
+	Project       model.Project         `json:"project"`
 	Members       []model.ProjectMember `json:"members"`
-	Stories       []model.UserStory   `json:"stories"`
-	Sprints       []model.Sprint      `json:"sprints"`
-	Bugs          []model.BugReport   `json:"bugs"`
-	Tasks         []model.Task        `json:"tasks"`
-	TestCases     []model.TestCase    `json:"test_cases"`
+	Stories       []model.UserStory     `json:"stories"`
+	Sprints       []model.Sprint        `json:"sprints"`
+	Bugs          []model.BugReport     `json:"bugs"`
+	Tasks         []model.Task          `json:"tasks"`
+	TestCases     []model.TestCase      `json:"test_cases"`
 }
 
 // ExportSnapshot queries every entity belonging to projectID and assembles a

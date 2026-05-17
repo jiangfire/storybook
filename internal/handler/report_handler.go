@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/logging"
-	"git.neolidy.top/neo/storybook/internal/middleware"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/repository"
-	"git.neolidy.top/neo/storybook/internal/util/dateparse"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/logging"
+	"github.com/jiangfire/storybook/internal/middleware"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/util/dateparse"
 	"gorm.io/gorm"
 )
 
@@ -578,11 +578,11 @@ func (h *ReportHandler) respondTimeMetric(c *gin.Context, label string, extract 
 	}
 
 	api.Success(c, "success", gin.H{
-		"project_id":  projectID,
-		"metric":      label,
-		"from":        from.Format("2006-01-02"),
-		"to":          to.Format("2006-01-02"),
-		"sample_size": samples,
+		"project_id":    projectID,
+		"metric":        label,
+		"from":          from.Format("2006-01-02"),
+		"to":            to.Format("2006-01-02"),
+		"sample_size":   samples,
 		"average_hours": avgHours,
 		"average_days":  avgHours / 24.0,
 		"per_story":     perStory,

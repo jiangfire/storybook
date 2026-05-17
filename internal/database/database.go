@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/config"
-	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/glebarez/sqlite"
+	"github.com/jiangfire/storybook/internal/config"
+	"github.com/jiangfire/storybook/internal/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

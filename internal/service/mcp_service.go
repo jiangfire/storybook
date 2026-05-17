@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/fileutil"
-	"git.neolidy.top/neo/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/fileutil"
+	"github.com/jiangfire/storybook/internal/model"
 	"gorm.io/gorm"
 )
 

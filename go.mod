@@ -1,4 +1,4 @@
-module git.neolidy.top/neo/storybook
+module github.com/jiangfire/storybook
 
 go 1.25.0
 

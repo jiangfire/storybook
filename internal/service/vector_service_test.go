@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/glebarez/sqlite"
+	"github.com/jiangfire/storybook/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"

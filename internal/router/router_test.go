@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"git.neolidy.top/neo/storybook/internal/auth"
-	"git.neolidy.top/neo/storybook/internal/config"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/wiring"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/jiangfire/storybook/internal/auth"
+	"github.com/jiangfire/storybook/internal/config"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/wiring"
 	"gorm.io/gorm"
 )
 

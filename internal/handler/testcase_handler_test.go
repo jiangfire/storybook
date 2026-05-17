@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"git.neolidy.top/neo/storybook/internal/middleware"
-	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/jiangfire/storybook/internal/middleware"
+	"github.com/jiangfire/storybook/internal/model"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )

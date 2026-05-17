@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/repository"
 	"gorm.io/gorm"
 )
 
@@ -28,8 +28,8 @@ type NotificationEvent struct {
 // (e.g. unit tests).
 type NoopNotifier struct{}
 
-func (NoopNotifier) Notify(context.Context, uint, NotificationEvent)              {}
-func (NoopNotifier) NotifyMany(context.Context, []uint, NotificationEvent)        {}
+func (NoopNotifier) Notify(context.Context, uint, NotificationEvent)               {}
+func (NoopNotifier) NotifyMany(context.Context, []uint, NotificationEvent)         {}
 func (NoopNotifier) NotifyProjectMembers(context.Context, uint, NotificationEvent) {}
 
 type NotificationService struct {

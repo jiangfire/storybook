@@ -5,13 +5,13 @@ import (
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/logging"
-	"git.neolidy.top/neo/storybook/internal/middleware"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/repository"
-	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/logging"
+	"github.com/jiangfire/storybook/internal/middleware"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/service"
 	"gorm.io/gorm"
 )
 

@@ -7,12 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/metrics"
-	"git.neolidy.top/neo/storybook/internal/middleware"
-	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/metrics"
+	"github.com/jiangfire/storybook/internal/middleware"
+	"github.com/jiangfire/storybook/internal/model"
 	"gorm.io/gorm"
 )
 

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/metrics"
+	"github.com/jiangfire/storybook/internal/metrics"
 )
 
 const aiServiceCacheLabel = "ai_service"

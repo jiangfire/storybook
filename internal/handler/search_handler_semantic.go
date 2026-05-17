@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"strings"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/middleware"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/middleware"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/service"
 )
 
 // SemanticSearchRequest 语义搜索请求

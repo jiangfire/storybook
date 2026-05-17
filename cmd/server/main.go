@@ -13,13 +13,13 @@ import (
 	"syscall"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/auth"
-	"git.neolidy.top/neo/storybook/internal/bootstrap"
-	"git.neolidy.top/neo/storybook/internal/config"
-	"git.neolidy.top/neo/storybook/internal/database"
-	"git.neolidy.top/neo/storybook/internal/logging"
-	"git.neolidy.top/neo/storybook/internal/router"
-	"git.neolidy.top/neo/storybook/internal/wiring"
+	"github.com/jiangfire/storybook/internal/auth"
+	"github.com/jiangfire/storybook/internal/bootstrap"
+	"github.com/jiangfire/storybook/internal/config"
+	"github.com/jiangfire/storybook/internal/database"
+	"github.com/jiangfire/storybook/internal/logging"
+	"github.com/jiangfire/storybook/internal/router"
+	"github.com/jiangfire/storybook/internal/wiring"
 )
 
 const bootstrapAdminCommand = "bootstrap-admin"

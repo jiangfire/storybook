@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/metrics"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/metrics"
 )
 
 type windowCounter struct {

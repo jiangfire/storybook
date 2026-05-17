@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/logging"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/logging"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/repository"
 	"gorm.io/gorm"
 )
 

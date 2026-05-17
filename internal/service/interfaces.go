@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"git.neolidy.top/neo/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/model"
 )
 
 // 本文件集中放置 service 包对外暴露的接口契约。

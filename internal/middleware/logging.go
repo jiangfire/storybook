@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/metrics"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/metrics"
 )
 
 func RequestLogger(logger *slog.Logger) gin.HandlerFunc {

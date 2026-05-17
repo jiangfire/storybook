@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"git.neolidy.top/neo/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/model"
 )
 
 // parseStoryFromContent attempts to extract a StoryResult from raw LLM output.

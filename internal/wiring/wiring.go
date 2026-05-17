@@ -11,12 +11,12 @@ package wiring
 import (
 	"log/slog"
 
-	"git.neolidy.top/neo/storybook/internal/auth"
-	"git.neolidy.top/neo/storybook/internal/config"
-	"git.neolidy.top/neo/storybook/internal/handler"
-	"git.neolidy.top/neo/storybook/internal/realtime"
-	"git.neolidy.top/neo/storybook/internal/repository"
-	"git.neolidy.top/neo/storybook/internal/service"
+	"github.com/jiangfire/storybook/internal/auth"
+	"github.com/jiangfire/storybook/internal/config"
+	"github.com/jiangfire/storybook/internal/handler"
+	"github.com/jiangfire/storybook/internal/realtime"
+	"github.com/jiangfire/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/service"
 	"gorm.io/gorm"
 )
 

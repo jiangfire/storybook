@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/metrics"
-	"git.neolidy.top/neo/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/metrics"
+	"github.com/jiangfire/storybook/internal/repository"
 	openai "github.com/sashabaranov/go-openai"
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
@@ -449,4 +449,3 @@ func (s *heuristicAIService) BatchGenerate(ctx context.Context, requirement stri
 func (s *heuristicAIService) Chat(_ context.Context, _, _ string) (string, error) {
 	return "", errors.New("ai_not_configured: 仅在配置 OpenAI 后可用")
 }
-

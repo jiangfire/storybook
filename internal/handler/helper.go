@@ -40,5 +40,3 @@ func parseUintQuery(c *gin.Context, key string) (uint, bool) {
 	}
 	return uint(value), true
 }
-
-

@@ -4,24 +4,24 @@ import (
 	"errors"
 	"strings"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/logging"
-	"git.neolidy.top/neo/storybook/internal/middleware"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/repository"
-	"git.neolidy.top/neo/storybook/internal/service"
-	"git.neolidy.top/neo/storybook/internal/util/dateparse"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/logging"
+	"github.com/jiangfire/storybook/internal/middleware"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/service"
+	"github.com/jiangfire/storybook/internal/util/dateparse"
 	"gorm.io/gorm"
 )
 
 type SprintHandler struct {
-	db          *gorm.DB
-	sprintRepo  repository.SprintRepo
-	storyRepo   repository.StoryRepo
+	db           *gorm.DB
+	sprintRepo   repository.SprintRepo
+	storyRepo    repository.StoryRepo
 	activityRepo repository.ActivityRepo
-	notifier    service.Notifier
-	events      service.EventPublisher
+	notifier     service.Notifier
+	events       service.EventPublisher
 }
 
 func NewSprintHandler(db *gorm.DB) *SprintHandler {
@@ -479,4 +479,3 @@ func (h *SprintHandler) Reorder(c *gin.Context) {
 		"order_count": len(req.Orders),
 	})
 }
-

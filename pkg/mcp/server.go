@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/fileutil"
-	"git.neolidy.top/neo/storybook/internal/service"
+	"github.com/jiangfire/storybook/internal/fileutil"
+	"github.com/jiangfire/storybook/internal/service"
 	"gorm.io/gorm"
 )
 

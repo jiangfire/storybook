@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/metrics"
-	"git.neolidy.top/neo/storybook/internal/middleware"
-	"git.neolidy.top/neo/storybook/internal/model"
-	"git.neolidy.top/neo/storybook/internal/webui"
-	"git.neolidy.top/neo/storybook/internal/wiring"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/metrics"
+	"github.com/jiangfire/storybook/internal/middleware"
+	"github.com/jiangfire/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/webui"
+	"github.com/jiangfire/storybook/internal/wiring"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

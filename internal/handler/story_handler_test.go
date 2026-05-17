@@ -3,7 +3,7 @@ package handler
 import (
 	"testing"
 
-	"git.neolidy.top/neo/storybook/internal/service"
+	"github.com/jiangfire/storybook/internal/service"
 )
 
 func TestCanTransit(t *testing.T) {

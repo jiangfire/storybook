@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"git.neolidy.top/neo/storybook/internal/metrics"
+	"github.com/jiangfire/storybook/internal/metrics"
 	"github.com/sashabaranov/go-openai"
 )
 

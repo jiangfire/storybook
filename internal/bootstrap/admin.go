@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"git.neolidy.top/neo/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

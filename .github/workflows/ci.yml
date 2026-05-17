@@ -10,14 +10,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "0"
-      GOPROXY: "https://goproxy.cn,direct"
-      GOSUMDB: "sum.golang.google.cn"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare runner toolchain
-        run: bash .gitea/scripts/verify-runner-env.sh
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Run Go tests
         run: go test ./...
@@ -27,16 +28,27 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "0"
-      GOPROXY: "https://goproxy.cn,direct"
-      GOSUMDB: "sum.golang.google.cn"
-      NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
-      npm_config_registry: "https://registry.npmmirror.com"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare runner toolchain
-        run: bash .gitea/scripts/verify-runner-env.sh
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: storybook-page/pnpm-lock.yaml
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Install frontend dependencies
         working-directory: storybook-page

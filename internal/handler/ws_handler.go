@@ -4,10 +4,10 @@ import (
 	"errors"
 	"strings"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/auth"
-	"git.neolidy.top/neo/storybook/internal/realtime"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/auth"
+	"github.com/jiangfire/storybook/internal/realtime"
 )
 
 type WSHandler struct {

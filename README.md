@@ -170,4 +170,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-gosec.ps1
 - [OpenAPI](docs/06-openapi.yaml)
 - [前端实施计划](docs/07-前端实施计划.md)
 - [技术负责人实施计划](docs/08-技术负责人角色实施计划.md)
+- [GitHub Actions 工作流说明](docs/github-actions.md)
 - [向量索引与语义搜索使用指南](docs/vector-index-usage.md)

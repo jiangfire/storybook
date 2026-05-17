@@ -3,7 +3,7 @@ package service
 import (
 	"strings"
 
-	"git.neolidy.top/neo/storybook/internal/model"
+	"github.com/jiangfire/storybook/internal/model"
 )
 
 // inferActor 从需求文本中推断用户角色。

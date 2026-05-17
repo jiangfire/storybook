@@ -5,11 +5,11 @@ import (
 	"strconv"
 	"testing"
 
-	"git.neolidy.top/neo/storybook/internal/auth"
-	"git.neolidy.top/neo/storybook/internal/config"
-	"git.neolidy.top/neo/storybook/internal/database"
-	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/auth"
+	"github.com/jiangfire/storybook/internal/config"
+	"github.com/jiangfire/storybook/internal/database"
+	"github.com/jiangfire/storybook/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

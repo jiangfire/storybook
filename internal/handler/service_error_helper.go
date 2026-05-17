@@ -3,8 +3,8 @@ package handler
 import (
 	"errors"
 
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/service"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/service"
 )
 
 func serviceValidationItems(err error) ([]api.ErrorItem, bool) {

@@ -1,6 +1,6 @@
 package service
 
-import "git.neolidy.top/neo/storybook/internal/model"
+import "github.com/jiangfire/storybook/internal/model"
 
 // WorkflowService 统一管理状态流转规则。
 type WorkflowService struct{}

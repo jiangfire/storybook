@@ -3,8 +3,8 @@ package bootstrap
 import (
 	"testing"
 
-	"git.neolidy.top/neo/storybook/internal/model"
 	"github.com/glebarez/sqlite"
+	"github.com/jiangfire/storybook/internal/model"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )

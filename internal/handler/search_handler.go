@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"git.neolidy.top/neo/storybook/internal/api"
-	"git.neolidy.top/neo/storybook/internal/repository"
-	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/storybook/internal/api"
+	"github.com/jiangfire/storybook/internal/repository"
+	"github.com/jiangfire/storybook/internal/service"
 	"gorm.io/gorm"
 )
 
