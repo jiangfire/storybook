@@ -16,72 +16,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestLoadStoryWithAccessAllowsAdminAndAssignedTechLead(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file:testcase_handler_access_test?mode=memory&cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	if err := db.AutoMigrate(
-		&model.User{},
-		&model.Project{},
-		&model.ProjectMember{},
-		&model.ProjectTechLead{},
-		&model.UserStory{},
-	); err != nil {
-		t.Fatalf("migrate db: %v", err)
-	}
-
-	owner := model.User{Username: "owner", Email: "owner@testcase-access.example.com", HashedPassword: "hashed-password", Role: model.RoleProduct}
-	admin := model.User{Username: "admin", Email: "admin@testcase-access.example.com", HashedPassword: "hashed-password", Role: model.RoleAdmin}
-	techLead := model.User{Username: "techlead", Email: "techlead@testcase-access.example.com", HashedPassword: "hashed-password", Role: model.RoleTechLead}
-	if err := db.Create(&[]model.User{owner, admin, techLead}).Error; err != nil {
-		t.Fatalf("create users: %v", err)
-	}
-
-	var users []model.User
-	if err := db.Order("id ASC").Find(&users).Error; err != nil {
-		t.Fatalf("reload users: %v", err)
-	}
-	owner = users[0]
-	admin = users[1]
-	techLead = users[2]
-
-	project := model.Project{Name: "测试用例访问", Description: "test", OwnerID: owner.ID, AgileMode: model.AgileModeKanban}
-	if err := db.Create(&project).Error; err != nil {
-		t.Fatalf("create project: %v", err)
-	}
-	if err := db.Create(&model.ProjectMember{ProjectID: project.ID, UserID: owner.ID, RoleInProject: model.RoleProduct}).Error; err != nil {
-		t.Fatalf("create owner member: %v", err)
-	}
-	if err := db.Create(&model.ProjectTechLead{ProjectID: project.ID, UserID: techLead.ID}).Error; err != nil {
-		t.Fatalf("assign tech lead: %v", err)
-	}
-
-	story := model.UserStory{
-		ProjectID:          project.ID,
-		Title:              "待验证故事",
-		StoryType:          model.StoryTypeFeature,
-		Status:             model.StoryStatusPending,
-		ReviewStatus:       model.ReviewStatusPending,
-		CreatedBy:          owner.ID,
-		AcceptanceCriteria: datatypes.JSON([]byte("[]")),
-		Tags:               datatypes.JSON([]byte("[]")),
-		CodeReferences:     datatypes.JSON([]byte("[]")),
-	}
-	if err := db.Create(&story).Error; err != nil {
-		t.Fatalf("create story: %v", err)
-	}
-
-	h := NewTestCaseHandler(db)
-
-	if _, err := h.loadStoryWithAccess(story.ID, admin.ID); err != nil {
-		t.Fatalf("expected admin access, got %v", err)
-	}
-	if _, err := h.loadStoryWithAccess(story.ID, techLead.ID); err != nil {
-		t.Fatalf("expected tech lead access, got %v", err)
-	}
-}
-
 type testCaseHandlerFixture struct {
 	db        *gorm.DB
 	handler   *TestCaseHandler
@@ -178,7 +112,7 @@ func setupTestCaseHandlerFixture(t *testing.T) testCaseHandlerFixture {
 	}
 }
 
-func newTestCaseRouter(userID uint, role string, story *model.UserStory, project *model.Project) *gin.Engine {
+func newTestCaseRouter(userID uint, role string, story *model.UserStory, project *model.Project, testCase *model.TestCase) *gin.Engine {
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, userID)
@@ -188,6 +122,9 @@ func newTestCaseRouter(userID uint, role string, story *model.UserStory, project
 		}
 		if project != nil {
 			c.Set(middleware.CtxProjectKey, project)
+		}
+		if testCase != nil {
+			c.Set(middleware.CtxTestCaseKey, testCase)
 		}
 		c.Next()
 	})
@@ -210,7 +147,7 @@ func TestListByStoryAllowsAssignedTechLead(t *testing.T) {
 		t.Fatalf("create test case: %v", err)
 	}
 
-	r := newTestCaseRouter(fixture.techLead.ID, model.RoleTechLead, &fixture.story, &fixture.project)
+	r := newTestCaseRouter(fixture.techLead.ID, model.RoleTechLead, &fixture.story, &fixture.project, nil)
 	r.GET("/stories/:id/test-cases", fixture.handler.ListByStory)
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/stories/%d/test-cases", fixture.story.ID), nil)
@@ -228,7 +165,7 @@ func TestListByStoryAllowsAssignedTechLead(t *testing.T) {
 func TestCreateRejectsBlankStepsAfterTrim(t *testing.T) {
 	fixture := setupTestCaseHandlerFixture(t)
 
-	r := newTestCaseRouter(fixture.tester.ID, model.RoleTester, &fixture.story, &fixture.project)
+	r := newTestCaseRouter(fixture.tester.ID, model.RoleTester, &fixture.story, &fixture.project, nil)
 	r.POST("/stories/:id/test-cases", fixture.handler.Create)
 
 	req := httptest.NewRequest(
@@ -271,7 +208,7 @@ func TestUpdateStatusRejectsDeveloperEvenWithProjectAccess(t *testing.T) {
 		t.Fatalf("create test case: %v", err)
 	}
 
-	r := newTestCaseRouter(fixture.developer.ID, model.RoleDeveloper, nil, nil)
+	r := newTestCaseRouter(fixture.developer.ID, model.RoleDeveloper, nil, nil, nil)
 	r.PATCH("/test-cases/:id/status", fixture.handler.UpdateStatus)
 
 	req := httptest.NewRequest(
@@ -306,7 +243,7 @@ func TestUpdateStatusAllowsAdminAccessAcrossProjects(t *testing.T) {
 		t.Fatalf("create test case: %v", err)
 	}
 
-	r := newTestCaseRouter(fixture.admin.ID, model.RoleAdmin, nil, nil)
+	r := newTestCaseRouter(fixture.admin.ID, model.RoleAdmin, &fixture.story, &fixture.project, &testCase)
 	r.PATCH("/test-cases/:id/status", fixture.handler.UpdateStatus)
 
 	req := httptest.NewRequest(

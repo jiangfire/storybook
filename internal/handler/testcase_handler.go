@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"strings"
 
 	"git.neolidy.top/neo/storybook/internal/api"
@@ -150,30 +149,11 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	testCaseID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "测试用例ID无效")
-		return
-	}
+	tc := middleware.MustTestCase(c)
+	story := middleware.MustStory(c)
 
 	var req updateTestCaseStatusRequest
 	if !middleware.BindJSON(c, &req) {
-		return
-	}
-
-	tc, err := h.tcRepo.FindByID(testCaseID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "测试用例不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	story, err := h.loadStoryWithAccess(tc.StoryID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
 		return
 	}
 
@@ -196,11 +176,6 @@ func (h *TestCaseHandler) UpdateStatus(c *gin.Context) {
 	})
 }
 
-func (h *TestCaseHandler) loadStoryWithAccess(storyID, userID uint) (*model.UserStory, error) {
-	story, _, _, err := ensureStoryAccess(h.db, storyID, userID)
-	return story, err
-}
-
 // Update edits a test case's title/description/steps/expected_result with
 // optimistic locking. Status changes still go through UpdateStatus so verify
 // audit fields stay aligned.
@@ -211,27 +186,8 @@ func (h *TestCaseHandler) Update(c *gin.Context) {
 		return
 	}
 
-	tcID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "测试用例ID无效")
-		return
-	}
-
-	tc, err := h.tcRepo.FindByID(tcID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "测试用例不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	story, err := h.loadStoryWithAccess(tc.StoryID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	tc := middleware.MustTestCase(c)
+	story := middleware.MustStory(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if tc.CreatedBy != userID && role != model.RoleTester && role != model.RoleAdmin {
@@ -332,27 +288,8 @@ func (h *TestCaseHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	tcID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "测试用例ID无效")
-		return
-	}
-
-	tc, err := h.tcRepo.FindByID(tcID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.NotFound(c, "测试用例不存在")
-			return
-		}
-		api.Internal(c, "服务器内部错误")
-		return
-	}
-
-	story, err := h.loadStoryWithAccess(tc.StoryID, userID)
-	if err != nil {
-		respondAccessError(c, err, "用户故事不存在")
-		return
-	}
+	tc := middleware.MustTestCase(c)
+	story := middleware.MustStory(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if tc.CreatedBy != userID && role != model.RoleAdmin {
