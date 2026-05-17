@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"time"
 
@@ -50,12 +49,6 @@ type RuntimeAIConfig struct {
 	MaxTokens   int
 	Enabled     bool
 }
-
-// StoryGenerator / ChatCompleter / AIService 接口集中声明在 interfaces.go。
-
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
 
 // NewAIService queries ai_configs and returns the appropriate implementation.
 // Caches the constructed service keyed by (config_id, updated_at) so the hot
@@ -496,25 +489,6 @@ func inferValue(text string) string {
 	return "提升任务交付效率"
 }
 
-func EstimatePoints(text string, acCount int) int {
-	l := len([]rune(text))
-	score := l/120 + acCount/2
-	switch {
-	case score <= 1:
-		return 1
-	case score <= 2:
-		return 2
-	case score <= 3:
-		return 3
-	case score <= 5:
-		return 5
-	case score <= 8:
-		return 8
-	default:
-		return 13
-	}
-}
-
 // parseStoryFromContent attempts to extract a StoryResult from raw LLM output.
 // Falls back to heuristic decomposition if JSON parsing fails.
 func parseStoryFromContent(content, fallbackRequirement string) (*StoryResult, error) {
@@ -770,52 +744,4 @@ func normalizeValue(value string) string {
 		return "提升任务交付效率"
 	}
 	return value
-}
-
-func SanitizeRequirement(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-
-	spaceRegexp := regexp.MustCompile(`\s+`)
-	return strings.TrimSpace(spaceRegexp.ReplaceAllString(trimmed, " "))
-}
-
-func ResolveAIResponseSource(svc StoryGenerator) string {
-	if svc != nil && svc.IsConfigured() {
-		return AIResponseSourceOpenAI
-	}
-	return AIResponseSourceHeuristic
-}
-
-func ResolveStoryResultSource(result *StoryResult, fallbackSvc StoryGenerator) string {
-	if result != nil && strings.TrimSpace(result.Source) != "" {
-		return result.Source
-	}
-	return ResolveAIResponseSource(fallbackSvc)
-}
-
-func withOpenAIFallbackWarning(result *StoryResult) *StoryResult {
-	if result == nil || result.Source == AIResponseSourceOpenAI {
-		return result
-	}
-	result.Warnings = PrependAIWarning(
-		result.Warnings,
-		"OpenAI 返回结果不可解析，已自动回退到规则草稿，请人工确认后再保存",
-	)
-	return result
-}
-
-func PrependAIWarning(warnings []string, warning string) []string {
-	warning = strings.TrimSpace(warning)
-	if warning == "" {
-		return warnings
-	}
-	for _, item := range warnings {
-		if item == warning {
-			return warnings
-		}
-	}
-	return append([]string{warning}, warnings...)
 }
