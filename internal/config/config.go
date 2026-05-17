@@ -24,8 +24,15 @@ type Config struct {
 	DBConnMaxLifetimeMinutes int  // 连接最大生存时间（分钟）
 	DBAutoMigrate            bool // 是否在启动时执行 AutoMigrate（生产建议关闭，使用独立迁移工具）
 
-	// 限流相关 env(AI_USER_RATE_LIMIT_PER_MIN 等)由 router 直接读取,详见 router/router.go
-	// aiUserRateLimitPerMin。此处不再在 Config 中重复持有以保持单一来源。
+	// Vector / Embedding (P3.3)
+	EmbeddingProvider string // EMBEDDING_PROVIDER：openai / ollama / 空（禁用）
+	OpenAIAPIKey      string // OPENAI_API_KEY：embedding service 使用（与 AIConfig.APIKey 分离）
+	OllamaURL         string // OLLAMA_URL：Ollama HTTP endpoint
+	OllamaModel       string // OLLAMA_MODEL：embedding 模型名
+	OllamaDimension   int    // OLLAMA_DIMENSION：embedding 向量维度（<=0 表示未设置）
+
+	// AI 限流
+	AIUserRateLimitPerMin int // AI_USER_RATE_LIMIT_PER_MIN：每用户每分钟 AI 调用次数
 
 	// Metrics
 	MetricsUser string // /metrics Basic Auth 用户名（为空则不注册 /metrics）
@@ -67,6 +74,15 @@ func load(requireJWT bool) (*Config, error) {
 		return nil, err
 	}
 
+	ollamaDim, err := getEnvInt("OLLAMA_DIMENSION", 0)
+	if err != nil {
+		return nil, err
+	}
+	aiUserLimit, err := getEnvInt("AI_USER_RATE_LIMIT_PER_MIN", 10)
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := &Config{
 		ServerAddr:               getEnv("SERVER_ADDR", ":8080"),
 		DBDriver:                 getEnv("DB_DRIVER", "sqlite"),
@@ -80,6 +96,12 @@ func load(requireJWT bool) (*Config, error) {
 		DBMaxIdleConns:           maxIdle,
 		DBConnMaxLifetimeMinutes: connLifetime,
 		DBAutoMigrate:            autoMigrate,
+		EmbeddingProvider:        strings.TrimSpace(os.Getenv("EMBEDDING_PROVIDER")),
+		OpenAIAPIKey:             strings.TrimSpace(os.Getenv("OPENAI_API_KEY")),
+		OllamaURL:                strings.TrimSpace(os.Getenv("OLLAMA_URL")),
+		OllamaModel:              strings.TrimSpace(os.Getenv("OLLAMA_MODEL")),
+		OllamaDimension:          ollamaDim,
+		AIUserRateLimitPerMin:    aiUserLimit,
 		MetricsUser:              strings.TrimSpace(os.Getenv("METRICS_USER")),
 		MetricsPass:              strings.TrimSpace(os.Getenv("METRICS_PASS")),
 	}
