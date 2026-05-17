@@ -158,14 +158,10 @@ func (s *openAIService) GenerateStory(ctx context.Context, requirement string) (
 		})
 		return apiErr
 	})
-	metrics.AICallDuration.WithLabelValues("generate_story", s.model).Observe(time.Since(start).Seconds())
+	recordChatMetrics("generate_story", s.model, &resp, err, start)
 	if err != nil {
-		metrics.AICallsTotal.WithLabelValues("generate_story", s.model, "error").Inc()
 		return nil, fmt.Errorf("openai completion: %w", err)
 	}
-	metrics.AICallsTotal.WithLabelValues("generate_story", s.model, "success").Inc()
-	metrics.AITokensTotal.WithLabelValues("generate_story", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
-	metrics.AITokensTotal.WithLabelValues("generate_story", s.model, "completion").Add(float64(resp.Usage.CompletionTokens))
 
 	if len(resp.Choices) == 0 {
 		return nil, errors.New("openai: empty response")
@@ -191,8 +187,7 @@ func (s *openAIService) StreamGenerateStory(ctx context.Context, requirement str
 		},
 	})
 	if err != nil {
-		metrics.AICallsTotal.WithLabelValues("stream_generate_story", s.model, "error").Inc()
-		metrics.AICallDuration.WithLabelValues("stream_generate_story", s.model).Observe(time.Since(start).Seconds())
+		recordChatMetrics("stream_generate_story", s.model, nil, err, start)
 		return nil, fmt.Errorf("openai stream create: %w", err)
 	}
 	defer func() {
@@ -200,12 +195,7 @@ func (s *openAIService) StreamGenerateStory(ctx context.Context, requirement str
 		if err == nil && closeErr != nil {
 			err = fmt.Errorf("openai stream close: %w", closeErr)
 		}
-		metrics.AICallDuration.WithLabelValues("stream_generate_story", s.model).Observe(time.Since(start).Seconds())
-		if err == nil {
-			metrics.AICallsTotal.WithLabelValues("stream_generate_story", s.model, "success").Inc()
-		} else {
-			metrics.AICallsTotal.WithLabelValues("stream_generate_story", s.model, "error").Inc()
-		}
+		recordChatMetrics("stream_generate_story", s.model, nil, err, start)
 	}()
 
 	var fullContent strings.Builder
@@ -275,14 +265,10 @@ func (s *openAIService) ChatRefine(ctx context.Context, original *StoryResult, f
 		})
 		return apiErr
 	})
-	metrics.AICallDuration.WithLabelValues("chat_refine", s.model).Observe(time.Since(start).Seconds())
+	recordChatMetrics("chat_refine", s.model, &resp, err, start)
 	if err != nil {
-		metrics.AICallsTotal.WithLabelValues("chat_refine", s.model, "error").Inc()
 		return nil, fmt.Errorf("openai refine: %w", err)
 	}
-	metrics.AICallsTotal.WithLabelValues("chat_refine", s.model, "success").Inc()
-	metrics.AITokensTotal.WithLabelValues("chat_refine", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
-	metrics.AITokensTotal.WithLabelValues("chat_refine", s.model, "completion").Add(float64(resp.Usage.CompletionTokens))
 
 	if len(resp.Choices) == 0 {
 		return nil, errors.New("openai: empty refine response")
@@ -347,19 +333,31 @@ func (s *openAIService) Chat(ctx context.Context, systemPrompt, userPrompt strin
 		})
 		return apiErr
 	})
-	metrics.AICallDuration.WithLabelValues("chat", s.model).Observe(time.Since(start).Seconds())
+	recordChatMetrics("chat", s.model, &resp, err, start)
 	if err != nil {
-		metrics.AICallsTotal.WithLabelValues("chat", s.model, "error").Inc()
 		return "", fmt.Errorf("openai chat: %w", err)
 	}
-	metrics.AICallsTotal.WithLabelValues("chat", s.model, "success").Inc()
-	metrics.AITokensTotal.WithLabelValues("chat", s.model, "prompt").Add(float64(resp.Usage.PromptTokens))
-	metrics.AITokensTotal.WithLabelValues("chat", s.model, "completion").Add(float64(resp.Usage.CompletionTokens))
 
 	if len(resp.Choices) == 0 {
 		return "", errors.New("openai: empty chat response")
 	}
 	return strings.TrimSpace(resp.Choices[0].Message.Content), nil
+}
+
+// recordChatMetrics records duration, call count, and token usage for a single
+// OpenAI chat completion. Pass nil resp when token metrics are unavailable
+// (e.g. streaming or pre-call error).
+func recordChatMetrics(op, model string, resp *openai.ChatCompletionResponse, err error, start time.Time) {
+	metrics.AICallDuration.WithLabelValues(op, model).Observe(time.Since(start).Seconds())
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	metrics.AICallsTotal.WithLabelValues(op, model, status).Inc()
+	if resp != nil && err == nil {
+		metrics.AITokensTotal.WithLabelValues(op, model, "prompt").Add(float64(resp.Usage.PromptTokens))
+		metrics.AITokensTotal.WithLabelValues(op, model, "completion").Add(float64(resp.Usage.CompletionTokens))
+	}
 }
 
 // ---------------------------------------------------------------------------
