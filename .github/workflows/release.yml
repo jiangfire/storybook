@@ -5,6 +5,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   package:
     name: Build Release Tarball
@@ -66,3 +69,19 @@ jobs:
         with:
           name: storybook-release-linux-amd64
           path: release/*.tar.gz
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" release/*.tar.gz --clobber
+          else
+            gh release create "${TAG}" release/*.tar.gz \
+              --title "${TAG}" \
+              --generate-notes
+          fi
