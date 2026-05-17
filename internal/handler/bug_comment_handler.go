@@ -18,7 +18,7 @@ type BugCommentHandler struct {
 	db           *gorm.DB
 	commentRepo  *repository.BugCommentRepository
 	bugRepo      *repository.BugRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 	events       EventPublisher
 }
 

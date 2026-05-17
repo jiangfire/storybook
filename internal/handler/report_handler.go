@@ -22,7 +22,7 @@ type ReportHandler struct {
 	sprintRepo *repository.SprintRepository
 	taskRepo   *repository.TaskRepository
 	bugRepo    *repository.BugRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 }
 
 type burndownDoneRange struct {

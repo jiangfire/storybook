@@ -21,7 +21,7 @@ type StoryHandler struct {
 	userRepo       *repository.UserRepository
 	storyRepo      *repository.StoryRepository
 	projectRepo    *repository.ProjectRepository
-	activityRepo   *repository.ActivityLogRepository
+	activityRepo   repository.ActivityRepo
 	boardColumnRepo *repository.BoardColumnRepository
 	notifier       service.Notifier
 }

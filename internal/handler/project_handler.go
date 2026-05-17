@@ -23,7 +23,7 @@ type ProjectHandler struct {
 	projectRepo  *repository.ProjectRepository
 	userRepo     *repository.UserRepository
 	storyRepo    *repository.StoryRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 }
 
 func NewProjectHandler(db *gorm.DB) *ProjectHandler {

@@ -22,7 +22,7 @@ type TechLeadHandler struct {
 	projectRepo *repository.ProjectRepository
 	userRepo    *repository.UserRepository
 	taskRepo    *repository.TaskRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 }
 
 func NewTechLeadHandler(db *gorm.DB) *TechLeadHandler {

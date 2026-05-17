@@ -19,7 +19,7 @@ type SprintHandler struct {
 	db          *gorm.DB
 	sprintRepo  *repository.SprintRepository
 	storyRepo   *repository.StoryRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 	notifier    service.Notifier
 	events      EventPublisher
 }

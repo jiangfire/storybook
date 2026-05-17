@@ -21,7 +21,7 @@ type BugHandler struct {
 	storyRepo    *repository.StoryRepository
 	userRepo     *repository.UserRepository
 	projectRepo  *repository.ProjectRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 	notifier     service.Notifier
 	events       EventPublisher
 }

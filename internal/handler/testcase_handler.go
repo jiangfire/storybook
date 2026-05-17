@@ -18,7 +18,7 @@ import (
 type TestCaseHandler struct {
 	db         *gorm.DB
 	tcRepo     *repository.TestCaseRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 }
 
 func NewTestCaseHandler(db *gorm.DB) *TestCaseHandler {

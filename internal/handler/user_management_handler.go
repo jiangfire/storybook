@@ -21,7 +21,7 @@ type UserManagementHandler struct {
 	userRepo   *repository.UserRepository
 	storyRepo  *repository.StoryRepository
 	taskRepo   *repository.TaskRepository
-	activityRepo *repository.ActivityLogRepository
+	activityRepo repository.ActivityRepo
 }
 
 func NewUserManagementHandler(db *gorm.DB) *UserManagementHandler {
