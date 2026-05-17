@@ -121,17 +121,20 @@ func (r *ProjectRepository) ListMembers(projectID uint) ([]model.ProjectMember, 
 	return members, nil
 }
 
-func (r *ProjectRepository) ListMemberCandidates(projectID uint, search string) ([]model.User, error) {
-	query := r.DB().Model(&model.User{}).
-		Where("role != ?", model.RoleAdmin).
-		Where("id NOT IN (?)",
-			r.DB().Model(&model.ProjectMember{}).Select("user_id").Where("project_id = ?", projectID),
-		)
-	if search != "" {
-		query = query.Where("email LIKE ? OR username LIKE ?", BuildLike(search), BuildLike(search))
-	}
+// ListMemberCandidates 列出尚未加入该项目、且不是该项目 Owner 的用户,
+// 供项目 Owner 添加成员时挑选;字段裁剪到展示页所需,按 email 升序。
+func (r *ProjectRepository) ListMemberCandidates(projectID, ownerID uint) ([]model.User, error) {
+	subQuery := r.DB().Model(&model.ProjectMember{}).
+		Select("user_id").
+		Where("project_id = ?", projectID)
+
 	var users []model.User
-	if err := query.Find(&users).Error; err != nil {
+	if err := r.DB().Model(&model.User{}).
+		Select("id, email, role, avatar_url, created_at").
+		Where("id <> ?", ownerID).
+		Where("id NOT IN (?)", subQuery).
+		Order("email ASC").
+		Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil

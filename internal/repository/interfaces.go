@@ -39,8 +39,8 @@ type UserRepo interface {
 	UpdateLoginState(userID uint, updates map[string]any) error
 	IncrementFailedLoginAttempts(userID uint) (int64, error)
 	UpdateLockedUntil(userID uint, until *time.Time) error
-
-	DB() *gorm.DB
+	ListFiltered(role, search string, page, limit int) ([]model.User, int64, error)
+	ListIDsByRole(role string) ([]uint, error)
 }
 
 // TaskRepo 是 handler 包对 TaskRepository 的最小依赖。
@@ -71,6 +71,7 @@ type ProjectRepo interface {
 	AddMember(member *model.ProjectMember) error
 	RemoveMember(projectID, userID uint) (int64, error)
 	GetMember(projectID, userID uint) (*model.ProjectMember, error)
+	ListMemberCandidates(projectID, ownerID uint) ([]model.User, error)
 	HasTechLead(projectID, userID uint) (bool, error)
 	AddTechLead(lead *model.ProjectTechLead) error
 	RemoveTechLead(projectID, userID uint) (int64, error)

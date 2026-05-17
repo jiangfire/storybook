@@ -546,17 +546,8 @@ func (h *ProjectHandler) ListMemberCandidates(c *gin.Context) {
 		return
 	}
 
-	subQuery := h.projectRepo.DB().Model(&model.ProjectMember{}).
-		Select("user_id").
-		Where("project_id = ?", project.ID)
-
-	var users []model.User
-	if err := h.userRepo.DB().
-		Select("id, email, role, avatar_url, created_at").
-		Where("id <> ?", project.OwnerID).
-		Where("id NOT IN (?)", subQuery).
-		Order("email ASC").
-		Find(&users).Error; err != nil {
+	users, err := h.projectRepo.ListMemberCandidates(project.ID, project.OwnerID)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

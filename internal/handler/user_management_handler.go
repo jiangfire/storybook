@@ -48,23 +48,8 @@ func (h *UserManagementHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
-	// 支持按角色筛选
 	roleFilter := strings.TrimSpace(c.Query("role"))
-	query := h.userRepo.DB().Model(&model.User{})
-	if roleFilter != "" {
-		query = query.Where("role = ?", roleFilter)
-	}
-
-	// 支持搜索
-	if search := strings.TrimSpace(c.Query("search")); search != "" {
-		query = query.Where("email LIKE ? OR username LIKE ?", "%"+search+"%", "%"+search+"%")
-	}
-
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		api.Internal(c, "服务器内部错误")
-		return
-	}
+	search := strings.TrimSpace(c.Query("search"))
 
 	// 分页
 	page := parseIntQuery(c, "page", 1)
@@ -73,12 +58,8 @@ func (h *UserManagementHandler) ListUsers(c *gin.Context) {
 		limit = 20
 	}
 
-	var users []model.User
-	if err := query.Select("id, email, username, role, avatar_url, created_at, last_login_at").
-		Order("created_at DESC").
-		Offset((page - 1) * limit).
-		Limit(limit).
-		Find(&users).Error; err != nil {
+	users, total, err := h.userRepo.ListFiltered(roleFilter, search, page, limit)
+	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
 	}

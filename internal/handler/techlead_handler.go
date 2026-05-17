@@ -197,7 +197,7 @@ func (h *TechLeadHandler) ListWorkload(c *gin.Context) {
 			Pluck("user_id", &developerIDs)
 	} else {
 		if role == model.RoleAdmin {
-			h.userRepo.DB().Model(&model.User{}).Where("role = ?", model.RoleDeveloper).Pluck("id", &developerIDs)
+			developerIDs, _ = h.userRepo.ListIDsByRole(model.RoleDeveloper)
 		} else {
 			h.projectRepo.DB().Model(&model.ProjectMember{}).
 				Where("project_id IN ? AND role_in_project = ?", visibleProjectIDs, model.RoleDeveloper).
