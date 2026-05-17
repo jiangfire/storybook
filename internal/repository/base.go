@@ -40,14 +40,6 @@ func (r *BaseRepository[T]) HardDelete(id uint) error {
 	return r.db.Unscoped().Delete(new(T), id).Error
 }
 
-func (r *BaseRepository[T]) Count(conds ...interface{}) (int64, error) {
-	var count int64
-	if err := r.db.Model(new(T)).Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
-}
-
 // UpdateWithVersion 执行乐观锁更新：WHERE id = ? AND version = ?
 func (r *BaseRepository[T]) UpdateWithVersion(id uint, version int, fields map[string]any) error {
 	if len(fields) == 0 {
