@@ -24,16 +24,14 @@ const (
 )
 
 type AuthHandler struct {
-	db           *gorm.DB
 	tokenManager *auth.TokenManager
 	userRepo     repository.UserRepo
 }
 
-func NewAuthHandler(db *gorm.DB, tokenManager *auth.TokenManager) *AuthHandler {
+func NewAuthHandler(userRepo repository.UserRepo, tokenManager *auth.TokenManager) *AuthHandler {
 	return &AuthHandler{
-		db:           db,
 		tokenManager: tokenManager,
-		userRepo:     repository.NewUserRepository(db),
+		userRepo:     userRepo,
 	}
 }
 

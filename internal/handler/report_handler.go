@@ -17,11 +17,10 @@ import (
 )
 
 type ReportHandler struct {
-	db         *gorm.DB
-	storyRepo  repository.StoryRepo
-	sprintRepo repository.SprintRepo
-	taskRepo   repository.TaskRepo
-	bugRepo    repository.BugRepo
+	storyRepo    repository.StoryRepo
+	sprintRepo   repository.SprintRepo
+	taskRepo     repository.TaskRepo
+	bugRepo      repository.BugRepo
 	activityRepo repository.ActivityRepo
 }
 
@@ -30,14 +29,13 @@ type burndownDoneRange struct {
 	end   time.Time
 }
 
-func NewReportHandler(db *gorm.DB) *ReportHandler {
+func NewReportHandler(storyRepo repository.StoryRepo, sprintRepo repository.SprintRepo, taskRepo repository.TaskRepo, bugRepo repository.BugRepo, activityRepo repository.ActivityRepo) *ReportHandler {
 	return &ReportHandler{
-		db:           db,
-		storyRepo:    repository.NewStoryRepository(db),
-		sprintRepo:   repository.NewSprintRepository(db),
-		taskRepo:     repository.NewTaskRepository(db),
-		bugRepo:      repository.NewBugRepository(db),
-		activityRepo: repository.NewActivityLogRepository(db),
+		storyRepo:    storyRepo,
+		sprintRepo:   sprintRepo,
+		taskRepo:     taskRepo,
+		bugRepo:      bugRepo,
+		activityRepo: activityRepo,
 	}
 }
 

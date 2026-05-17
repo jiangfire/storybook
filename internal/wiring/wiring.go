@@ -15,6 +15,7 @@ import (
 	"git.neolidy.top/neo/storybook/internal/config"
 	"git.neolidy.top/neo/storybook/internal/handler"
 	"git.neolidy.top/neo/storybook/internal/realtime"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"gorm.io/gorm"
 )
@@ -64,17 +65,29 @@ func Build(cfg *config.Config, db *gorm.DB, logger *slog.Logger, tokenManager *a
 	c.Hub = realtime.NewHub(db)
 	c.Vector = buildVectorService(cfg, db, logger)
 
-	c.Auth = handler.NewAuthHandler(db, tokenManager)
+	// Repositories — 供不需要直接操作 db 的 handler 注入使用。
+	userRepo := repository.NewUserRepository(db)
+	storyRepo := repository.NewStoryRepository(db)
+	taskRepo := repository.NewTaskRepository(db)
+	sprintRepo := repository.NewSprintRepository(db)
+	bugRepo := repository.NewBugRepository(db)
+	activityRepo := repository.NewActivityLogRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
+
+	// Services — 在 handler 之前构造，避免 handler 持有 db。
+	taskSvc := service.NewTaskService(db, c.Hub)
+
+	c.Auth = handler.NewAuthHandler(userRepo, tokenManager)
 	c.Project = handler.NewProjectHandler(db)
 	c.Story = handler.NewStoryHandlerWithVector(db, c.Hub, c.Vector)
-	c.Me = handler.NewMeHandler(db)
+	c.Me = handler.NewMeHandler(userRepo, storyRepo, taskRepo)
 	c.AI = handler.NewAIHandler(db)
 	c.TestCase = handler.NewTestCaseHandler(db)
-	c.Task = handler.NewTaskHandler(db, c.Hub)
+	c.Task = handler.NewTaskHandler(taskSvc, taskRepo)
 	c.Sprint = handler.NewSprintHandler(db)
 	c.Bug = handler.NewBugHandler(db)
 	c.BugComment = handler.NewBugCommentHandler(db)
-	c.Report = handler.NewReportHandler(db)
+	c.Report = handler.NewReportHandler(storyRepo, sprintRepo, taskRepo, bugRepo, activityRepo)
 	// SearchHandler 有两种构造函数：vectorSvc 为 nil 时退化为纯 SQL 搜索，
 	// 保留 router 原本的等价分支。
 	if c.Vector != nil {
@@ -86,7 +99,7 @@ func Build(cfg *config.Config, db *gorm.DB, logger *slog.Logger, tokenManager *a
 	c.WS = handler.NewWSHandler(tokenManager, c.Hub)
 	c.TechLead = handler.NewTechLeadHandler(db)
 	c.UserManagement = handler.NewUserManagementHandler(db)
-	c.Notification = handler.NewNotificationHandler(db)
+	c.Notification = handler.NewNotificationHandler(notificationRepo)
 
 	// 通知/事件需要在 handler 构造之后注入：
 	// - Notifier 让 story/task/sprint/bug 在状态变更时下发站内通知；

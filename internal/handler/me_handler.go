@@ -7,7 +7,6 @@ import (
 	"git.neolidy.top/neo/storybook/internal/model"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type MeHandler struct {
@@ -16,11 +15,11 @@ type MeHandler struct {
 	taskRepo  repository.TaskRepo
 }
 
-func NewMeHandler(db *gorm.DB) *MeHandler {
+func NewMeHandler(userRepo repository.UserRepo, storyRepo repository.StoryRepo, taskRepo repository.TaskRepo) *MeHandler {
 	return &MeHandler{
-		userRepo:  repository.NewUserRepository(db),
-		storyRepo: repository.NewStoryRepository(db),
-		taskRepo:  repository.NewTaskRepository(db),
+		userRepo:  userRepo,
+		storyRepo: storyRepo,
+		taskRepo:  taskRepo,
 	}
 }
 

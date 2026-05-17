@@ -10,23 +10,18 @@ import (
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"git.neolidy.top/neo/storybook/internal/service"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type TaskHandler struct {
-	db       *gorm.DB
-	events   service.EventPublisher
 	taskSvc  *service.TaskService
 	taskRepo repository.TaskRepo
 	notifier service.Notifier
 }
 
-func NewTaskHandler(db *gorm.DB, events service.EventPublisher) *TaskHandler {
+func NewTaskHandler(taskSvc *service.TaskService, taskRepo repository.TaskRepo) *TaskHandler {
 	return &TaskHandler{
-		db:       db,
-		events:   events,
-		taskSvc:  service.NewTaskService(db, events),
-		taskRepo: repository.NewTaskRepository(db),
+		taskSvc:  taskSvc,
+		taskRepo: taskRepo,
 		notifier: service.NoopNotifier{},
 	}
 }

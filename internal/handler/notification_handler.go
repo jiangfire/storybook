@@ -8,17 +8,14 @@ import (
 	"git.neolidy.top/neo/storybook/internal/middleware"
 	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type NotificationHandler struct {
 	repo *repository.NotificationRepository
 }
 
-func NewNotificationHandler(db *gorm.DB) *NotificationHandler {
-	return &NotificationHandler{
-		repo: repository.NewNotificationRepository(db),
-	}
+func NewNotificationHandler(repo *repository.NotificationRepository) *NotificationHandler {
+	return &NotificationHandler{repo: repo}
 }
 
 func (h *NotificationHandler) List(c *gin.Context) {

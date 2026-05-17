@@ -10,6 +10,7 @@ import (
 
 	"git.neolidy.top/neo/storybook/internal/auth"
 	"git.neolidy.top/neo/storybook/internal/model"
+	"git.neolidy.top/neo/storybook/internal/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"golang.org/x/crypto/bcrypt"
@@ -38,7 +39,7 @@ func TestLoginLockoutAfterFiveFailures(t *testing.T) {
 		t.Fatalf("seed user: %v", err)
 	}
 
-	h := NewAuthHandler(db, auth.NewTokenManager("test-secret", 24, 24*7))
+	h := NewAuthHandler(repository.NewUserRepository(db), auth.NewTokenManager("test-secret", 24, 24*7))
 
 	for i := 0; i < 5; i++ {
 		w := httptest.NewRecorder()
@@ -112,7 +113,7 @@ func TestRefreshRejectedAfterUserStateChanges(t *testing.T) {
 		t.Fatalf("update user: %v", err)
 	}
 
-	h := NewAuthHandler(db, tokenManager)
+	h := NewAuthHandler(repository.NewUserRepository(db), tokenManager)
 	w := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(w)
 	r.POST("/api/auth/refresh", h.Refresh)
