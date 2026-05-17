@@ -17,7 +17,6 @@ import (
 type BugCommentHandler struct {
 	db           *gorm.DB
 	commentRepo  repository.BugCommentRepo
-	bugRepo      repository.BugRepo
 	activityRepo repository.ActivityRepo
 	events       service.EventPublisher
 }
@@ -26,7 +25,6 @@ func NewBugCommentHandler(db *gorm.DB) *BugCommentHandler {
 	return &BugCommentHandler{
 		db:           db,
 		commentRepo:  repository.NewBugCommentRepository(db),
-		bugRepo:      repository.NewBugRepository(db),
 		activityRepo: repository.NewActivityLogRepository(db),
 	}
 }
@@ -49,33 +47,13 @@ type updateBugCommentRequest struct {
 	Version int    `json:"version"`
 }
 
-func (h *BugCommentHandler) loadBugForUser(bugID, userID uint) (*model.BugReport, error) {
-	bug, err := h.bugRepo.FindByID(bugID)
-	if err != nil {
-		return nil, err
-	}
-	if _, _, err := ensureProjectAccess(h.db, bug.ProjectID, userID); err != nil {
-		return nil, err
-	}
-	return bug, nil
-}
-
 func (h *BugCommentHandler) Create(c *gin.Context) {
 	userID, ok := middleware.CurrentUserID(c)
 	if !ok {
 		api.Unauthorized(c, "未登录")
 		return
 	}
-	bugID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "缺陷ID无效")
-		return
-	}
-	bug, err := h.loadBugForUser(bugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
-		return
-	}
+	bug := middleware.MustBug(c)
 
 	var req createBugCommentRequest
 	if !middleware.BindJSON(c, &req) {
@@ -118,21 +96,7 @@ func (h *BugCommentHandler) Create(c *gin.Context) {
 }
 
 func (h *BugCommentHandler) List(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
-	bugID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "缺陷ID无效")
-		return
-	}
-	bug, err := h.loadBugForUser(bugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
-		return
-	}
+	bug := middleware.MustBug(c)
 
 	items, err := h.commentRepo.ListByBug(bug.ID)
 	if err != nil {
@@ -141,9 +105,9 @@ func (h *BugCommentHandler) List(c *gin.Context) {
 	}
 
 	api.Success(c, "success", gin.H{
-		"bug_id":   bug.ID,
-		"items":    items,
-		"total":    len(items),
+		"bug_id": bug.ID,
+		"items":  items,
+		"total":  len(items),
 	})
 }
 
@@ -153,6 +117,8 @@ func (h *BugCommentHandler) Update(c *gin.Context) {
 		api.Unauthorized(c, "未登录")
 		return
 	}
+	bug := middleware.MustBug(c)
+
 	commentID, ok := parseUintParam(c, "commentID")
 	if !ok {
 		api.BadRequest(c, "评论ID无效")
@@ -168,10 +134,8 @@ func (h *BugCommentHandler) Update(c *gin.Context) {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
-
-	bug, err := h.loadBugForUser(comment.BugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
+	if comment.BugID != bug.ID {
+		api.NotFound(c, "评论不存在")
 		return
 	}
 
@@ -227,6 +191,8 @@ func (h *BugCommentHandler) Delete(c *gin.Context) {
 		api.Unauthorized(c, "未登录")
 		return
 	}
+	bug := middleware.MustBug(c)
+
 	commentID, ok := parseUintParam(c, "commentID")
 	if !ok {
 		api.BadRequest(c, "评论ID无效")
@@ -242,10 +208,8 @@ func (h *BugCommentHandler) Delete(c *gin.Context) {
 		api.Internal(c, "服务器内部错误")
 		return
 	}
-
-	bug, err := h.loadBugForUser(comment.BugID, userID)
-	if err != nil {
-		respondAccessError(c, err, "缺陷不存在")
+	if comment.BugID != bug.ID {
+		api.NotFound(c, "评论不存在")
 		return
 	}
 
