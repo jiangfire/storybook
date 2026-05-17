@@ -116,16 +116,7 @@ func (h *StoryHandler) CreateStory(c *gin.Context) {
 		return
 	}
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
+	project := middleware.MustProject(c)
 
 	var req createStoryRequest
 	if !middleware.BindJSON(c, &req) {
@@ -134,7 +125,7 @@ func (h *StoryHandler) CreateStory(c *gin.Context) {
 
 	criteria := normalizeAC(req.AcceptanceCriteria)
 	story, err := h.storySvc.Create(service.CreateStoryInput{
-		ProjectID:          projectID,
+		ProjectID:          project.ID,
 		UserID:             userID,
 		Title:              req.Title,
 		Description:        req.Description,
@@ -181,24 +172,9 @@ func (h *StoryHandler) CreateStory(c *gin.Context) {
 }
 
 func (h *StoryHandler) ListStories(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
-
-	query := h.storyRepo.DB().Model(&model.UserStory{}).Where("project_id = ?", projectID)
+	query := h.storyRepo.DB().Model(&model.UserStory{}).Where("project_id = ?", project.ID)
 	includeArchived := strings.EqualFold(strings.TrimSpace(c.DefaultQuery("include_archived", "false")), "true")
 	if !includeArchived {
 		query = query.Where("archived = ?", false)
@@ -299,24 +275,9 @@ func (h *StoryHandler) ListStories(c *gin.Context) {
 }
 
 func (h *StoryHandler) GetBoard(c *gin.Context) {
-	userID, ok := middleware.CurrentUserID(c)
-	if !ok {
-		api.Unauthorized(c, "未登录")
-		return
-	}
+	project := middleware.MustProject(c)
 
-	projectID, ok := parseUintParam(c, "id")
-	if !ok {
-		api.BadRequest(c, "项目ID无效")
-		return
-	}
-
-	if _, _, err := ensureProjectAccess(h.db, projectID, userID); err != nil {
-		respondAccessError(c, err, "项目不存在")
-		return
-	}
-
-	columns, err := h.boardColumnRepo.ListByProject(projectID)
+	columns, err := h.boardColumnRepo.ListByProject(project.ID)
 	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
@@ -331,7 +292,7 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 		model.StoryStatusDone:       {},
 	}
 
-	stories, err := h.storyRepo.ListBoardByProjectWithAssignee(projectID)
+	stories, err := h.storyRepo.ListBoardByProjectWithAssignee(project.ID)
 	if err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
@@ -418,7 +379,7 @@ func (h *StoryHandler) GetBoard(c *gin.Context) {
 	}
 
 	api.Success(c, "success", gin.H{
-		"project_id": projectID,
+		"project_id": project.ID,
 		"columns":    result,
 	})
 }

@@ -604,8 +604,6 @@ func (h *ProjectHandler) RemoveMember(c *gin.Context) {
 	})
 }
 
-var errForbidden = fmt.Errorf("forbidden")
-
 // ArchiveProject hides a project from default listings without deleting it.
 // Owner-only. Stories/sprints/bugs stay intact and accessible via direct ID
 // access; ListProjects filters archived projects out unless include_archived

@@ -71,6 +71,7 @@ func TestGetBoardIncludesPendingColumn(t *testing.T) {
 	r.Use(func(c *gin.Context) {
 		c.Set(middleware.CtxUserIDKey, owner.ID)
 		c.Set(middleware.CtxRoleKey, model.RoleProduct)
+		c.Set(middleware.CtxProjectKey, &project)
 		c.Next()
 	})
 	r.GET("/api/projects/:id/board", h.GetBoard)
