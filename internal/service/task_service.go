@@ -221,7 +221,7 @@ func (s *TaskService) AddCodeReference(task *model.Task, projectID, userID uint,
 		return nil, NewValidationError(ValidationIssue{Field: "reference", Message: "reference不能为空"})
 	}
 
-	refs := parseStringArrayJSON(task.CodeReferences)
+	refs := ParseStringArrayJSON(task.CodeReferences)
 	for _, ex := range refs {
 		if ex == ref {
 			return refs, nil

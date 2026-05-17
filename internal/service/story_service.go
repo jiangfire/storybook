@@ -612,7 +612,7 @@ func (s *StoryService) AddCodeReference(story *model.UserStory, userID uint, ref
 		return nil, NewValidationError(ValidationIssue{Field: "reference", Message: "reference不能为空"})
 	}
 
-	refs := parseStringArrayJSON(story.CodeReferences)
+	refs := ParseStringArrayJSON(story.CodeReferences)
 	for _, existing := range refs {
 		if existing == ref {
 			return refs, nil

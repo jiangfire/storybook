@@ -157,7 +157,7 @@ func (h *TaskHandler) ListByStory(c *gin.Context) {
 			"priority":        t.Priority,
 			"progress":        t.Progress,
 			"estimated_hours": t.EstimatedHours,
-			"code_references": parseStringArrayJSON(t.CodeReferences),
+			"code_references": service.ParseStringArrayJSON(t.CodeReferences),
 			"created_at":      t.CreatedAt,
 			"updated_at":      t.UpdatedAt,
 		}
@@ -484,7 +484,7 @@ func (h *TaskHandler) taskPayload(task *model.Task) gin.H {
 		"priority":        task.Priority,
 		"progress":        task.Progress,
 		"estimated_hours": task.EstimatedHours,
-		"code_references": parseStringArrayJSON(task.CodeReferences),
+		"code_references": service.ParseStringArrayJSON(task.CodeReferences),
 		"created_at":      task.CreatedAt,
 		"updated_at":      task.UpdatedAt,
 	}

@@ -461,7 +461,7 @@ func (h *StoryHandler) GetStory(c *gin.Context) {
 		}(),
 		"acceptance_criteria": criteria,
 		"tags":                story.Tags,
-		"code_references":     parseStringArrayJSON(story.CodeReferences),
+		"code_references":     service.ParseStringArrayJSON(story.CodeReferences),
 		"sprint_id":           story.SprintID,
 		"created_at":          story.CreatedAt,
 		"updated_at":          story.UpdatedAt,
