@@ -107,7 +107,7 @@ func (s *OllamaEmbedding) EmbedBatch(ctx context.Context, texts []string) ([][]f
 		return nil, ErrEmptyText
 	}
 
-	// Ollama 不支持原生批量，需要逐个调用（KISS：保持简单）
+	// Ollama 不支持原生批量，需要逐个调用
 	result := make([][]float32, len(texts))
 	for i, text := range texts {
 		if text == "" {

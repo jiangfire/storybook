@@ -100,7 +100,7 @@ func (s *vectorService) SearchSimilarStories(ctx context.Context, query string, 
 		return nil, fmt.Errorf("vector search: %w", err)
 	}
 
-	// 4. 转换结果（DRY 原则：提取公共方法）
+	// 4. 转换结果
 	return s.toSimilarStories(results), nil
 }
 
@@ -195,7 +195,7 @@ func (s *vectorService) indexBatch(ctx context.Context, stories []model.UserStor
 	return nil
 }
 
-// PrepareStoryContent 准备用于向量化的文本内容（DRY 原则：避免重复）
+// PrepareStoryContent 准备用于向量化的文本内容
 func (s *vectorService) PrepareStoryContent(story *model.UserStory) string {
 	var parts []string
 
@@ -249,7 +249,7 @@ func (s *vectorService) validateEmbeddingDimension(embedding []float32) error {
 	return nil
 }
 
-// toSimilarStories 转换搜索结果为相似故事列表（DRY 原则）
+// toSimilarStories 转换搜索结果为相似故事列表
 func (s *vectorService) toSimilarStories(results []struct {
 	model.UserStory
 	Similarity float64
@@ -307,7 +307,7 @@ func float32ArrayToString(vec []float32) string {
 	return sb.String()
 }
 
-// safeJoin 安全地连接字符串（KISS 原则：保持简单）
+// safeJoin 安全地连接字符串
 func safeJoin(parts []string, sep string) string {
 	if len(parts) == 0 {
 		return ""
