@@ -18,7 +18,7 @@ type StoryHandler struct {
 	db             *gorm.DB
 	events         EventPublisher
 	storySvc       *service.StoryService
-	userRepo       *repository.UserRepository
+	userRepo       repository.UserRepo
 	storyRepo      *repository.StoryRepository
 	projectRepo    *repository.ProjectRepository
 	activityRepo   repository.ActivityRepo

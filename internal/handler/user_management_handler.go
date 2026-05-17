@@ -18,7 +18,7 @@ import (
 
 type UserManagementHandler struct {
 	db         *gorm.DB
-	userRepo   *repository.UserRepository
+	userRepo   repository.UserRepo
 	storyRepo  *repository.StoryRepository
 	taskRepo   *repository.TaskRepository
 	activityRepo repository.ActivityRepo

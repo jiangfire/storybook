@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"git.neolidy.top/neo/storybook/internal/model"
 	"gorm.io/gorm"
 )
@@ -19,5 +21,24 @@ import (
 type ActivityRepo interface {
 	ListRecentByProject(projectID uint, limit int) ([]model.ActivityLog, error)
 	ListByEntityFiltered(entityType string, entityID uint, action string, page, limit int) ([]model.ActivityLog, int64, error)
+	DB() *gorm.DB
+}
+
+// UserRepo 是 handler 包对 UserRepository 的最小依赖。
+type UserRepo interface {
+	// 来自 BaseRepository[model.User]
+	FindByID(id uint) (*model.User, error)
+	Create(item *model.User) error
+	Save(item *model.User) error
+	HardDelete(id uint) error
+
+	// user_repo.go 自有方法
+	FindByEmail(email string) (*model.User, error)
+	ExistsByEmail(email string) (bool, error)
+	ExistsByUsername(username string, excludeID *uint) (bool, error)
+	UpdateLoginState(userID uint, updates map[string]any) error
+	IncrementFailedLoginAttempts(userID uint) (int64, error)
+	UpdateLockedUntil(userID uint, until *time.Time) error
+
 	DB() *gorm.DB
 }

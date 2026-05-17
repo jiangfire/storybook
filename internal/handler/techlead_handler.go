@@ -20,7 +20,7 @@ type TechLeadHandler struct {
 	db          *gorm.DB
 	storyRepo   *repository.StoryRepository
 	projectRepo *repository.ProjectRepository
-	userRepo    *repository.UserRepository
+	userRepo    repository.UserRepo
 	taskRepo    *repository.TaskRepository
 	activityRepo repository.ActivityRepo
 }

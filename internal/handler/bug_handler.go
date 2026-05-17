@@ -19,7 +19,7 @@ type BugHandler struct {
 	db           *gorm.DB
 	bugRepo      *repository.BugRepository
 	storyRepo    *repository.StoryRepository
-	userRepo     *repository.UserRepository
+	userRepo     repository.UserRepo
 	projectRepo  *repository.ProjectRepository
 	activityRepo repository.ActivityRepo
 	notifier     service.Notifier

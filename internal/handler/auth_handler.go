@@ -26,7 +26,7 @@ const (
 type AuthHandler struct {
 	db           *gorm.DB
 	tokenManager *auth.TokenManager
-	userRepo     *repository.UserRepository
+	userRepo     repository.UserRepo
 }
 
 func NewAuthHandler(db *gorm.DB, tokenManager *auth.TokenManager) *AuthHandler {

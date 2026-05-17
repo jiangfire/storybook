@@ -21,7 +21,7 @@ import (
 type ProjectHandler struct {
 	db           *gorm.DB
 	projectRepo  *repository.ProjectRepository
-	userRepo     *repository.UserRepository
+	userRepo     repository.UserRepo
 	storyRepo    *repository.StoryRepository
 	activityRepo repository.ActivityRepo
 }

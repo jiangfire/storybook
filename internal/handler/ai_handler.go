@@ -20,7 +20,7 @@ import (
 
 type AIHandler struct {
 	db           *gorm.DB
-	userRepo     *repository.UserRepository
+	userRepo     repository.UserRepo
 	storyRepo    *repository.StoryRepository
 	aiConfigRepo *repository.AIConfigRepository
 }

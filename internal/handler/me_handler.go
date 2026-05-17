@@ -11,7 +11,7 @@ import (
 )
 
 type MeHandler struct {
-	userRepo  *repository.UserRepository
+	userRepo  repository.UserRepo
 	storyRepo *repository.StoryRepository
 	taskRepo  *repository.TaskRepository
 }
