@@ -135,7 +135,7 @@ func (s *vectorService) IndexStory(ctx context.Context, story *model.UserStory) 
 // BatchIndexStories 批量为故事生成并存储向量
 func (s *vectorService) BatchIndexStories(ctx context.Context, stories []model.UserStory) error {
 	for i := 0; i < len(stories); i += s.batchSize {
-		end := vectorMin(i+s.batchSize, len(stories))
+		end := min(i+s.batchSize, len(stories))
 		batch := stories[i:end]
 
 		if err := s.indexBatch(ctx, batch); err != nil {
@@ -320,14 +320,6 @@ func safeJoin(parts []string, sep string) string {
 		sb.WriteString(part)
 	}
 	return sb.String()
-}
-
-// vectorMin 返回两个整数中的最小值（避免与其他 min 函数冲突）
-func vectorMin(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // uintSliceToString 将 uint 切片转换为 PostgreSQL 数组字符串（防止 SQL 注入）
