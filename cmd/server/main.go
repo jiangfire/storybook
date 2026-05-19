@@ -18,6 +18,7 @@ import (
 	"github.com/jiangfire/storybook/internal/config"
 	"github.com/jiangfire/storybook/internal/database"
 	"github.com/jiangfire/storybook/internal/logging"
+	"github.com/jiangfire/storybook/internal/model"
 	"github.com/jiangfire/storybook/internal/router"
 	"github.com/jiangfire/storybook/internal/wiring"
 )
@@ -36,6 +37,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 }
 
 func runServer(stderr io.Writer) int {
+	config.LoadDotEnv()
 	cfg, err := config.Load()
 	if err != nil {
 		if _, writeErr := fmt.Fprintf(stderr, "load config failed: %v\n", err); writeErr != nil {
@@ -115,6 +117,7 @@ func runServer(stderr io.Writer) int {
 }
 
 func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
+	config.LoadDotEnv()
 	fs := flag.NewFlagSet(bootstrapAdminCommand, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -145,6 +148,13 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 	db, err := database.Connect(cfg)
 	if err != nil {
 		if _, writeErr := fmt.Fprintf(stderr, "connect database failed: %v\n", err); writeErr != nil {
+			return 1
+		}
+		return 1
+	}
+
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		if _, writeErr := fmt.Fprintf(stderr, "auto migrate failed: %v\n", err); writeErr != nil {
 			return 1
 		}
 		return 1

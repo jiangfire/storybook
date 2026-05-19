@@ -43,6 +43,7 @@ type StreamCallback func(chunk string) error
 type RuntimeAIConfig struct {
 	APIKey      string
 	Model       string
+	BaseURL     string
 	Temperature float64
 	MaxTokens   int
 	Enabled     bool
@@ -70,6 +71,7 @@ func NewAIService(db *gorm.DB) AIService {
 	svc := NewAIServiceFromConfig(RuntimeAIConfig{
 		APIKey:      apiKey,
 		Model:       cfg.Model,
+		BaseURL:     cfg.BaseURL,
 		Temperature: cfg.Temperature,
 		MaxTokens:   cfg.MaxTokens,
 		Enabled:     cfg.Enabled,
@@ -92,7 +94,14 @@ func NewAIServiceFromConfig(cfg RuntimeAIConfig) AIService {
 		maxTokens = 1200
 	}
 
-	client := openai.NewClient(cfg.APIKey)
+	var client *openai.Client
+	if baseURL := strings.TrimSpace(cfg.BaseURL); baseURL != "" {
+		oc := openai.DefaultConfig(cfg.APIKey)
+		oc.BaseURL = baseURL
+		client = openai.NewClientWithConfig(oc)
+	} else {
+		client = openai.NewClient(cfg.APIKey)
+	}
 	return &openAIService{
 		client:      client,
 		model:       modelName,

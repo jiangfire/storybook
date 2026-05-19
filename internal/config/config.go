@@ -3,8 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 // Config 应用配置。
@@ -47,6 +50,14 @@ func LoadForBootstrap() (*Config, error) {
 	return load(false)
 }
 
+func LoadDotEnv() {
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		_ = godotenv.Load(filepath.Join(exeDir, ".env"))
+	}
+	_ = godotenv.Load()
+}
+
 func load(requireJWT bool) (*Config, error) {
 	maxOpen, err := getEnvInt("DB_MAX_OPEN_CONNS", 50)
 	if err != nil {
@@ -60,7 +71,7 @@ func load(requireJWT bool) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	autoMigrate, err := getEnvBool("DB_AUTO_MIGRATE", false)
+	autoMigrate, err := getEnvBool("DB_AUTO_MIGRATE", true)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +95,7 @@ func load(requireJWT bool) (*Config, error) {
 	}
 
 	cfg := &Config{
-		ServerAddr:               getEnv("SERVER_ADDR", ":8080"),
+		ServerAddr:               normalizeServerAddr(getEnv("SERVER_ADDR", ":8080")),
 		DBDriver:                 getEnv("DB_DRIVER", "sqlite"),
 		DBDSN:                    getEnv("DB_DSN", "storybook.db"),
 		JWTSecret:                strings.TrimSpace(os.Getenv("JWT_SECRET")),
@@ -147,4 +158,15 @@ func getEnvBool(key string, fallback bool) (bool, error) {
 		return false, fmt.Errorf("invalid %s: %q is not a valid boolean (use true/false/1/0)", key, v)
 	}
 	return b, nil
+}
+
+func normalizeServerAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return ":8080"
+	}
+	if _, err := strconv.Atoi(addr); err == nil {
+		return ":" + addr
+	}
+	return addr
 }

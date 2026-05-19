@@ -17,12 +17,20 @@ Storybook 是一个围绕用户故事（User Story）的敏捷协作系统，支
 
 ## 技术栈
 
-- 后端：Go 1.25 + Gin + GORM + SQLite/PostgreSQL
+- 后端：Go 1.26 + Gin + GORM + SQLite/PostgreSQL
 - 前端：React 19 + TypeScript + Rsbuild + Tailwind CSS 4 + Zustand + React Router 7
 
 ## 本地开发
 
 1. 启动后端（仓库根目录）：
+
+使用编译好的二进制：
+
+```bash
+./storybook-server
+```
+
+或在源码开发时使用：
 
 ```bash
 go run ./cmd/server
@@ -60,21 +68,21 @@ pnpm run dev
 首次启动没有 `admin` 账号时，可直接执行：
 
 ```bash
-go run ./cmd/server -- bootstrap-admin --email admin@example.com --password Admin1234
+./storybook-server bootstrap-admin --email admin@example.com --password Admin1234
 ```
 
 可选指定用户名：
 
 ```bash
-go run ./cmd/server -- bootstrap-admin --email admin@example.com --username admin --password Admin1234
+./storybook-server bootstrap-admin --email admin@example.com --username admin --password Admin1234
 ```
 
 如果该邮箱已存在，命令会把该用户提升为 `admin`；如果同时传入 `--password`，还会重置密码。
 
-构建成单体二进制后，也可以直接执行：
+源码开发环境下也可以直接用 `go run` 执行：
 
 ```bash
-./storybook-server bootstrap-admin --email admin@example.com --password Admin1234
+go run ./cmd/server -- bootstrap-admin --email admin@example.com --password Admin1234
 ```
 
 补充说明：

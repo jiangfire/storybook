@@ -128,6 +128,7 @@ func generateStoryWithFallback(ctx context.Context, requirement string, primary 
 type aiConfigRequest struct {
 	APIKey      string   `json:"api_key"`
 	Model       string   `json:"model"`
+	BaseURL     string   `json:"base_url"`
 	Temperature *float64 `json:"temperature"`
 	MaxTokens   *int     `json:"max_tokens"`
 	Enabled     *bool    `json:"enabled"`
@@ -147,6 +148,7 @@ func (h *AIHandler) GetConfig(c *gin.Context) {
 				"config": gin.H{
 					"provider":       "openai",
 					"model":          "gpt-4o-mini",
+					"base_url":       "",
 					"temperature":    0.2,
 					"max_tokens":     1200,
 					"enabled":        false,
@@ -386,6 +388,7 @@ func (h *AIHandler) serializeConfig(cfg model.AIConfig) gin.H {
 		"id":             cfg.ID,
 		"provider":       "openai",
 		"model":          cfg.Model,
+		"base_url":       cfg.BaseURL,
 		"temperature":    cfg.Temperature,
 		"max_tokens":     cfg.MaxTokens,
 		"enabled":        cfg.Enabled,
@@ -406,6 +409,11 @@ func (h *AIHandler) mergeConfig(existing model.AIConfig, req aiConfigRequest, us
 		} else {
 			modelName = "gpt-4o-mini"
 		}
+	}
+
+	baseURL := strings.TrimSpace(req.BaseURL)
+	if baseURL == "" && hasExisting {
+		baseURL = existing.BaseURL
 	}
 
 	temperature := 0.2
@@ -451,6 +459,7 @@ func (h *AIHandler) mergeConfig(existing model.AIConfig, req aiConfigRequest, us
 		ID:              existing.ID,
 		APIKeyEncrypted: encryptedKey,
 		Model:           modelName,
+		BaseURL:         baseURL,
 		Temperature:     temperature,
 		MaxTokens:       maxTokens,
 		Enabled:         enabled,
@@ -469,6 +478,11 @@ func (h *AIHandler) resolveRuntimeConfig(existing model.AIConfig, req aiConfigRe
 	}
 	if modelName == "" {
 		modelName = "gpt-4o-mini"
+	}
+
+	baseURL := strings.TrimSpace(req.BaseURL)
+	if baseURL == "" {
+		baseURL = existing.BaseURL
 	}
 
 	temperature := existing.Temperature
@@ -515,6 +529,7 @@ func (h *AIHandler) resolveRuntimeConfig(existing model.AIConfig, req aiConfigRe
 	return service.RuntimeAIConfig{
 		APIKey:      apiKey,
 		Model:       modelName,
+		BaseURL:     baseURL,
 		Temperature: temperature,
 		MaxTokens:   maxTokens,
 		Enabled:     enabled,

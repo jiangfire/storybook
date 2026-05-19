@@ -559,6 +559,7 @@ export interface AIConfig {
   id?: number;
   provider: 'openai';
   model: string;
+  base_url?: string;
   temperature: number;
   max_tokens: number;
   enabled: boolean;
@@ -572,6 +573,7 @@ export interface AIConfig {
 export interface AIConfigUpdateRequest {
   api_key?: string;
   model?: string;
+  base_url?: string;
   temperature?: number;
   max_tokens?: number;
   enabled?: boolean;

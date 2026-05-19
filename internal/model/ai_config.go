@@ -7,6 +7,7 @@ type AIConfig struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	APIKeyEncrypted string    `gorm:"type:text;not null" json:"-"`
 	Model           string    `gorm:"size:100;not null" json:"model"`
+	BaseURL         string    `gorm:"size:255" json:"base_url"`
 	Temperature     float64   `gorm:"not null;default:0.7" json:"temperature"`
 	MaxTokens       int       `gorm:"not null;default:4096" json:"max_tokens"`
 	Enabled         bool      `gorm:"not null;default:true;index" json:"enabled"`

@@ -9,6 +9,7 @@ import { useToast } from '../../components/ui/Toast';
 type ConfigForm = {
   api_key: string;
   model: string;
+  base_url: string;
   temperature: string;
   max_tokens: string;
   enabled: boolean;
@@ -19,6 +20,7 @@ type ConfigForm = {
 const defaultForm: ConfigForm = {
   api_key: '',
   model: 'gpt-4o-mini',
+  base_url: '',
   temperature: '0.2',
   max_tokens: '1200',
   enabled: false,
@@ -41,6 +43,7 @@ export default function AIConfigPage() {
       setForm({
         api_key: '',
         model: data.config.model || 'gpt-4o-mini',
+        base_url: data.config.base_url || '',
         temperature: String(data.config.temperature ?? 0.2),
         max_tokens: String(data.config.max_tokens ?? 1200),
         enabled: Boolean(data.config.enabled),
@@ -61,6 +64,7 @@ export default function AIConfigPage() {
   const buildPayload = (): AIConfigUpdateRequest => ({
     api_key: form.api_key.trim() || undefined,
     model: form.model.trim(),
+    base_url: form.base_url.trim() || undefined,
     temperature: Number(form.temperature),
     max_tokens: Number(form.max_tokens),
     enabled: form.enabled,
@@ -146,6 +150,19 @@ export default function AIConfigPage() {
               className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-text mb-2">Base URL（可选）</label>
+          <input
+            value={form.base_url}
+            onChange={(event) => setForm((prev) => ({ ...prev, base_url: event.target.value }))}
+            placeholder="留空使用官方 OpenAI 地址"
+            className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <p className="mt-2 text-xs text-text-light">
+            如需使用兼容 OpenAI API 格式的第三方服务（如 DeepSeek、通义千问等），可在此填写自定义端点地址。
+          </p>
         </div>
 
         <div>

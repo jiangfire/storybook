@@ -35,12 +35,12 @@ func EnsureAdmin(db *gorm.DB, params EnsureAdminParams) (*EnsureAdminResult, err
 	password := strings.TrimSpace(params.Password)
 
 	var user model.User
-	err := db.Where("email = ?", email).First(&user).Error
-	switch {
-	case err == nil:
+	result := db.Where("email = ?", email).Limit(1).Find(&user)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if result.RowsAffected > 0 {
 		return ensureExistingAdmin(db, &user, username, password)
-	case err != nil && err != gorm.ErrRecordNotFound:
-		return nil, err
 	}
 
 	if password == "" {
@@ -142,7 +142,7 @@ func resolveUsername(db *gorm.DB, requestedUsername, email string, excludeUserID
 	}
 
 	candidate := base
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		var exists int64
 		query := db.Model(&model.User{}).Where("username = ?", candidate)
 		if excludeUserID > 0 {
