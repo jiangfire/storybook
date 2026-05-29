@@ -23,34 +23,88 @@ import (
 	"github.com/jiangfire/storybook/internal/wiring"
 )
 
-const bootstrapAdminCommand = "bootstrap-admin"
+const (
+	cmdServer         = "server"
+	cmdBootstrapAdmin = "bootstrap-admin"
+)
+
+var (
+	binName = "storybook"
+	version = "dev"
+	commands = []struct{ name, short string }{
+		{cmdServer, "启动 HTTP 服务器（默认子命令）"},
+		{cmdBootstrapAdmin, "创建或提升管理员账户"},
+	}
+)
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	if len(args) > 0 && args[0] == bootstrapAdminCommand {
-		return runBootstrapAdmin(args[1:], stdout, stderr)
+	if len(args) == 0 {
+		return runServer(stdout, stderr)
 	}
-	return runServer(stderr)
+
+	switch args[0] {
+	case cmdServer:
+		return runServerWithArgs(args[1:], stdout, stderr)
+	case cmdBootstrapAdmin:
+		return runBootstrapAdmin(args[1:], stdout, stderr)
+	case "help", "-h", "--help":
+		printUsage(stdout)
+		return 0
+	case "version", "-v", "--version":
+		fmt.Fprintf(stdout, "%s %s\n", binName, version)
+		return 0
+	default:
+		fmt.Fprintf(stderr, "未知子命令: %s\n\n", args[0])
+		printUsage(stderr)
+		return 2
+	}
 }
 
-func runServer(stderr io.Writer) int {
+func runServerWithArgs(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet(cmdServer, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.Usage = func() {
+		fmt.Fprintf(stderr, "用法: %s server\n\n", binName)
+		fmt.Fprintf(stderr, "启动 storybook HTTP 服务器。\n\n")
+		fmt.Fprintf(stderr, "配置通过环境变量或 .env 文件加载，无需额外 flags。\n")
+	}
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	return runServer(stdout, stderr)
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprintf(w, "%s - storybook 后端管理工具\n\n", binName)
+	fmt.Fprintf(w, "用法:\n  %s <command> [flags]\n\n", binName)
+	fmt.Fprintf(w, "子命令:\n")
+	for _, cmd := range commands {
+		fmt.Fprintf(w, "  %-20s %s\n", cmd.name, cmd.short)
+	}
+	fmt.Fprintf(w, "\n全局标志:\n")
+	fmt.Fprintf(w, "  %-20s 显示帮助信息\n", "-h, --help")
+	fmt.Fprintf(w, "  %-20s 显示版本号\n", "-v, --version")
+	fmt.Fprintf(w, "\n使用 \"%s <command> -h\" 查看子命令的详细用法。\n", binName)
+}
+
+func runServer(stdout, stderr io.Writer) int {
 	config.LoadDotEnv()
 	cfg, err := config.Load()
 	if err != nil {
-		if _, writeErr := fmt.Fprintf(stderr, "load config failed: %v\n", err); writeErr != nil {
-			return 1
-		}
+		fmt.Fprintf(stderr, "load config failed: %v\n", err)
 		return 1
 	}
 
-	logger, err := logging.New(cfg.LogLevel, cfg.LogFormat, os.Stdout)
+	logger, err := logging.New(cfg.LogLevel, cfg.LogFormat, stdout)
 	if err != nil {
-		if _, writeErr := fmt.Fprintf(stderr, "create logger failed: %v\n", err); writeErr != nil {
-			return 1
-		}
+		fmt.Fprintf(stderr, "create logger failed: %v\n", err)
 		return 1
 	}
 	slog.SetDefault(logger)
@@ -89,6 +143,7 @@ func runServer(stderr io.Writer) int {
 
 	errCh := make(chan error, 1)
 	go func() {
+		defer close(errCh)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -118,7 +173,7 @@ func runServer(stderr io.Writer) int {
 
 func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 	config.LoadDotEnv()
-	fs := flag.NewFlagSet(bootstrapAdminCommand, flag.ContinueOnError)
+	fs := flag.NewFlagSet(cmdBootstrapAdmin, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
 	email := fs.String("email", "", "admin email, required")
@@ -130,33 +185,25 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if *email == "" {
-		if _, writeErr := fmt.Fprintln(stderr, "缺少必填参数: --email"); writeErr != nil {
-			return 2
-		}
+		fmt.Fprintln(stderr, "缺少必填参数: --email")
 		fs.Usage()
 		return 2
 	}
 
 	cfg, err := config.LoadForBootstrap()
 	if err != nil {
-		if _, writeErr := fmt.Fprintf(stderr, "load config failed: %v\n", err); writeErr != nil {
-			return 1
-		}
+		fmt.Fprintf(stderr, "load config failed: %v\n", err)
 		return 1
 	}
 
 	db, err := database.Connect(cfg)
 	if err != nil {
-		if _, writeErr := fmt.Fprintf(stderr, "connect database failed: %v\n", err); writeErr != nil {
-			return 1
-		}
+		fmt.Fprintf(stderr, "connect database failed: %v\n", err)
 		return 1
 	}
 
 	if err := db.AutoMigrate(&model.User{}); err != nil {
-		if _, writeErr := fmt.Fprintf(stderr, "auto migrate failed: %v\n", err); writeErr != nil {
-			return 1
-		}
+		fmt.Fprintf(stderr, "auto migrate failed: %v\n", err)
 		return 1
 	}
 
@@ -166,9 +213,7 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 		Password: *password,
 	})
 	if err != nil {
-		if _, writeErr := fmt.Fprintf(stderr, "bootstrap admin failed: %v\n", err); writeErr != nil {
-			return 1
-		}
+		fmt.Fprintf(stderr, "bootstrap admin failed: %v\n", err)
 		return 1
 	}
 
@@ -177,7 +222,7 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 		action = "created"
 	}
 
-	if _, err := fmt.Fprintf(
+	fmt.Fprintf(
 		stdout,
 		"admin %s: id=%d email=%s username=%s role_changed=%t password_changed=%t\n",
 		action,
@@ -186,8 +231,6 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 		result.Username,
 		result.RoleChanged,
 		result.PasswordChanged,
-	); err != nil {
-		return 1
-	}
+	)
 	return 0
 }

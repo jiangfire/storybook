@@ -6,11 +6,67 @@ import (
 	"testing"
 )
 
+func TestRunHelpFlag(t *testing.T) {
+	for _, arg := range []string{"help", "-h", "--help"} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		code := run([]string{arg}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("expected exit code 0 for %q, got %d", arg, code)
+		}
+		if !strings.Contains(stdout.String(), "子命令:") {
+			t.Fatalf("expected usage output for %q, got %q", arg, stdout.String())
+		}
+	}
+}
+
+func TestRunVersionFlag(t *testing.T) {
+	for _, arg := range []string{"version", "-v", "--version"} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		code := run([]string{arg}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("expected exit code 0 for %q, got %d", arg, code)
+		}
+		if !strings.Contains(stdout.String(), version) {
+			t.Fatalf("expected version output for %q, got %q", arg, stdout.String())
+		}
+	}
+}
+
+func TestRunUnknownCommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"foobar"}, &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "未知子命令: foobar") {
+		t.Fatalf("expected unknown command error, got %q", stderr.String())
+	}
+}
+
+func TestRunServerHelp(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{cmdServer, "-h"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "启动 storybook HTTP 服务器") {
+		t.Fatalf("expected server help output, got %q", stderr.String())
+	}
+}
+
 func TestRunBootstrapAdminRequiresEmail(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run([]string{bootstrapAdminCommand}, &stdout, &stderr)
+	code := run([]string{cmdBootstrapAdmin}, &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("expected exit code 2, got %d", code)
 	}
@@ -31,7 +87,7 @@ func TestRunBootstrapAdminDoesNotRequireJWTSecret(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run([]string{bootstrapAdminCommand, "--email", "admin@example.com", "--password", "Admin1234"}, &stdout, &stderr)
+	code := run([]string{cmdBootstrapAdmin, "--email", "admin@example.com", "--password", "Admin1234"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d, stderr=%q", code, stderr.String())
 	}
