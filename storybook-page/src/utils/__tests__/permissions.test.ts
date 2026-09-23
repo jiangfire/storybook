@@ -25,9 +25,13 @@ describe('permissions', () => {
     expect(canManageProjectMembers(null)).toBe(false);
   });
 
-  it('keeps admin-only tech lead management and story claim parity', () => {
+  it('allows product/admin tech lead management and keeps story claim parity', () => {
+    // PM 可自主指定/移除技术负责人，避免审批闭环卡在管理员身上
     expect(canManageTechLeads('admin')).toBe(true);
-    expect(canManageTechLeads('product')).toBe(false);
+    expect(canManageTechLeads('product')).toBe(true);
+    expect(canManageTechLeads('developer')).toBe(false);
+    expect(canManageTechLeads('tester')).toBe(false);
+    expect(canManageTechLeads('tech_lead')).toBe(false);
     expect(canCreateStory('product')).toBe(true);
     expect(canCreateStory('developer')).toBe(false);
     expect(canClaimStory('admin')).toBe(true);

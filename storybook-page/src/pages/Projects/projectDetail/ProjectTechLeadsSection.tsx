@@ -51,7 +51,15 @@ export function ProjectTechLeadsSection({
         </div>
       )}
       {techLeads.length === 0 ? (
-        <div className="state-panel state-panel-empty">当前项目暂无技术负责人</div>
+        <div className="state-panel state-panel-empty">
+          <p>当前项目暂无技术负责人</p>
+          <p className="mt-2 text-xs leading-5 text-text-light">
+            故事创建后由技术负责人审批。
+            {canManageTechLeads
+              ? ' 从上方选择一位技术负责人加入项目，故事才能进入审批流转。'
+              : ' 审批人由产品经理或管理员在此页添加。'}
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
           {techLeads.map((techLead) => (

@@ -1,148 +1,130 @@
 import { useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import { aiService } from '../../services/aiService';
-import type { AIFormDraft } from '../../types/api';
+import { getErrorMessage } from '../../utils/error';
+import type { AIGeneratedStoryResponse, AIFormDraft } from '../../types/api';
 
 interface AICreatorProps {
-	onGenerated: (draft: AIFormDraft, strategy: 'replace' | 'fill_empty') => void;
-	strategy?: 'replace' | 'fill_empty';
+  onGenerated: (draft: AIFormDraft, strategy: 'replace' | 'fill_empty') => void;
+  strategy?: 'replace' | 'fill_empty';
 }
 
+const MIN_REQUIREMENT_LENGTH = 5;
+const MAX_REQUIREMENT_LENGTH = 2000;
+
 export const AICreator = ({ onGenerated, strategy = 'replace' }: AICreatorProps) => {
-	const [aiRequirement, setAIRequirement] = useState('');
-	const [isGenerating, setIsGenerating] = useState(false);
-	const [error, setError] = useState('');
+  const [requirement, setRequirement] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<AIGeneratedStoryResponse | null>(null);
 
-	const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-		setAIRequirement(e.target.value);
-		if (error) {
-			setError('');
-		}
-	};
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setRequirement(e.target.value);
+    if (error) {
+      setError('');
+    }
+  };
 
-	const handleGenerate = async () => {
-		const requirement = aiRequirement.trim();
-		if (!requirement) {
-			setError('请输入需求描述');
-			return;
-		}
+  const handleGenerate = async (event?: FormEvent) => {
+    event?.preventDefault();
+    const text = requirement.trim();
+    if (text.length < MIN_REQUIREMENT_LENGTH) {
+      setError(`再多描述几个字（至少 ${MIN_REQUIREMENT_LENGTH} 个字），AI 才能理解你的需求`);
+      return;
+    }
 
-		setIsGenerating(true);
-		setError('');
+    setIsGenerating(true);
+    setError('');
 
-		try {
-			const data = await aiService.generateStory({ requirement });
-			onGenerated(data.form_draft, strategy);
-		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : 'AI生成失败';
-			setError(`AI生成失败: ${message}`);
-		} finally {
-			setIsGenerating(false);
-		}
-	};
+    try {
+      const data = await aiService.generateStory({ requirement: text });
+      onGenerated(data.form_draft, strategy);
+      setResult(data);
+    } catch (err: unknown) {
+      setResult(null);
+      setError(getErrorMessage(err, 'AI 生成失败，请稍后重试'));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
-	const handleFillEmpty = async () => {
-		// 规则辅助模式 - 使用启发式规则生成草稿
-		const draft = {
-			title: aiRequirement.trim() || '用户故事',
-			description: aiRequirement.trim() || '',
-			story_type: 'feature',
-			priority: 2,
-			story_points: 3 as const,
-			acceptance_criteria: [
-				{
-					description: 'Given 用户未登录',
-					order: 1,
-				},
-				{
-					description: 'When 用户输入有效的邮箱和密码',
-					order: 2,
-				},
-				{
-					description: 'Then 用户成功登录并跳转到首页',
-					order: 3,
-				},
-			],
-			tags: [],
-		};
+  const trimmedLength = requirement.trim().length;
+  const isDisabled = trimmedLength < MIN_REQUIREMENT_LENGTH || isGenerating;
+  const sourceLabel =
+    result?.source === 'openai' ? 'AI 模型生成' : result ? '规则草稿（未调用大模型）' : '';
 
-		onGenerated(draft, 'fill_empty');
-	};
+  return (
+    <section
+      aria-label="一句话创建故事"
+      className="rounded-2xl border border-primary-200 bg-gradient-to-br from-primary-50 via-white to-accent-50 p-5 shadow-sm"
+    >
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold text-text">一句话创建故事</h3>
+          <p className="text-sm text-text-light">
+            用一句话描述需求，AI 会生成标题、描述、验收标准等完整草稿并填入下方表单，生成后可继续手动修改。
+          </p>
+        </div>
+        {result && (
+          <span
+            className={`inline-flex w-fit shrink-0 items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+              result.source === 'openai'
+                ? 'bg-primary-100 text-primary'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            来源：{sourceLabel}
+          </span>
+        )}
+      </div>
 
-	const isDisabled = !aiRequirement.trim() || isGenerating;
+      <form className="mt-4 space-y-3" onSubmit={(e) => void handleGenerate(e)}>
+        <div>
+          <label htmlFor="ai-requirement" className="mb-2 block text-sm font-medium text-text">
+            需求描述
+          </label>
+          <textarea
+            id="ai-requirement"
+            value={requirement}
+            onChange={handleInputChange}
+            rows={3}
+            autoFocus
+            placeholder="例：支持用户用手机号和短信验证码登录"
+            maxLength={MAX_REQUIREMENT_LENGTH}
+            className="w-full rounded-xl border border-primary-200 bg-white/90 px-3 py-3 text-sm leading-6 text-text shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
+          />
+        </div>
 
-	return (
-		<div className="space-y-6">
-			{/* 模型辅助 */}
-			<section className="rounded-2xl border border-primary-200 bg-gradient-to-br from-primary-50 via-white to-accent-50 p-5 shadow-sm">
-				<div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-					<div className="space-y-1">
-						<h3 className="text-lg font-semibold text-text">模型辅助</h3>
-						<p className="text-sm text-text-light">
-							使用 OpenAI 生成故事草稿，可直接覆盖或只补空白字段
-						</p>
-					</div>
-				</div>
+        {error && (
+          <div role="alert" className="rounded-lg border border-danger/30 bg-red-50 px-3 py-2 text-xs text-danger">
+            {error}
+          </div>
+        )}
 
-				<div className="mt-5 space-y-3">
-					<div>
-						<label
-							htmlFor="ai-requirement"
-							className="mb-2 block text-sm font-medium text-text"
-						>
-							需求描述
-						</label>
-						<textarea
-							id="ai-requirement"
-							value={aiRequirement}
-							onChange={handleInputChange}
-							rows={4}
-							placeholder="输入需求、会议纪要或原话"
-							maxLength={2000}
-							className="w-full rounded-xl border border-primary-200 bg-white/90 px-3 py-3 text-sm leading-6 text-text shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
-						/>
-					</div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-xs text-text-light">
+            {trimmedLength}/{MAX_REQUIREMENT_LENGTH}（至少 {MIN_REQUIREMENT_LENGTH} 字）
+            {isGenerating ? ' · 生成最长约 45 秒，请稍候' : ''}
+          </span>
+          <button
+            type="submit"
+            disabled={isDisabled}
+            className="inline-flex items-center justify-center rounded-xl border border-transparent bg-primary px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGenerating ? '生成中…' : '生成完整草稿'}
+          </button>
+        </div>
+      </form>
 
-					{error && <div className="text-xs text-danger">{error}</div>}
-
-					<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-						<div className="flex flex-wrap gap-2">
-							<button
-								type="button"
-								onClick={handleGenerate}
-								disabled={isDisabled}
-								className="inline-flex items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								{isGenerating ? '生成中...' : '生成草稿'}
-							</button>
-							<button
-								type="button"
-								onClick={handleFillEmpty}
-								className="inline-flex items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-text shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-							>
-								补空白
-							</button>
-						</div>
-					</div>
-				</div>
-			</section>
-
-			{/* 规则辅助 */}
-			<section className="rounded-2xl border border-amber-200 bg-amber-50/80 p-5 shadow-sm">
-				<div className="space-y-1">
-					<h3 className="text-lg font-semibold text-text">规则辅助</h3>
-					<p className="text-sm text-text-light">
-						当未配置 OpenAI、调用失败或返回不可解析时，系统会回退到规则草稿。
-					</p>
-				</div>
-
-				<div className="mt-4 space-y-3 text-sm text-text-light">
-					<div className="rounded-xl border border-amber-200 bg-white/80 px-3 py-3">
-						<div className="font-medium text-text">当前兜底能力</div>
-						<div className="mt-1">角色、标题、优先级、标签、故事点和基础 AC 会按启发式规则生成。</div>
-					</div>
-				</div>
-			</section>
-		</div>
-	);
+      {result && (
+        <div className="mt-3 rounded-xl border border-success/30 bg-white/80 px-3 py-2.5 text-xs text-text-light">
+          <span className="font-medium text-text">草稿已填入下方表单</span>
+          ，请检查各字段后保存。
+          {result.warnings && result.warnings.length > 0 && (
+            <span className="ml-1 text-amber-700">{result.warnings[0]}</span>
+          )}
+        </div>
+      )}
+    </section>
+  );
 };

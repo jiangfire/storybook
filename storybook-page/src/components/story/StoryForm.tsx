@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { storyService } from '../../services/storyService';
 import { projectService } from '../../services/projectService';
@@ -16,6 +16,7 @@ import { getErrorMessage } from '../../utils/error';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { AICreator } from './AICreator';
+import { StoryChatPanel } from './StoryChatPanel';
 import { AcceptanceCriteriaManager } from './AcceptanceCriteriaManager';
 import { TagManager } from './TagManager';
 import { PrioritySelector } from './PrioritySelector';
@@ -65,6 +66,7 @@ export default function StoryForm({
   const { user } = useAuthStore();
   const isCreateMode = mode === 'create';
   const canPlanSprint = user?.role === 'product' || user?.role === 'admin';
+  const canUseAIStory = user?.role === 'product' || user?.role === 'admin';
 
   const [formData, setFormData] = useState(initialStoryFormState);
 
@@ -265,6 +267,26 @@ export default function StoryForm({
     }));
   };
 
+  // 当前表单内容 → 对话式录入的上下文草稿；表单为空时传 null，避免无意义请求体
+  const storyChatContextDraft = useMemo<AIFormDraft | null>(() => {
+    const hasContent =
+      formData.title.trim() !== '' ||
+      formData.description.trim() !== '' ||
+      formData.acceptance_criteria.length > 0;
+    if (!hasContent) {
+      return null;
+    }
+    return {
+      title: formData.title,
+      description: formData.description,
+      story_type: formData.story_type,
+      priority: formData.priority,
+      story_points: (formData.story_points ?? 3) as 1 | 2 | 3 | 5 | 8 | 13,
+      acceptance_criteria: formData.acceptance_criteria,
+      tags: formData.tags,
+    };
+  }, [formData]);
+
   return (
     <Modal
       isOpen={isOpen}
@@ -273,11 +295,19 @@ export default function StoryForm({
       size="lg"
     >
       <div className="space-y-6">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          {user?.role === 'product' || user?.role === 'admin' ? (
-            <AICreator onGenerated={applyAIDraft} />
-          ) : null}
-        </div>
+        {canUseAIStory && (
+          <>
+            <AICreator
+              onGenerated={applyAIDraft}
+              strategy={isCreateMode ? 'replace' : 'fill_empty'}
+            />
+            <StoryChatPanel
+              currentDraft={storyChatContextDraft}
+              onApply={applyAIDraft}
+              strategy={isCreateMode ? 'replace' : 'fill_empty'}
+            />
+          </>
+        )}
 
         <section className="space-y-6 rounded-xl border border-border bg-white p-4 md:p-5">
           {/* 标题 */}

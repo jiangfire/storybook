@@ -9,7 +9,7 @@ export function canManageProjectMembers(project?: Pick<Project, 'is_owner'> | nu
 }
 
 export function canManageTechLeads(role?: UserRole): boolean {
-  return role === 'admin';
+  return role === 'product' || role === 'admin';
 }
 
 export function canCreateStory(role?: UserRole): boolean {

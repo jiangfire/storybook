@@ -44,6 +44,8 @@ export interface Story {
   status: StoryStatus;
   review_status?: StoryReviewStatus;
   review_comment?: string;
+  reviewed_by?: { id: number; email: string } | null;
+  reviewed_at?: string | null;
   priority: number;
   story_points?: number;
   position: number;

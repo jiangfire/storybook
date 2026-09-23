@@ -8,14 +8,28 @@ import type {
   AIConfigTestResponse,
   AIConfigUpdateRequest,
   ApiResponse,
+  AIStoryChatRequest,
+  AIStoryChatResponse,
   INVESTCheckData,
 } from '../types/api';
 
 export const aiService = {
   async generateStory(data: AIGenerateStoryRequest): Promise<AIGeneratedStoryResponse> {
+    // 后端 AI 生成超时为 45s，前端全局超时只有 30s；这里单独放宽，避免慢请求前端先报错
     const response = await apiClient.post<ApiResponse<AIGeneratedStoryResponse>>(
       '/api/ai/generate-story',
-      data
+      data,
+      { timeout: 60000 }
+    );
+    return response.data.data;
+  },
+
+  async storyChat(data: AIStoryChatRequest): Promise<AIStoryChatResponse> {
+    // 与 generate-story 同样的 45s 后端超时，前端放宽到 60s
+    const response = await apiClient.post<ApiResponse<AIStoryChatResponse>>(
+      '/api/ai/story-chat',
+      data,
+      { timeout: 60000 }
     );
     return response.data.data;
   },

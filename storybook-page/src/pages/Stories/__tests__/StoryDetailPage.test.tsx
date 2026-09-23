@@ -6,6 +6,7 @@ import { useAuthStore } from '../../../stores/authStore';
 import { useStoryStore } from '../../../stores/storyStore';
 import { projectService } from '../../../services/projectService';
 import { storyService } from '../../../services/storyService';
+import { techLeadService } from '../../../services/techLeadService';
 import { aiService } from '../../../services/aiService';
 import StoryDetailPage from '../StoryDetailPage';
 
@@ -48,10 +49,18 @@ vi.mock('../../../services/projectService', () => ({
   },
 }));
 
+vi.mock('../../../services/techLeadService', () => ({
+  techLeadService: {
+    getProjectTechLeads: vi.fn(),
+  },
+}));
+
 vi.mock('../../../services/storyService', () => ({
   storyService: {
     planToSprint: vi.fn(),
     assignStory: vi.fn(),
+    resubmitReview: vi.fn(),
+    urgeReview: vi.fn(),
   },
 }));
 
@@ -64,6 +73,7 @@ vi.mock('../../../services/aiService', () => ({
 
 const mockedProjectService = vi.mocked(projectService, { deep: true });
 const mockedStoryService = vi.mocked(storyService, { deep: true });
+const mockedTechLeadService = vi.mocked(techLeadService, { deep: true });
 const mockedAIService = vi.mocked(aiService, { deep: true });
 
 const NOW = '2026-03-29T00:00:00Z';
@@ -191,11 +201,21 @@ describe('StoryDetailPage', () => {
           id: 1,
           user_id: 11,
           role_in_project: 'developer',
-          user: { id: 11, email: 'dev@example.com' },
+          joined_at: NOW,
+          is_owner: false,
+          user: { id: 11, email: 'dev@example.com', role: 'developer', created_at: NOW },
         },
       ],
     });
-    mockedStoryService.assignStory.mockResolvedValue({});
+    mockedStoryService.assignStory.mockResolvedValue(createStory());
+    mockedStoryService.resubmitReview.mockResolvedValue(
+      createStory({ status: 'pending', review_status: 'pending' })
+    );
+    mockedTechLeadService.getProjectTechLeads.mockResolvedValue({
+      tech_leads: [
+        { id: 5, email: 'tl@example.com', role: 'tech_lead', created_at: NOW },
+      ],
+    });
     mockedStoryService.planToSprint.mockResolvedValue({
       story_id: 18,
       sprint_id: 3,
@@ -310,10 +330,16 @@ describe('StoryDetailPage', () => {
       sprints: [
         {
           id: 3,
+          project_id: 4,
           name: 'Sprint 1',
+          goal: '',
           status: 'planned',
           start_date: NOW,
           end_date: NOW,
+          total_stories: 0,
+          done_stories: 0,
+          created_at: NOW,
+          updated_at: NOW,
         },
       ],
     });
@@ -325,7 +351,7 @@ describe('StoryDetailPage', () => {
           title: '拆分后的子故事',
           description: '拆分建议',
           story_points: 2,
-          acceptance_criteria: [{ id: 'ac-2', description: '可独立交付', status: 'pending' }],
+          acceptance_criteria: [{ id: 'ac-2', description: '可独立交付', status: 'pending', order: 1 }],
         },
       ],
     });
@@ -389,5 +415,63 @@ describe('StoryDetailPage', () => {
       expect(showError).toHaveBeenCalledWith('拆分服务异常');
     });
     expect(screen.getByText('拆分服务异常')).toBeInTheDocument();
+  });
+
+  it('被驳回的待审批故事展示原因并可重新提交审批', async () => {
+    const user = userEvent.setup();
+    const fetchStory = vi.fn(async () => {});
+
+    setAuthUser('product', 7);
+    setStoryStore(
+      createStory({
+        status: 'pending',
+        review_status: 'rejected',
+        review_comment: '验收标准不可验证',
+      })
+    );
+    useStoryStore.setState({ fetchStory });
+
+    renderPage();
+
+    expect(await screen.findByText(/上次审批被驳回：验收标准不可验证/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '重新提交审批' }));
+
+    await waitFor(() => {
+      expect(mockedStoryService.resubmitReview).toHaveBeenCalledWith(18);
+      expect(showSuccess).toHaveBeenCalledWith('已重新提交审批，审批人将收到通知');
+    });
+  });
+
+  it('待审批故事在项目没有技术负责人时提示联系管理员', async () => {
+    mockedTechLeadService.getProjectTechLeads.mockResolvedValue({ tech_leads: [] });
+
+    setAuthUser('product', 7);
+    setStoryStore(createStory({ status: 'pending', review_status: 'pending' }));
+
+    renderPage();
+
+    expect(
+      await screen.findByText(/当前项目还没有技术负责人，请尽快前往项目详情页添加审批人/)
+    ).toBeInTheDocument();
+  });
+
+  it('待审批故事可以催审并收到已提醒反馈', async () => {
+    const user = userEvent.setup();
+
+    mockedStoryService.urgeReview.mockResolvedValue(undefined);
+
+    setAuthUser('product', 7);
+    setStoryStore(createStory({ status: 'pending', review_status: 'pending' }));
+
+    renderPage();
+
+    const urgeBtn = await screen.findByRole('button', { name: '催审' });
+    await user.click(urgeBtn);
+
+    await waitFor(() => {
+      expect(mockedStoryService.urgeReview).toHaveBeenCalledWith(18);
+      expect(showSuccess).toHaveBeenCalledWith('已提醒审批人尽快处理');
+    });
   });
 });

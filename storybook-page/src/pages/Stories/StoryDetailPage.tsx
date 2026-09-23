@@ -12,12 +12,14 @@ import Button from '../../components/ui/Button';
 import { StoryDetailSkeleton } from '../../components/ui/Skeleton';
 import { projectService } from '../../services/projectService';
 import { storyService } from '../../services/storyService';
+import { techLeadService } from '../../services/techLeadService';
 import { aiService } from '../../services/aiService';
 import type { AISplitStoryData, INVESTCheckData, SprintSummary } from '../../types/api';
 import { getErrorMessage } from '../../utils/error';
 import {
   canClaimStory as canClaimStoryPermission,
   canManageStoryAssignee,
+  canManageTechLeads as canManageTechLeadsPermission,
   canReleaseStory as canReleaseStoryPermission,
   canUseStoryAI,
 } from '../../utils/permissions';
@@ -73,6 +75,9 @@ export default function StoryDetailPage() {
   const [isSplitLoading, setIsSplitLoading] = useState(false);
   const [splitError, setSplitError] = useState('');
   const [splitResult, setSplitResult] = useState<AISplitStoryData | null>(null);
+  const [projectTechLeads, setProjectTechLeads] = useState<Array<{ id: number; email: string }>>([]);
+  const [isResubmitting, setIsResubmitting] = useState(false);
+  const [isUrging, setIsUrging] = useState(false);
 
   useEffect(() => {
     clearCurrentStory();
@@ -144,6 +149,32 @@ export default function StoryDetailPage() {
     loadMembers();
   }, [currentStory?.project_id, canManageAssignee]);
 
+  // 待审批故事需要展示“项目是否有审批人”，帮助 PM 在无技术负责人时自救
+  useEffect(() => {
+    if (!currentStory?.project_id || currentStory.status !== 'pending') {
+      setProjectTechLeads([]);
+      return;
+    }
+
+    let cancelled = false;
+    techLeadService
+      .getProjectTechLeads(currentStory.project_id)
+      .then((data) => {
+        if (!cancelled) {
+          setProjectTechLeads(data.tech_leads || []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProjectTechLeads([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStory?.project_id, currentStory?.status]);
+
   if (!currentStory) {
     return <StoryDetailSkeleton />;
   }
@@ -166,7 +197,35 @@ export default function StoryDetailPage() {
     }
   };
 
+  const handleResubmit = async () => {
+    try {
+      setIsResubmitting(true);
+      await storyService.resubmitReview(currentStory.id);
+      showSuccess('已重新提交审批，审批人将收到通知');
+      await fetchStory(currentStory.id);
+      await fetchActivities(currentStory.id);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '重新提交审批失败'));
+    } finally {
+      setIsResubmitting(false);
+    }
+  };
+
+  const handleUrge = async () => {
+    try {
+      setIsUrging(true);
+      await storyService.urgeReview(currentStory.id);
+      showSuccess('已提醒审批人尽快处理');
+      await fetchActivities(currentStory.id);
+    } catch (error: unknown) {
+      showError(getErrorMessage(error, '催审失败'));
+    } finally {
+      setIsUrging(false);
+    }
+  };
+
   const canPlanSprint = user?.role === 'product' || user?.role === 'admin';
+  const canManageTechLeadsHere = canManageTechLeadsPermission(user?.role);
   const canUseAIInStory = canUseStoryAI(user?.role);
   const canClaimCurrentStory = canClaimStoryPermission(user?.role);
   const canReleaseCurrentStory = canReleaseStoryPermission(user, currentStory.assigned_to);
@@ -316,9 +375,57 @@ export default function StoryDetailPage() {
                 </span>
               </div>
             </div>
-            {currentStory.review_status === 'rejected' && currentStory.review_comment && (
-              <div className="mt-3 inline-flex items-center rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                拒绝原因：{currentStory.review_comment}
+            {currentStory.status === 'pending' && (
+              <div className="mt-3 space-y-2">
+                {currentStory.review_status === 'rejected' ? (
+                  <div className="inline-flex items-start rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <span>
+                      上次审批被驳回
+                      {currentStory.review_comment ? `：${currentStory.review_comment}` : ''}
+                      。修改内容后可重新提交审批。
+                    </span>
+                  </div>
+                ) : (
+                  <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                    <span>
+                      等待审批中：审批通过前故事不会进入看板流转。
+                      {projectTechLeads.length === 0 &&
+                        (canManageTechLeadsHere
+                          ? ' 当前项目还没有技术负责人，请尽快前往项目详情页添加审批人。'
+                          : ' 当前项目还没有技术负责人，请联系产品经理或管理员添加审批人。')}
+                    </span>
+                    {canEditStory && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={handleUrge}
+                        isLoading={isUrging}
+                      >
+                        催审
+                      </Button>
+                    )}
+                    {projectTechLeads.length === 0 && canManageTechLeadsHere && (
+                      <Link
+                        to={`/projects/${currentStory.project_id}`}
+                        className="text-sm font-medium text-primary underline-offset-2 hover:underline"
+                      >
+                        前往项目详情添加
+                      </Link>
+                    )}
+                  </div>
+                )}
+                {canEditStory && currentStory.review_status === 'rejected' && (
+                  <div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={handleResubmit}
+                      isLoading={isResubmitting}
+                    >
+                      重新提交审批
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -588,6 +695,20 @@ export default function StoryDetailPage() {
                   {new Date(currentStory.updated_at).toLocaleString()}
                 </span>
               </div>
+              {currentStory.reviewed_at && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-text-light">上次审批人:</span>
+                    <span className="text-text">{currentStory.reviewed_by?.email || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-light">审批时间:</span>
+                    <span className="text-text">
+                      {new Date(currentStory.reviewed_at).toLocaleString()}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

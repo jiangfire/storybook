@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { usePendingReviewStore } from '../../stores/pendingReviewStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { getUserInitials } from '../../utils/formatters';
 import { searchService } from '../../services/searchService';
@@ -191,6 +192,16 @@ export default function Header() {
     onNotificationNew: (message: NotificationNewMessage) => {
       prepend(message);
       showInfo(message.title);
+      // 审批相关通知到达时刷新侧边栏“审批”角标（仅技术负责人/管理员关心）
+      if (
+        message.type === 'story.review_requested' ||
+        message.type === 'story.review_resubmitted'
+      ) {
+        const role = user?.role;
+        if (role === 'tech_lead' || role === 'admin') {
+          void usePendingReviewStore.getState().fetch();
+        }
+      }
     },
   });
 

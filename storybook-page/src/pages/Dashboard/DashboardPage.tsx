@@ -37,6 +37,7 @@ function StoryListSection({
   emptyTitle,
   emptyAction,
   items,
+  showReviewBadge = false,
 }: {
   title: string;
   count: number;
@@ -45,6 +46,7 @@ function StoryListSection({
   emptyTitle: string;
   emptyAction?: ReactNode;
   items: DashboardStoryItem[];
+  showReviewBadge?: boolean;
 }) {
   return (
     <section className="section-card rounded-[1.7rem] p-4 sm:p-5">
@@ -87,9 +89,22 @@ function StoryListSection({
                   <p className="break-words text-sm text-text-light">{story.project}</p>
                 </div>
                 <div className="sm:ml-4">
-                  <span className="inline-flex rounded-lg bg-secondary-100 px-3 py-1 text-sm text-text">
-                    {formatStoryStatus(story.status)}
-                  </span>
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    {showReviewBadge && story.status === 'pending' && (
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${
+                          story.review_status === 'rejected'
+                            ? 'bg-danger-light text-danger'
+                            : 'bg-warning-light text-warning'
+                        }`}
+                      >
+                        {story.review_status === 'rejected' ? '被驳回' : '待审批'}
+                      </span>
+                    )}
+                    <span className="inline-flex rounded-lg bg-secondary-100 px-3 py-1 text-sm text-text">
+                      {formatStoryStatus(story.status)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </Link>
@@ -277,6 +292,7 @@ export default function DashboardPage() {
               badgeClass="bg-accent-100 text-accent"
               emptyIcon={<SparklesIcon size={26} />}
               emptyTitle="还没有创建任何故事"
+              showReviewBadge
               items={dashboardData?.my_stories.created || []}
             />
           </div>

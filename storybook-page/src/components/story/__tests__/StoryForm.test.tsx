@@ -47,6 +47,7 @@ vi.mock('../../../services/projectService', () => ({
 vi.mock('../../../services/aiService', () => ({
   aiService: {
     generateStory: vi.fn(),
+    storyChat: vi.fn(),
   },
 }));
 
@@ -184,6 +185,19 @@ describe('StoryForm', () => {
     setAuthUser('product');
 
     mockedAiService.generateStory.mockResolvedValue({
+      title: 'AI 生成的标题',
+      user_story: 'AI 生成的描述',
+      actor: '用户',
+      action: '登录',
+      value: '安全访问',
+      story_type: 'bug',
+      priority: 4,
+      suggested_ac: ['AI AC 1', 'AI AC 2'],
+      story_points: 8,
+      tags: ['ai'],
+      warnings: [],
+      source: 'openai',
+      is_configured: true,
       form_draft: {
         title: 'AI 生成的标题',
         description: 'AI 生成的描述',
@@ -226,13 +240,40 @@ describe('StoryForm', () => {
     );
   });
 
-  it('保留模型辅助与规则辅助入口', () => {
+  it('创建模式下提供一句话生成入口', () => {
     renderStoryForm();
 
-    expect(screen.getByText('模型辅助')).toBeInTheDocument();
-    expect(screen.getByText('规则辅助')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '生成草稿' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '补空白' })).toBeInTheDocument();
+    expect(screen.getByText('一句话创建故事')).toBeInTheDocument();
+    expect(screen.getByText('对话式完善')).toBeInTheDocument();
+    expect(screen.getByLabelText('需求描述')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '生成完整草稿' })).toBeInTheDocument();
+    // 旧的假数据“补空白”入口应已移除
+    expect(screen.queryByRole('button', { name: '补空白' })).not.toBeInTheDocument();
+  });
+
+  it('对话式完善可以把草稿写入表单', async () => {
+    mockedAiService.storyChat.mockResolvedValue({
+      reply: '草稿好了，可以直接保存',
+      form_draft: {
+        title: '对话生成的标题',
+        description: '对话生成的描述',
+        story_type: 'feature',
+        priority: 3,
+        story_points: 5,
+        acceptance_criteria: [{ description: '对话 AC', order: 1 }],
+        tags: ['chat'],
+      },
+      source: 'openai',
+    });
+    const user = userEvent.setup();
+    renderStoryForm();
+
+    await user.type(screen.getByLabelText('对话输入'), '做一个导出报表的功能');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+    await user.click(await screen.findByRole('button', { name: '应用到表单' }));
+
+    expect(await screen.findByLabelText(/标题/)).toHaveValue('对话生成的标题');
+    expect(screen.getByText('对话 AC')).toBeInTheDocument();
   });
 
   it('应该验证必填字段和标题长度', async () => {
@@ -249,36 +290,30 @@ describe('StoryForm', () => {
     expect(await screen.findByText('标题长度应在2-200字符之间')).toBeInTheDocument();
   });
 
-  it('规则辅助会补齐空字段，并生成结构化验收标准', async () => {
+  it('创建模式下 AI 生成会覆盖表单字段', async () => {
     renderStoryForm();
 
     fireEvent.change(screen.getByLabelText('需求描述'), { target: { value: '用户登录功能' } });
-    fireEvent.click(screen.getByRole('button', { name: '补空白' }));
+    fireEvent.click(screen.getByRole('button', { name: '生成完整草稿' }));
 
-    expect(await screen.findByLabelText(/标题/)).toHaveValue('用户登录功能');
-    expect(screen.getByLabelText('描述')).toHaveValue('用户登录功能');
-    expect(screen.getByText('Given 用户未登录')).toBeInTheDocument();
-    expect(screen.getByText('When 用户输入有效的邮箱和密码')).toBeInTheDocument();
-    expect(screen.getByText('Then 用户成功登录并跳转到首页')).toBeInTheDocument();
+    expect(await screen.findByLabelText(/标题/)).toHaveValue('AI 生成的标题');
+    expect(screen.getByLabelText('描述')).toHaveValue('AI 生成的描述');
+    expect(screen.getByText('AI AC 1')).toBeInTheDocument();
   });
 
-  it('模型辅助 replace 会覆盖已有字段，而 fill_empty 会保留用户已编辑内容', async () => {
-    renderStoryForm();
+  it('编辑模式下 AI 生成只补空白，保留用户已编辑内容', async () => {
+    renderStoryForm({ mode: 'edit', storyId: 12 });
 
-    const titleInput = screen.getByLabelText(/标题/);
+    const titleInput = await screen.findByLabelText(/标题/);
     fireEvent.change(titleInput, { target: { value: '用户手写标题' } });
-    fireEvent.change(screen.getByLabelText('需求描述'), { target: { value: '登录场景' } });
-
-    fireEvent.click(screen.getByRole('button', { name: '补空白' }));
-    expect(await screen.findByDisplayValue('用户手写标题')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '生成草稿' }));
+    fireEvent.change(screen.getByLabelText('需求描述'), { target: { value: '优化登录场景体验' } });
+    fireEvent.click(screen.getByRole('button', { name: '生成完整草稿' }));
 
     await waitFor(() => {
-      expect(mockedAiService.generateStory).toHaveBeenCalledWith({ requirement: '登录场景' });
-      expect(screen.getByDisplayValue('AI 生成的标题')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('AI 生成的描述')).toBeInTheDocument();
+      expect(mockedAiService.generateStory).toHaveBeenCalledWith({ requirement: '优化登录场景体验' });
     });
+    expect(screen.getByLabelText(/标题/)).toHaveValue('用户手写标题');
+    expect(screen.getByLabelText('描述')).toHaveValue('已有描述');
   });
 
   it('创建故事成功后会提交表单、跳转详情并关闭弹窗', async () => {
@@ -439,8 +474,8 @@ describe('StoryForm', () => {
       storyId: 12,
     });
 
-    expect(screen.queryByText('模型辅助')).not.toBeInTheDocument();
-    expect(screen.queryByText('规则辅助')).not.toBeInTheDocument();
+    expect(screen.queryByText('一句话创建故事')).not.toBeInTheDocument();
+    expect(screen.queryByText('对话式完善')).not.toBeInTheDocument();
     expect(await screen.findByText('仅产品经理可规划冲刺')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '更新冲刺' })).toBeDisabled();
   });

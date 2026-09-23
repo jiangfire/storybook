@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '../../utils/cn';
 import { useAuthStore } from '../../stores/authStore';
+import { usePendingReviewStore } from '../../stores/pendingReviewStore';
 import type { UserRole } from '../../types/models';
 import {
   BoardIcon,
@@ -68,6 +70,24 @@ interface SidebarProps {
 export default function Sidebar({ currentProject }: SidebarProps) {
   const location = useLocation();
   const { user } = useAuthStore();
+  const pendingReviewTotal = usePendingReviewStore((state) => state.total);
+  const fetchPendingReview = usePendingReviewStore((state) => state.fetch);
+  const canReview = user?.role === 'tech_lead' || user?.role === 'admin';
+
+  useEffect(() => {
+    if (canReview) {
+      void fetchPendingReview();
+    }
+  }, [canReview, fetchPendingReview]);
+
+  const pendingReviewLabel = pendingReviewTotal > 99 ? '99+' : String(pendingReviewTotal);
+
+  const renderReviewBadge = (path: string) =>
+    path === '/techlead/review' && pendingReviewTotal > 0 ? (
+      <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-danger px-1.5 py-0.5 text-[11px] font-semibold leading-none text-white">
+        {pendingReviewLabel}
+      </span>
+    ) : null;
 
   const isActivePath = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + '/');
@@ -102,6 +122,7 @@ export default function Sidebar({ currentProject }: SidebarProps) {
                 >
                   <Icon size={15} />
                   <span>{item.label}</span>
+                  {renderReviewBadge(item.path)}
                 </Link>
               );
             })}
@@ -164,6 +185,7 @@ export default function Sidebar({ currentProject }: SidebarProps) {
                     <Icon size={18} />
                   </span>
                   <span className="text-sm font-medium">{item.label}</span>
+                  {renderReviewBadge(item.path)}
                 </Link>
               );
             })}

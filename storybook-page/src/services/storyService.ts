@@ -112,6 +112,21 @@ export const storyService = {
   },
 
   /**
+   * 驳回后重新提交审批
+   */
+  async resubmitReview(id: number): Promise<Story> {
+    const response = await apiClient.post<ApiResponse<Story>>(`/api/stories/${id}/resubmit`);
+    return response.data.data;
+  },
+
+  /**
+   * 催审：提醒审批人尽快处理待审批故事
+   */
+  async urgeReview(id: number): Promise<void> {
+    await apiClient.post(`/api/stories/${id}/urge-review`);
+  },
+
+  /**
    * 分配故事负责人（产品经理）
    */
   async assignStory(id: number, data: AssignStoryRequest): Promise<Story> {

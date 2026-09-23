@@ -555,6 +555,23 @@ export interface AIGeneratedStoryResponse {
   form_draft: AIFormDraft;
 }
 
+// AI对话式录入
+export interface AIChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AIStoryChatRequest {
+  messages: AIChatMessage[];
+  current_draft?: AIFormDraft | null;
+}
+
+export interface AIStoryChatResponse {
+  reply: string;
+  form_draft: AIFormDraft;
+  source: 'openai';
+}
+
 export interface AIConfig {
   id?: number;
   provider: 'openai';
@@ -691,6 +708,7 @@ export interface DashboardData {
       status: string;
       priority: number;
       story_type?: string;
+      review_status?: string;
     }>;
     created: Array<{
       id: number;
@@ -699,6 +717,7 @@ export interface DashboardData {
       status: string;
       priority: number;
       story_type?: string;
+      review_status?: string;
     }>;
   };
   statistics: {
@@ -758,6 +777,9 @@ export type NotificationType =
   | 'story.claimed'
   | 'story.released'
   | 'story.reviewed'
+  | 'story.review_requested'
+  | 'story.review_resubmitted'
+  | 'story.review_urged'
   | 'task.assigned'
   | 'bug.assigned'
   | 'sprint.started'

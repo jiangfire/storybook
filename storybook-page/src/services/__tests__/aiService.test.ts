@@ -28,9 +28,12 @@ describe('aiService', () => {
     await aiService.updateConfig({ enabled: false });
     await aiService.testConfig({ model: 'gpt-4.1' });
 
-    expect(mockedApi.post).toHaveBeenNthCalledWith(1, '/api/ai/generate-story', {
-      requirement: '登录功能',
-    });
+    expect(mockedApi.post).toHaveBeenNthCalledWith(
+      1,
+      '/api/ai/generate-story',
+      { requirement: '登录功能' },
+      { timeout: 60000 }
+    );
     expect(mockedApi.get).toHaveBeenCalledWith('/api/admin/ai/config');
     expect(mockedApi.put).toHaveBeenCalledWith('/api/admin/ai/config', { enabled: false });
     expect(mockedApi.post).toHaveBeenNthCalledWith(2, '/api/admin/ai/config/test', {
