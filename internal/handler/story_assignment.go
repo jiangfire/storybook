@@ -23,6 +23,12 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 		return
 	}
 
+	// 未审批的故事不能进入分配流程，避免绕过审批直接派活
+	if story.Status == model.StoryStatusPending {
+		api.BadRequest(c, "故事审批通过后才能分配负责人")
+		return
+	}
+
 	var req assignStoryRequest
 	if !middleware.BindJSON(c, &req) {
 		return
@@ -89,6 +95,60 @@ func (h *StoryHandler) AssignStory(c *gin.Context) {
 		"assigned_to": assignee,
 		"status":      story.Status,
 		"updated_at":  story.UpdatedAt,
+	})
+}
+
+// ResubmitStory 驳回后重新提交审批（创建者/产品经理/管理员）
+func (h *StoryHandler) ResubmitStory(c *gin.Context) {
+	story := middleware.MustStory(c)
+	userID := middleware.MustUserID(c)
+
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin && story.CreatedBy != userID {
+		api.Forbidden(c, "仅创建者、产品经理或管理员可重新提交审批")
+		return
+	}
+
+	if err := h.storySvc.ResubmitReview(story, userID); err != nil {
+		if items, ok := serviceValidationItems(err); ok {
+			api.BadRequest(c, "参数验证失败", items...)
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	api.Success(c, "已重新提交审批", gin.H{
+		"id":            story.ID,
+		"status":        story.Status,
+		"review_status": story.ReviewStatus,
+		"updated_at":    story.UpdatedAt,
+	})
+}
+
+// UrgeStory 催审：提醒审批人尽快处理待审批故事（创建者/产品经理/管理员）
+func (h *StoryHandler) UrgeStory(c *gin.Context) {
+	story := middleware.MustStory(c)
+	userID := middleware.MustUserID(c)
+
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin && story.CreatedBy != userID {
+		api.Forbidden(c, "仅创建者、产品经理或管理员可催审")
+		return
+	}
+
+	if err := h.storySvc.UrgeReview(story, userID); err != nil {
+		if items, ok := serviceValidationItems(err); ok {
+			api.BadRequest(c, "参数验证失败", items...)
+			return
+		}
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	api.Success(c, "已提醒审批人尽快处理", gin.H{
+		"id":     story.ID,
+		"status": story.Status,
 	})
 }
 

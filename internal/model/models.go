@@ -77,14 +77,17 @@ const (
 )
 
 const (
-	NotificationStoryAssigned   = "story.assigned"
-	NotificationStoryClaimed    = "story.claimed"
-	NotificationStoryReleased   = "story.released"
-	NotificationStoryReviewed   = "story.reviewed"
-	NotificationTaskAssigned    = "task.assigned"
-	NotificationBugAssigned     = "bug.assigned"
-	NotificationSprintStarted   = "sprint.started"
-	NotificationSprintCompleted = "sprint.completed"
+	NotificationStoryAssigned          = "story.assigned"
+	NotificationStoryClaimed           = "story.claimed"
+	NotificationStoryReleased          = "story.released"
+	NotificationStoryReviewed          = "story.reviewed"
+	NotificationStoryReviewRequested   = "story.review_requested"
+	NotificationStoryReviewResubmitted = "story.review_resubmitted"
+	NotificationStoryReviewUrged       = "story.review_urged"
+	NotificationTaskAssigned           = "task.assigned"
+	NotificationBugAssigned            = "bug.assigned"
+	NotificationSprintStarted          = "sprint.started"
+	NotificationSprintCompleted        = "sprint.completed"
 
 	NotificationEntityStory  = "story"
 	NotificationEntityTask   = "task"

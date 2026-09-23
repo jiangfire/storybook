@@ -328,14 +328,14 @@ func (h *TechLeadHandler) ListMyProjects(c *gin.Context) {
 	api.Success(c, "success", gin.H{"projects": items})
 }
 
-// AddTechLead 为项目指定技术负责人（admin）
+// AddTechLead 为项目指定技术负责人（产品经理/管理员）
 func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	project := middleware.MustProject(c)
 	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleAdmin {
-		api.Forbidden(c, "仅管理员可指定技术负责人")
+	if role != model.RoleAdmin && role != model.RoleProduct {
+		api.Forbidden(c, "仅产品经理或管理员可指定技术负责人")
 		return
 	}
 
@@ -396,14 +396,14 @@ func (h *TechLeadHandler) AddTechLead(c *gin.Context) {
 	})
 }
 
-// RemoveTechLead 移除项目技术负责人（admin）
+// RemoveTechLead 移除项目技术负责人（产品经理/管理员）
 func (h *TechLeadHandler) RemoveTechLead(c *gin.Context) {
 	project := middleware.MustProject(c)
 	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleAdmin {
-		api.Forbidden(c, "仅管理员可移除技术负责人")
+	if role != model.RoleAdmin && role != model.RoleProduct {
+		api.Forbidden(c, "仅产品经理或管理员可移除技术负责人")
 		return
 	}
 
@@ -447,19 +447,18 @@ func (h *TechLeadHandler) ListProjectTechLeads(c *gin.Context) {
 		return
 	}
 
+	// 返回用户形态（id=用户ID、email 平铺），与前端 TechLeadsResponse: User[] 契约一致：
+	// 移除接口 DELETE /projects/:id/techleads/:userID 期望的就是用户 ID。
 	items := make([]gin.H, 0, len(techLeads))
 	for _, tl := range techLeads {
-		item := gin.H{
-			"id":          tl.ID,
+		if tl.User == nil {
+			continue
+		}
+		items = append(items, gin.H{
+			"id":          tl.User.ID,
+			"email":       tl.User.Email,
 			"assigned_at": tl.AssignedAt,
-		}
-		if tl.User != nil {
-			item["user"] = gin.H{
-				"id":    tl.User.ID,
-				"email": tl.User.Email,
-			}
-		}
-		items = append(items, item)
+		})
 	}
 
 	api.Success(c, "success", gin.H{

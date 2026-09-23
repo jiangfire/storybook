@@ -83,10 +83,12 @@ func (h *MeHandler) Dashboard(c *gin.Context) {
 
 func storySummaryWithProject(story model.UserStory) gin.H {
 	item := gin.H{
-		"id":       story.ID,
-		"title":    story.Title,
-		"status":   story.Status,
-		"priority": story.Priority,
+		"id":            story.ID,
+		"title":         story.Title,
+		"status":        story.Status,
+		"priority":      story.Priority,
+		"story_type":    story.StoryType,
+		"review_status": story.ReviewStatus,
 	}
 
 	if story.Project != nil {

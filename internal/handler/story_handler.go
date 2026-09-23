@@ -428,6 +428,15 @@ func (h *StoryHandler) GetStory(c *gin.Context) {
 	if story.Creator != nil {
 		data["created_by"] = gin.H{"id": story.Creator.ID, "email": story.Creator.Email}
 	}
+	if story.ReviewedBy != nil {
+		data["reviewed_by_id"] = *story.ReviewedBy
+		if reviewer, err := h.userRepo.FindByID(*story.ReviewedBy); err == nil {
+			data["reviewed_by"] = gin.H{"id": reviewer.ID, "email": reviewer.Email}
+		}
+	}
+	if story.ReviewedAt != nil {
+		data["reviewed_at"] = story.ReviewedAt
+	}
 
 	api.Success(c, "success", data)
 }

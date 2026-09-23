@@ -143,6 +143,8 @@ func New(c *wiring.Container) *gin.Engine {
 		protected.GET("/stories/:id/activities", storyAccess, c.Story.GetActivities)
 		protected.PATCH("/stories/:id/assignee", storyAccess, c.Story.AssignStory)
 		protected.POST("/stories/:id/review", storyAccess, c.Story.ReviewStory)
+		protected.POST("/stories/:id/resubmit", storyAccess, c.Story.ResubmitStory)
+		protected.POST("/stories/:id/urge-review", storyAccess, c.Story.UrgeStory)
 		protected.PATCH("/stories/:id/sprint", storyAccess, c.Sprint.AssignStory)
 		protected.POST("/stories/:id/tasks", storyAccess, c.Task.Create)
 		protected.POST("/stories/:id/tasks/split-from-ac", storyAccess, c.Task.SplitFromAC)
@@ -182,6 +184,7 @@ func New(c *wiring.Container) *gin.Engine {
 		protected.DELETE("/bugs/:id/comments/:commentID", bugAccess, c.BugComment.Delete)
 
 		protected.POST("/ai/generate-story", aiLimiter.Middleware(), c.AI.GenerateStory)
+		protected.POST("/ai/story-chat", aiLimiter.Middleware(), c.AI.StoryChat)
 		protected.POST("/ai/stories/:id/split", aiLimiter.Middleware(), storyAccess, c.AI.SplitStory)
 		protected.GET("/ai/stories/:id/invest-check", aiLimiter.Middleware(), storyAccess, c.AI.INVESTCheck)
 		protected.POST("/ai/stories/:id/refine-ac", aiLimiter.Middleware(), storyAccess, c.AI.RefineAC)

@@ -142,8 +142,156 @@ func (s *StoryService) Create(input CreateStoryInput) (*model.UserStory, error) 
 	}
 
 	s.indexStoryIfEnabled(&story)
+	s.notifyStoryReviewRequested(&story, input.UserID, false)
 
 	return &story, nil
+}
+
+// reviewerIDs 收集应当处理故事审批的人：项目技术负责人 + 平台管理员，并排除
+// 操作者本人。项目还没有技术负责人时，通知会兜底发给管理员，避免故事无人审批。
+func (s *StoryService) reviewerIDs(projectID, excludeUserID uint) []uint {
+	ids := make(map[uint]struct{})
+
+	var techLeadIDs []uint
+	if err := s.db.Model(&model.ProjectTechLead{}).Where("project_id = ?", projectID).Pluck("user_id", &techLeadIDs).Error; err != nil {
+		logging.LogIfErr(err, "collect project tech leads for review notify", "project_id", projectID)
+	}
+	for _, id := range techLeadIDs {
+		ids[id] = struct{}{}
+	}
+
+	var adminIDs []uint
+	if err := s.db.Model(&model.User{}).Where("role = ?", model.RoleAdmin).Pluck("id", &adminIDs).Error; err != nil {
+		logging.LogIfErr(err, "collect admins for review notify", "project_id", projectID)
+	}
+	for _, id := range adminIDs {
+		ids[id] = struct{}{}
+	}
+
+	out := make([]uint, 0, len(ids))
+	for id := range ids {
+		if id == 0 || id == excludeUserID {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
+}
+
+// notifyStoryReviewRequested 在故事创建/重提后通知审批人（best-effort，
+// 通知失败不阻塞业务主流程）。
+func (s *StoryService) notifyStoryReviewRequested(story *model.UserStory, actorID uint, resubmitted bool) {
+	reviewers := s.reviewerIDs(story.ProjectID, actorID)
+	if len(reviewers) == 0 {
+		return
+	}
+
+	evtType := model.NotificationStoryReviewRequested
+	title := "有新故事等待审批"
+	if resubmitted {
+		evtType = model.NotificationStoryReviewResubmitted
+		title = "故事已重新提交审批"
+	}
+
+	pid := story.ProjectID
+	s.notifier.NotifyMany(context.Background(), reviewers, NotificationEvent{
+		Type:       evtType,
+		EntityType: model.NotificationEntityStory,
+		EntityID:   story.ID,
+		ProjectID:  &pid,
+		ActorID:    &actorID,
+		Title:      title,
+		Body:       story.Title,
+		Metadata: map[string]any{
+			"story_id":      story.ID,
+			"title":         story.Title,
+			"project_id":    story.ProjectID,
+			"resubmitted":   resubmitted,
+			"review_status": story.ReviewStatus,
+		},
+	})
+}
+
+// ResubmitReview 驳回后重新提交审批：把 review_status 重置为 pending，保留
+// 上次驳回原因供审批人参考，并通知原审批人与项目审批人。
+func (s *StoryService) ResubmitReview(story *model.UserStory, userID uint) error {
+	if story.Status != model.StoryStatusPending || story.ReviewStatus != model.ReviewStatusRejected {
+		return NewValidationError(ValidationIssue{Field: "status", Message: "只有被驳回的待审批故事可以重新提交"})
+	}
+
+	oldReviewStatus := story.ReviewStatus
+	story.ReviewStatus = model.ReviewStatusPending
+
+	if err := s.db.Save(story).Error; err != nil {
+		return err
+	}
+
+	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "review_resubmitted", map[string]any{
+		"review_status":  oldReviewStatus,
+		"review_comment": story.ReviewComment,
+	}, map[string]any{
+		"review_status": story.ReviewStatus,
+	}), "write story activity log", "story_id", story.ID, "action", "review_resubmitted")
+
+	if s.events != nil {
+		s.events.BroadcastProject(story.ProjectID, "story.review_resubmitted", map[string]any{
+			"story_id":   story.ID,
+			"project_id": story.ProjectID,
+			"actor":      userID,
+		})
+	}
+
+	s.notifyStoryReviewRequested(story, userID, true)
+
+	return nil
+}
+
+// UrgeReview 催审：待审批故事的创建者/产品经理/管理员可提醒审批人尽快处理。
+// 只发通知与活动日志，不改变故事状态。
+func (s *StoryService) UrgeReview(story *model.UserStory, userID uint) error {
+	if story.Status != model.StoryStatusPending {
+		return NewValidationError(ValidationIssue{Field: "status", Message: "只有待审批状态的故事可以催审"})
+	}
+
+	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "review_urged", nil, map[string]any{
+		"review_status": story.ReviewStatus,
+	}), "write story activity log", "story_id", story.ID, "action", "review_urged")
+
+	if s.events != nil {
+		s.events.BroadcastProject(story.ProjectID, "story.review_urged", map[string]any{
+			"story_id":   story.ID,
+			"project_id": story.ProjectID,
+			"actor":      userID,
+		})
+	}
+
+	s.notifyStoryReviewUrged(story, userID)
+
+	return nil
+}
+
+// notifyStoryReviewUrged 催审通知：发给项目审批人（技术负责人+管理员，排除操作者）。
+func (s *StoryService) notifyStoryReviewUrged(story *model.UserStory, actorID uint) {
+	reviewers := s.reviewerIDs(story.ProjectID, actorID)
+	if len(reviewers) == 0 {
+		return
+	}
+
+	pid := story.ProjectID
+	s.notifier.NotifyMany(context.Background(), reviewers, NotificationEvent{
+		Type:       model.NotificationStoryReviewUrged,
+		EntityType: model.NotificationEntityStory,
+		EntityID:   story.ID,
+		ProjectID:  &pid,
+		ActorID:    &actorID,
+		Title:      "有故事被催促审批",
+		Body:       story.Title,
+		Metadata: map[string]any{
+			"story_id":   story.ID,
+			"title":      story.Title,
+			"project_id": story.ProjectID,
+		},
+	})
 }
 
 func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateStoryInput) (bool, error) {
@@ -249,6 +397,11 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 }
 
 func (s *StoryService) UpdateStatus(story *model.UserStory, userID uint, newStatus string, position float64, actor any) error {
+	// pending（含被驳回）故事必须走 review/resubmit 审批流转，
+	// 否则任何项目成员都能用状态接口把未审批故事推进看板，绕过审批。
+	if story.Status == model.StoryStatusPending {
+		return NewValidationError(ValidationIssue{Field: "status", Message: "待审批故事需通过审批流转，不能直接修改状态"})
+	}
 	if !s.workflow.CanStoryTransit(story.Status, newStatus) {
 		return ErrInvalidTransition
 	}
