@@ -38,3 +38,7 @@ node_modules/
 *.db
 .envcli/
 .omc/
+# Local tool caches / temp dirs
+.gocache_local/
+.pnpm-store/
+.tmp-*/
