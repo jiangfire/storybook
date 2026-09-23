@@ -38,7 +38,8 @@ describe('ActivityTimeline', () => {
             new_value: { status: 'ready' },
           }),
           createActivity(2, {
-            action: 'unknown_action',
+            // 故意传入未知 action，验证组件的兜底文案
+            action: 'unknown_action' as unknown as Activity['action'],
             new_value: { assignee: 'dev@example.com' },
           }),
         ]}

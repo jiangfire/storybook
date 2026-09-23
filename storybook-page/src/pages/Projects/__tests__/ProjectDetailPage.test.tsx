@@ -314,7 +314,19 @@ describe('ProjectDetailPage', () => {
     mockedProjectService.addProjectMember.mockResolvedValue({});
     mockedProjectService.removeProjectMember.mockResolvedValue({});
     mockedProjectService.getSprints.mockResolvedValue({ sprints: [] });
-    mockedProjectService.createSprint.mockResolvedValue({});
+    mockedProjectService.createSprint.mockResolvedValue({
+      id: 99,
+      project_id: 1,
+      name: '新建冲刺',
+      goal: '',
+      start_date: NOW,
+      end_date: NOW,
+      status: 'planned',
+      total_stories: 0,
+      done_stories: 0,
+      created_at: NOW,
+      updated_at: NOW,
+    });
     mockedProjectService.updateSprintStatus.mockResolvedValue({});
     mockedProjectService.getBurndown.mockResolvedValue(burndownData);
     mockedProjectService.getVelocity.mockResolvedValue(velocityData);

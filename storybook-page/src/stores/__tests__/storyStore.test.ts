@@ -1,4 +1,5 @@
 import { storyService } from '../../services/storyService';
+import type { Story } from '../../types/models';
 import { useStoryStore } from '../storyStore';
 
 vi.mock('../../services/storyService', () => ({
@@ -16,6 +17,23 @@ vi.mock('../../services/storyService', () => ({
 const mockedStoryService = vi.mocked(storyService, { deep: true });
 
 const NOW = '2026-03-29T00:00:00Z';
+
+function buildStory(overrides: Partial<Story> = {}): Story {
+  return {
+    id: 0,
+    project_id: 1,
+    title: 'Story',
+    story_type: 'feature',
+    status: 'ready',
+    priority: 2,
+    position: 0,
+    created_by: { id: 1, email: 'pm@example.com', role: 'product', created_at: NOW },
+    acceptance_criteria: [],
+    created_at: NOW,
+    updated_at: NOW,
+    ...overrides,
+  };
+}
 
 function resetStore() {
   useStoryStore.setState({
@@ -98,7 +116,7 @@ describe('storyStore', () => {
         done: [],
       },
     });
-    mockedStoryService.updateStoryStatus.mockResolvedValue({});
+    mockedStoryService.updateStoryStatus.mockResolvedValue(buildStory({ id: 3, status: 'ready' }));
 
     await useStoryStore.getState().updateStoryStatus(3, { status: 'ready', position: 0 });
 
@@ -178,13 +196,18 @@ describe('storyStore', () => {
         updated_at: NOW,
       },
     });
-    mockedStoryService.claimStory.mockResolvedValue({
-      assigned_to: {
-        id: 9,
-        email: 'dev@example.com',
-      },
-      status: 'in_progress',
-    });
+    mockedStoryService.claimStory.mockResolvedValue(
+      buildStory({
+        id: 5,
+        status: 'in_progress',
+        assigned_to: {
+          id: 9,
+          email: 'dev@example.com',
+          role: 'developer',
+          created_at: NOW,
+        },
+      })
+    );
 
     await useStoryStore.getState().claimStory(5);
 
@@ -256,7 +279,7 @@ describe('storyStore', () => {
         updated_at: NOW,
       },
     });
-    mockedStoryService.releaseStory.mockResolvedValue({ status: 'ready' });
+    mockedStoryService.releaseStory.mockResolvedValue(buildStory({ id: 6, status: 'ready' }));
     mockedStoryService.updateACStatus.mockResolvedValue(undefined);
 
     await useStoryStore.getState().releaseStory(6);

@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { User } from '../../../types/models';
+import type { Story, User } from '../../../types/models';
+import type { BugItem } from '../../../types/api';
 import { useAuthStore } from '../../../stores/authStore';
 import { bugService } from '../../../services/bugService';
 import { projectService } from '../../../services/projectService';
@@ -51,6 +52,8 @@ const members = [
     id: 1,
     user_id: 11,
     role_in_project: 'developer',
+    joined_at: NOW,
+    is_owner: false,
     user: {
       id: 11,
       email: 'dev@example.com',
@@ -62,6 +65,8 @@ const members = [
     id: 2,
     user_id: 12,
     role_in_project: 'tester',
+    joined_at: NOW,
+    is_owner: false,
     user: {
       id: 12,
       email: 'tester@example.com',
@@ -73,6 +78,8 @@ const members = [
     id: 3,
     user_id: 13,
     role_in_project: 'product',
+    joined_at: NOW,
+    is_owner: false,
     user: {
       id: 13,
       email: 'product@example.com',
@@ -84,6 +91,8 @@ const members = [
     id: 4,
     user_id: 14,
     role_in_project: 'admin',
+    joined_at: NOW,
+    is_owner: false,
     user: {
       id: 14,
       email: 'admin@example.com',
@@ -92,6 +101,36 @@ const members = [
     } satisfies User,
   },
 ];
+
+const storyFixture = {
+  id: 7,
+  project_id: 1,
+  title: '登录故事',
+  story_type: 'feature',
+  status: 'in_progress',
+  priority: 2,
+  position: 1,
+  created_by: {
+    id: 13,
+    email: 'product@example.com',
+    role: 'product',
+    created_at: NOW,
+  },
+  acceptance_criteria: [],
+  created_at: NOW,
+  updated_at: NOW,
+} satisfies Story;
+
+const bugFixture = {
+  id: 102,
+  project_id: 1,
+  story_id: 7,
+  title: '登录缺陷',
+  severity: 'high',
+  status: 'open',
+  created_at: NOW,
+  updated_at: NOW,
+} satisfies BugItem;
 
 function setAuthUser(role: User['role']) {
   useAuthStore.setState({
@@ -134,12 +173,8 @@ describe('ProjectBugsPage', () => {
 
     mockedProjectService.getProjectMembers.mockResolvedValue({ members });
     mockedStoryService.getStories.mockResolvedValue({
-      stories: [
-        {
-          id: 7,
-          title: '登录故事',
-        },
-      ],
+      stories: [storyFixture],
+      total: 1,
     });
     mockedBugService.getProjectBugs.mockResolvedValue({
       bugs: [
@@ -211,7 +246,7 @@ describe('ProjectBugsPage', () => {
   it('tester 创建缺陷成功后会刷新列表并清空表单', async () => {
     const user = userEvent.setup();
     setAuthUser('tester');
-    mockedBugService.createBug.mockResolvedValue({});
+    mockedBugService.createBug.mockResolvedValue(bugFixture);
 
     renderPage();
 
@@ -298,8 +333,10 @@ describe('ProjectBugsPage', () => {
   it('admin 可以更新缺陷状态并重新指派负责人', async () => {
     const user = userEvent.setup();
     setAuthUser('admin');
-    mockedBugService.updateBugStatus.mockResolvedValue({});
+    mockedBugService.updateBugStatus.mockResolvedValue(bugFixture);
     mockedBugService.assignBug.mockResolvedValue({
+      ...bugFixture,
+      id: 101,
       assigned_to: {
         id: 14,
         email: 'admin@example.com',
@@ -313,8 +350,8 @@ describe('ProjectBugsPage', () => {
     const rowSelects = screen
       .getAllByRole('combobox')
       .filter((element) => element.className.includes('field-control'));
-    const statusSelect = rowSelects.at(-2);
-    const assigneeSelect = rowSelects.at(-1);
+    const statusSelect = rowSelects[rowSelects.length - 2];
+    const assigneeSelect = rowSelects[rowSelects.length - 1];
     if (!(statusSelect instanceof HTMLSelectElement) || !(assigneeSelect instanceof HTMLSelectElement)) {
       throw new Error('row selects not found');
     }

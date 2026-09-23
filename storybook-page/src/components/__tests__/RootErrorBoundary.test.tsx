@@ -1,7 +1,8 @@
+import type { ReactElement } from 'react';
 import { render, screen } from '@testing-library/react';
 import ErrorBoundary from '../ErrorBoundary';
 
-function ThrowError() {
+function ThrowError(): ReactElement {
   throw new Error('boom');
 }
 

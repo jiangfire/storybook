@@ -1,11 +1,13 @@
 const axiosMock = vi.hoisted(() => {
-  const client = vi.fn();
   const requestUse = vi.fn();
   const responseUse = vi.fn();
-  client.interceptors = {
-    request: { use: requestUse },
-    response: { use: responseUse },
-  };
+  // axios 实例上的 interceptors 是属性而非方法，用 Object.assign 挂到 mock 函数上
+  const client = Object.assign(vi.fn(), {
+    interceptors: {
+      request: { use: requestUse },
+      response: { use: responseUse },
+    },
+  });
 
   const axiosDefault = {
     create: vi.fn(() => client),

@@ -190,7 +190,8 @@ describe('UserManagementPage', () => {
     await user.clear(usernameInput);
     await user.type(usernameInput, 'alice');
 
-    const roleSelect = screen.getAllByRole('combobox').at(-1);
+    const comboboxes = screen.getAllByRole('combobox');
+    const roleSelect = comboboxes[comboboxes.length - 1];
     if (!(roleSelect instanceof HTMLSelectElement)) {
       throw new Error('edit role select not found');
     }

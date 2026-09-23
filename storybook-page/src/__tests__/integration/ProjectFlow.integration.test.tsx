@@ -33,7 +33,7 @@ describe('Project Flow Integration', () => {
   beforeEach(() => {
     localStorage.clear();
     useAuthStore.setState({
-      user: { id: 1, email: 'test@example.com', username: 'tester', role: 'developer', created_at: '', updated_at: '' },
+      user: { id: 1, email: 'test@example.com', role: 'developer', created_at: '' },
       token: 'mock-token',
       isAuthenticated: true,
       isLoading: false,
