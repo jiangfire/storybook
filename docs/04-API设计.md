@@ -458,6 +458,9 @@ Content-Type: application/json
 - AC-4.2.2: 状态自动更新
 - AC-4.2.3: 活动日志记录
 
+> **注意**：`pending`（待审批，含被驳回）状态的故事不允许通过本接口流转，
+> 必须走审批（`POST /stories/:id/review`）与重提（`POST /stories/:id/resubmit`）流程。
+
 ---
 
 ### 4.4 领取故事
@@ -667,6 +670,100 @@ Authorization: Bearer <TOKEN>
 - AC-5.2.2: 字段修改记录
 - AC-5.2.3: 操作人信息
 - AC-5.2.4: 新旧值对比
+
+---
+
+### 4.9 重新提交审批（驳回后）
+
+被驳回（`status=pending` 且 `review_status=rejected`）的故事，由创建者、产品经理或管理员重新提交审批。
+成功后 `review_status` 复位为 `pending`，并通知上次审批人与项目审批人。
+
+**请求**：
+```http
+POST /api/stories/1/resubmit
+Authorization: Bearer <TOKEN>
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "已重新提交审批",
+  "data": {
+    "id": 1,
+    "status": "pending",
+    "review_status": "pending",
+    "updated_at": "2025-01-15T12:00:00Z"
+  }
+}
+```
+
+---
+
+### 4.10 催审
+
+待审批故事的创建者、产品经理或管理员可提醒审批人尽快处理。只发送通知与活动日志，不改变故事状态。
+
+**请求**：
+```http
+POST /api/stories/1/urge-review
+Authorization: Bearer <TOKEN>
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "已提醒审批人尽快处理",
+  "data": { "id": 1, "status": "pending" }
+}
+```
+
+---
+
+### 4.11 AI 对话式录入
+
+产品经理/管理员与 AI 多轮对话完善故事草稿。每轮返回 AI 回复与最新表单草稿（结构同 4.1 的字段），
+由前端显式应用到表单，端点本身不落库。需要在管理后台配置 AI，未配置时返回 503。
+
+**请求**：
+```http
+POST /api/ai/story-chat
+Authorization: Bearer <TOKEN>
+Content-Type: application/json
+
+{
+  "messages": [
+    { "role": "user", "content": "做一个手机号验证码登录" },
+    { "role": "assistant", "content": "优先级是多少？" },
+    { "role": "user", "content": "高优先级" }
+  ],
+  "current_draft": { "title": "手机号验证码登录", "priority": 2 }
+}
+```
+
+**响应**：
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "reply": "已生成草稿，还需要补充异常场景吗？",
+    "form_draft": {
+      "title": "支持手机号验证码登录",
+      "description": "作为注册用户，我想要用手机号和验证码登录，以便快速进入系统",
+      "story_type": "feature",
+      "priority": 3,
+      "story_points": 5,
+      "acceptance_criteria": [
+        { "description": "Given 未登录用户 When 输入正确验证码 Then 登录成功", "order": 1 }
+      ],
+      "tags": ["auth"]
+    },
+    "source": "openai"
+  }
+}
+```
 
 ---
 

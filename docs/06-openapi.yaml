@@ -340,7 +340,9 @@ paths:
     patch:
       tags: [Stories]
       summary: 分配或取消分配故事
-      description: 允许 `product`、`tech_lead`、`admin` 操作；仅可分配给项目内开发成员。
+      description: >
+        允许 `product`、`tech_lead`、`admin` 操作；仅可分配给项目内开发成员。
+        `pending`（未审批）状态的故事不可分配，审批通过后才能派发。
       parameters:
         - $ref: '#/components/parameters/StoryID'
       requestBody:
@@ -355,6 +357,7 @@ paths:
                   nullable: true
       responses:
         '200': { description: OK }
+        '400': { description: 故事仍处于待审批状态 }
 
   /api/stories/{id}/review:
     post:
@@ -375,6 +378,33 @@ paths:
                 comment: { type: string }
       responses:
         '200': { description: OK }
+
+  /api/stories/{id}/resubmit:
+    post:
+      tags: [Stories]
+      summary: 重新提交审批（驳回后）
+      description: >
+        仅 `pending` 且 `review_status=rejected` 的故事可调用；
+        创建者、`product`、`admin` 可操作。成功后 review_status 复位为 pending，
+        并通知上次审批人与项目审批人。
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+        '400': { description: 非被驳回的待审批状态 }
+
+  /api/stories/{id}/urge-review:
+    post:
+      tags: [Stories]
+      summary: 催审
+      description: >
+        提醒审批人尽快处理待审批故事；创建者、`product`、`admin` 可操作。
+        只发送通知与活动日志，不改变故事状态。
+      parameters:
+        - $ref: '#/components/parameters/StoryID'
+      responses:
+        '200': { description: OK }
+        '400': { description: 非待审批状态 }
 
   /api/stories/{id}/acceptance-criteria/{acID}:
     patch:
@@ -828,6 +858,35 @@ paths:
       responses:
         '200': { description: OK }
 
+  /api/ai/story-chat:
+    post:
+      tags: [AI]
+      summary: AI对话式故事录入
+      description: >
+        `product`/`admin` 与 AI 多轮对话完善故事草稿；每轮返回回复与最新 form_draft，
+        端点不落库。未配置 AI 时返回 503。受 AI 用户限流约束。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [role, content]
+                    properties:
+                      role: { type: string, enum: [user, assistant] }
+                      content: { type: string }
+                current_draft: { type: object }
+      responses:
+        '200': { description: OK }
+        '503': { description: AI 未配置 }
+
   /api/ai/stories/{id}/split:
     post:
       tags: [AI]
@@ -908,7 +967,7 @@ paths:
         '200': { description: OK }
     post:
       tags: [TechLead]
-      summary: 添加项目技术负责人（仅Admin）
+      summary: 添加项目技术负责人（产品经理/管理员）
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -926,7 +985,7 @@ paths:
   /api/projects/{id}/techleads/{userID}:
     delete:
       tags: [TechLead]
-      summary: 移除项目技术负责人（仅Admin）
+      summary: 移除项目技术负责人（产品经理/管理员）
       parameters:
         - $ref: '#/components/parameters/ProjectID'
         - $ref: '#/components/parameters/UserID'

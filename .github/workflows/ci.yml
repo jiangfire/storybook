@@ -56,6 +56,10 @@ jobs:
         working-directory: storybook-page
         run: pnpm run lint
 
+      - name: Type check frontend
+        working-directory: storybook-page
+        run: pnpm exec tsc --noEmit
+
       - name: Run frontend tests
         working-directory: storybook-page
         run: pnpm run test
