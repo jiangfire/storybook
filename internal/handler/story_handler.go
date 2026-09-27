@@ -179,6 +179,7 @@ func buildBoardItem(s model.UserStory) gin.H {
 		"updated_at":                  s.UpdatedAt,
 		"acceptance_criteria_summary": buildACSummary(criteria),
 		"story_points":                nullablePoints(s.Points),
+		"sprint_id":                   s.SprintID,
 	}
 	if info := assigneeInfo(s.Assignee); info != nil {
 		item["assignee"] = info
