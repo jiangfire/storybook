@@ -731,6 +731,7 @@ paths:
     post:
       tags: [Bugs]
       summary: 创建缺陷
+      description: 允许 `product`、`tester`、`admin` 操作；`assigned_to` 若填写，必须是项目内开发成员。
       parameters:
         - $ref: '#/components/parameters/ProjectID'
       requestBody:
@@ -762,6 +763,7 @@ paths:
     patch:
       tags: [Bugs]
       summary: 更新缺陷状态
+      description: 允许 `product`、`developer`、`tester`、`admin` 操作。
       parameters:
         - $ref: '#/components/parameters/BugID'
       requestBody:
@@ -780,6 +782,8 @@ paths:
     patch:
       tags: [Bugs]
       summary: 指派缺陷
+      description: >
+        允许 `product`、`admin` 操作；被指派人必须是项目内开发成员（与故事指派同口径）。
       parameters:
         - $ref: '#/components/parameters/BugID'
       requestBody:
@@ -790,6 +794,43 @@ paths:
               type: object
               properties:
                 assigned_to: { type: integer, nullable: true }
+      responses:
+        '200': { description: OK }
+
+  /api/bugs/{id}/comments:
+    get:
+      tags: [Bugs]
+      summary: 缺陷评论列表
+      description: 项目成员可查看。
+      parameters:
+        - $ref: '#/components/parameters/BugID'
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Bugs]
+      summary: 添加缺陷评论
+      description: 项目成员可评论；评论仅作者本人或管理员可编辑/删除。
+      parameters:
+        - $ref: '#/components/parameters/BugID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /api/me/bugs:
+    get:
+      tags: [Projects]
+      summary: 我负责的缺陷（跨项目聚合）
+      description: >
+        返回指派给当前用户、仍在处理中（open/in_progress）的缺陷，含项目名，
+        按创建时间倒序，最多 20 条。供工作台展示。
       responses:
         '200': { description: OK }
 
