@@ -13,13 +13,15 @@ type MeHandler struct {
 	userRepo  repository.UserRepo
 	storyRepo repository.StoryRepo
 	taskRepo  repository.TaskRepo
+	bugRepo   *repository.BugRepository
 }
 
-func NewMeHandler(userRepo repository.UserRepo, storyRepo repository.StoryRepo, taskRepo repository.TaskRepo) *MeHandler {
+func NewMeHandler(userRepo repository.UserRepo, storyRepo repository.StoryRepo, taskRepo repository.TaskRepo, bugRepo *repository.BugRepository) *MeHandler {
 	return &MeHandler{
 		userRepo:  userRepo,
 		storyRepo: storyRepo,
 		taskRepo:  taskRepo,
+		bugRepo:   bugRepo,
 	}
 }
 
@@ -96,4 +98,36 @@ func storySummaryWithProject(story model.UserStory) gin.H {
 	}
 
 	return item
+}
+
+// MyBugs 跨项目聚合“我负责的、仍在处理中”的缺陷，供工作台展示。
+func (h *MeHandler) MyBugs(c *gin.Context) {
+	userID := middleware.MustUserID(c)
+
+	bugs, err := h.bugRepo.ListByAssignee(userID, 20)
+	if err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
+	items := make([]gin.H, 0, len(bugs))
+	for _, bug := range bugs {
+		item := gin.H{
+			"id":         bug.ID,
+			"project_id": bug.ProjectID,
+			"title":      bug.Title,
+			"severity":   bug.Severity,
+			"status":     bug.Status,
+			"updated_at": bug.UpdatedAt,
+		}
+		if bug.Project != nil {
+			item["project"] = bug.Project.Name
+		}
+		items = append(items, item)
+	}
+
+	api.Success(c, "success", gin.H{
+		"bugs":  items,
+		"total": len(items),
+	})
 }

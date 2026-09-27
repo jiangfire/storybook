@@ -165,7 +165,7 @@ func TestCreateRejectsNonDeveloperInitialAssignee(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
 	}
-	if !strings.Contains(w.Body.String(), "缺陷仅可指派给开发角色") {
+	if !strings.Contains(w.Body.String(), "缺陷仅可指派给项目内的开发成员") {
 		t.Fatalf("expected role validation error, got body=%s", w.Body.String())
 	}
 
@@ -205,7 +205,7 @@ func TestAssignRejectsNonDeveloperAssignee(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d body=%s", w.Code, w.Body.String())
 	}
-	if !strings.Contains(w.Body.String(), "缺陷仅可指派给开发角色") {
+	if !strings.Contains(w.Body.String(), "缺陷仅可指派给项目内的开发成员") {
 		t.Fatalf("expected role validation error, got body=%s", w.Body.String())
 	}
 

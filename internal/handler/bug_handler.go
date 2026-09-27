@@ -88,8 +88,8 @@ func (h *BugHandler) Create(c *gin.Context) {
 	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleTester && role != model.RoleAdmin {
-		api.Forbidden(c, "仅测试人员可创建缺陷")
+	if role != model.RoleTester && role != model.RoleAdmin && role != model.RoleProduct {
+		api.Forbidden(c, "仅产品经理、测试人员或管理员可创建缺陷")
 		return
 	}
 
@@ -232,8 +232,8 @@ func (h *BugHandler) UpdateStatus(c *gin.Context) {
 	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
-	if role != model.RoleDeveloper && role != model.RoleTester && role != model.RoleAdmin {
-		api.Forbidden(c, "仅开发或测试可更新缺陷状态")
+	if role != model.RoleDeveloper && role != model.RoleTester && role != model.RoleAdmin && role != model.RoleProduct {
+		api.Forbidden(c, "仅项目成员可更新缺陷状态")
 		return
 	}
 
@@ -452,16 +452,16 @@ func (h *BugHandler) Delete(c *gin.Context) {
 }
 
 func (h *BugHandler) ensureAssignableUser(projectID, userID uint) error {
-	// 直查 service.EnsureProjectAccess 以校验目标用户是否属于项目。
-	if _, _, err := service.EnsureProjectAccess(h.db, projectID, userID); err != nil {
-		return err
-	}
-
-	user, err := h.userRepo.FindByID(userID)
+	// 与故事指派同口径：按项目内角色判断，缺陷只能指派给项目内的开发成员。
+	// （此前按全局角色判断，同一个人会出现“能接故事不能接缺陷”的不一致。）
+	member, err := h.projectRepo.GetMember(projectID, userID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return service.ErrForbidden
+		}
 		return err
 	}
-	if user.Role != model.RoleDeveloper && user.Role != model.RoleAdmin {
+	if member.RoleInProject != model.RoleDeveloper {
 		return errBugAssigneeRole
 	}
 	return nil
@@ -474,7 +474,7 @@ func (h *BugHandler) handleAssignUserErr(c *gin.Context, err error) {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		api.NotFound(c, "指派用户不存在")
 	case errors.Is(err, errBugAssigneeRole):
-		api.BadRequest(c, "缺陷仅可指派给开发角色")
+		api.BadRequest(c, "缺陷仅可指派给项目内的开发成员")
 	default:
 		api.Internal(c, "服务器内部错误")
 	}

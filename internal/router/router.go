@@ -112,6 +112,7 @@ func New(c *wiring.Container) *gin.Engine {
 		protected.GET("/projects/:id/reports/throughput", projectAccess, c.Report.Throughput)
 
 		protected.GET("/me/dashboard", c.Me.Dashboard)
+		protected.GET("/me/bugs", c.Me.MyBugs)
 		protected.GET("/notifications", c.Notification.List)
 		protected.GET("/notifications/unread-count", c.Notification.UnreadCount)
 		protected.POST("/notifications/:id/read", c.Notification.MarkRead)

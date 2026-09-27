@@ -73,6 +73,25 @@ func (r *BugRepository) UpdateStatus(bugID uint, status string) error {
 	return r.DB().Model(&model.BugReport{}).Where("id = ?", bugID).Update("status", status).Error
 }
 
+// ListByAssignee 返回指派给某用户、仍在处理中（open/in_progress）的缺陷，
+// 供跨项目工作台聚合使用；limit<=0 表示不限。
+func (r *BugRepository) ListByAssignee(userID uint, limit int) ([]model.BugReport, error) {
+	q := r.DB().Model(&model.BugReport{}).
+		Where("assigned_to = ?", userID).
+		Where("status IN ?", []string{model.BugStatusOpen, model.BugStatusInProgress}).
+		Preload("Project").
+		Preload("Assignee").
+		Order("created_at DESC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	var bugs []model.BugReport
+	if err := q.Find(&bugs).Error; err != nil {
+		return nil, err
+	}
+	return bugs, nil
+}
+
 func (r *BugRepository) UpdateAssignee(bugID uint, assignedTo *uint) error {
 	return r.DB().Model(&model.BugReport{}).Where("id = ?", bugID).Update("assigned_to", assignedTo).Error
 }
