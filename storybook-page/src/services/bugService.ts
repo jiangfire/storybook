@@ -5,7 +5,9 @@ import type {
   BugItem,
   BugListParams,
   BugListResponse,
+  BugCommentsResponse,
   CreateBugRequest,
+  MeBugsResponse,
   UpdateBugStatusRequest,
 } from '../types/api';
 
@@ -41,5 +43,22 @@ export const bugService = {
   async assignBug(id: number, data: AssignBugRequest): Promise<BugItem> {
     const response = await apiClient.patch<ApiResponse<BugItem>>(`/api/bugs/${id}/assign`, data);
     return response.data.data;
+  },
+
+  /** 跨项目聚合：我负责的、仍在处理中的缺陷（工作台） */
+  async getMyBugs(): Promise<MeBugsResponse> {
+    const response = await apiClient.get<ApiResponse<MeBugsResponse>>('/api/me/bugs');
+    return response.data.data;
+  },
+
+  async getBugComments(bugId: number): Promise<BugCommentsResponse> {
+    const response = await apiClient.get<ApiResponse<BugCommentsResponse>>(
+      `/api/bugs/${bugId}/comments`
+    );
+    return response.data.data;
+  },
+
+  async addBugComment(bugId: number, body: string): Promise<void> {
+    await apiClient.post(`/api/bugs/${bugId}/comments`, { body });
   },
 };

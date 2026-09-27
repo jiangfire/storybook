@@ -318,6 +318,39 @@ export interface BugListResponse {
   bugs: BugItem[];
 }
 
+// ===== 跨项目缺陷聚合 / 缺陷评论 =====
+
+export interface MeBugItem {
+  id: number;
+  project_id: number;
+  project?: string;
+  title: string;
+  severity: string;
+  status: string;
+  updated_at: string;
+}
+
+export interface MeBugsResponse {
+  bugs: MeBugItem[];
+  total: number;
+}
+
+export interface BugCommentItem {
+  id: number;
+  bug_id: number;
+  author: {
+    id: number;
+    email: string;
+  };
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BugCommentsResponse {
+  comments: BugCommentItem[];
+}
+
 // ===== 冲刺相关 =====
 
 // 创建冲刺请求

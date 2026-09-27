@@ -44,14 +44,18 @@ describe('permissions', () => {
   });
 
   it('matches bug permissions and assignable roles', () => {
+    // PM 可以记录与跟进缺陷；指派口径与故事一致（仅项目内开发成员）
     expect(canCreateBug('tester')).toBe(true);
-    expect(canCreateBug('product')).toBe(false);
+    expect(canCreateBug('product')).toBe(true);
+    expect(canCreateBug('developer')).toBe(false);
     expect(canUpdateBugStatus('developer')).toBe(true);
-    expect(canUpdateBugStatus('product')).toBe(false);
+    expect(canUpdateBugStatus('product')).toBe(true);
+    expect(canUpdateBugStatus('tester')).toBe(true);
     expect(canAssignBug('admin')).toBe(true);
+    expect(canAssignBug('product')).toBe(true);
     expect(canAssignBug('tester')).toBe(false);
     expect(canReceiveBugAssignments('developer')).toBe(true);
-    expect(canReceiveBugAssignments('admin')).toBe(true);
+    expect(canReceiveBugAssignments('admin')).toBe(false);
     expect(canReceiveBugAssignments('tester')).toBe(false);
   });
 

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { DashboardData } from '../../../types/api';
 import type { Project, User } from '../../../types/models';
 import apiClient from '../../../services/api';
+import { bugService } from '../../../services/bugService';
 import { useAuthStore } from '../../../stores/authStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import DashboardPage from '../DashboardPage';
@@ -14,7 +15,14 @@ vi.mock('../../../services/api', () => ({
   },
 }));
 
+vi.mock('../../../services/bugService', () => ({
+  bugService: {
+    getMyBugs: vi.fn(),
+  },
+}));
+
 const mockedApiClient = vi.mocked(apiClient, { deep: true });
+const mockedBugService = vi.mocked(bugService, { deep: true });
 
 const NOW = '2026-03-29T00:00:00Z';
 
@@ -134,6 +142,7 @@ describe('DashboardPage', () => {
     localStorage.clear();
     setAuthUser('product');
     setProjectStore();
+    mockedBugService.getMyBugs.mockResolvedValue({ bugs: [], total: 0 });
   });
 
   it('加载工作台数据后会展示快速开始入口，并支持切换目标项目', async () => {
@@ -174,6 +183,30 @@ describe('DashboardPage', () => {
       'href',
       '/projects/2/stories/new'
     );
+  });
+
+  it('展示我负责的缺陷跨项目聚合', async () => {
+    mockedBugService.getMyBugs.mockResolvedValue({
+      bugs: [
+        {
+          id: 9,
+          project_id: 1,
+          project: 'Alpha',
+          title: '登录页白屏',
+          severity: 'high',
+          status: 'in_progress',
+          updated_at: NOW,
+        },
+      ],
+      total: 1,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('我负责的缺陷')).toBeInTheDocument();
+    expect(await screen.findByText('登录页白屏')).toBeInTheDocument();
+    const bugLink = screen.getByRole('link', { name: /登录页白屏/ });
+    expect(bugLink).toHaveAttribute('href', '/projects/1/bugs');
   });
 
   it('接口失败时会展示加载错误', async () => {

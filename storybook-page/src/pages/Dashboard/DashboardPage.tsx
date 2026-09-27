@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { bugService } from '../../services/bugService';
 import apiClient from '../../services/api';
 import { PageContainer, PageHero } from '../../components/page/PageLayout';
 import {
@@ -10,9 +11,11 @@ import {
   getStoryTypeColor,
   formatPriority,
   getPriorityColor,
+  formatBugStatus,
+  formatBugSeverity,
 } from '../../utils/formatters';
 import { getUserRoleLabel } from '../../utils/roleLabel';
-import type { ApiResponse, DashboardData } from '../../types/api';
+import type { ApiResponse, DashboardData, MeBugItem } from '../../types/api';
 import { resolveQuickStartProject } from './quickStart';
 import {
   BoardIcon,
@@ -122,6 +125,8 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [selectedQuickProjectId, setSelectedQuickProjectId] = useState<number | null>(null);
+  const [myBugs, setMyBugs] = useState<MeBugItem[]>([]);
+  const [myBugsLoading, setMyBugsLoading] = useState(true);
   const canCreateStory = user?.role === 'product' || user?.role === 'admin';
   const ownerProjects = projects.filter((project) => project.is_owner).length;
 
@@ -150,6 +155,7 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboardData();
     fetchProjects();
+    loadMyBugs();
   }, [fetchProjects]);
 
   const loadDashboardData = async () => {
@@ -163,6 +169,19 @@ export default function DashboardPage() {
       setDashboardData(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMyBugs = async () => {
+    setMyBugsLoading(true);
+    try {
+      const data = await bugService.getMyBugs();
+      setMyBugs(data.bugs || []);
+    } catch {
+      // 缺陷聚合拉取失败不打断工作台，静默展示为空
+      setMyBugs([]);
+    } finally {
+      setMyBugsLoading(false);
     }
   };
 
@@ -296,6 +315,56 @@ export default function DashboardPage() {
               items={dashboardData?.my_stories.created || []}
             />
           </div>
+
+          <section className="section-card rounded-[1.7rem] p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-text sm:text-xl">我负责的缺陷</h2>
+                <p className="mt-1 text-sm text-text-light">跨项目聚合你名下仍在处理中的缺陷。</p>
+              </div>
+              <span className="rounded-full bg-danger-light px-3 py-1 text-sm font-medium text-danger">
+                {myBugsLoading ? '…' : myBugs.length}
+              </span>
+            </div>
+            {myBugsLoading ? (
+              <div className="state-panel state-panel-loading py-6">缺陷加载中...</div>
+            ) : myBugs.length === 0 ? (
+              <div className="py-6 text-center text-sm text-text-light">
+                没有进行中的缺陷，继续保持。
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {myBugs.map((bug) => (
+                  <Link
+                    key={bug.id}
+                    to={`/projects/${bug.project_id}/bugs`}
+                    className="section-block block rounded-2xl p-4 transition-colors hover:border-primary-200 hover:bg-white"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-medium ${
+                              bug.severity === 'critical' || bug.severity === 'high'
+                                ? 'bg-danger-light text-danger'
+                                : 'bg-warning-light text-warning'
+                            }`}
+                          >
+                            {formatBugSeverity(bug.severity)}
+                          </span>
+                          <span className="rounded-full bg-secondary-100 px-2 py-1 text-xs text-text">
+                            {formatBugStatus(bug.status)}
+                          </span>
+                        </div>
+                        <h3 className="truncate font-medium text-text">{bug.title}</h3>
+                      </div>
+                      <span className="shrink-0 text-xs text-text-light">{bug.project || '—'}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
 
           <section className="section-card rounded-[1.8rem] p-4 sm:p-5">
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">

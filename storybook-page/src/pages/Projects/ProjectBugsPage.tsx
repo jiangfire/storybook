@@ -26,6 +26,7 @@ import {
   UsersIcon,
   WrenchIcon,
 } from '../../components/ui/AppIcon';
+import type { BugCommentItem } from '../../types/api';
 import type { BugItem } from '../../types/api';
 
 interface ProjectMemberOption {
@@ -109,6 +110,9 @@ export default function ProjectBugsPage() {
   const [error, setError] = useState('');
   const [detailOpen, setDetailOpen] = useState(false);
   const [detail, setDetail] = useState<BugItem | null>(null);
+  const [comments, setComments] = useState<BugCommentItem[]>([]);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
 
   const [filters, setFilters] = useState({
     status: '',
@@ -209,8 +213,17 @@ export default function ProjectBugsPage() {
       try {
         setDetailOpen(true);
         setLoadingDetail(true);
+        setComments([]);
+        setCommentDraft('');
         const data = await bugService.getBug(bugID);
         setDetail(data);
+        try {
+          const commentData = await bugService.getBugComments(bugID);
+          setComments(commentData.comments || []);
+        } catch {
+          // 评论加载失败不阻塞详情查看
+          setComments([]);
+        }
       } catch (err: unknown) {
         showError(getErrorMessage(err, '缺陷详情加载失败'));
         setDetailOpen(false);
@@ -222,6 +235,28 @@ export default function ProjectBugsPage() {
   );
 
   const bugQueryParam = searchParams.get('bug');
+
+  const handleAddComment = async () => {
+    if (!detail) {
+      return;
+    }
+    const body = commentDraft.trim();
+    if (!body) {
+      return;
+    }
+    try {
+      setCommentSubmitting(true);
+      await bugService.addBugComment(detail.id, body);
+      const data = await bugService.getBugComments(detail.id);
+      setComments(data.comments || []);
+      setCommentDraft('');
+      showSuccess('评论已添加');
+    } catch (err: unknown) {
+      showError(getErrorMessage(err, '评论添加失败'));
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const bugID = bugQueryParam;
@@ -785,6 +820,50 @@ export default function ProjectBugsPage() {
                 <div className="mt-1 whitespace-pre-wrap text-text">{detail.description}</div>
               </div>
             )}
+            <div className="border-t border-border pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-medium text-text">评论（{comments.length}）</span>
+              </div>
+              {comments.length === 0 ? (
+                <p className="text-xs text-text-light">还没有评论，项目成员可以在这里补充排查信息。</p>
+              ) : (
+                <div className="max-h-48 space-y-2 overflow-y-auto">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="rounded-lg bg-secondary-50 px-3 py-2">
+                      <div className="flex items-center justify-between text-xs text-text-light">
+                        <span className="font-medium text-text">{comment.author?.email}</span>
+                        <span>{new Date(comment.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1 whitespace-pre-wrap text-text">{comment.body}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3">
+                <label htmlFor="bug-comment-input" className="sr-only">
+                  添加评论
+                </label>
+                <textarea
+                  id="bug-comment-input"
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="补充排查信息、结论或备注…"
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => void handleAddComment()}
+                    disabled={!commentDraft.trim() || commentSubmitting}
+                    isLoading={commentSubmitting}
+                  >
+                    发表评论
+                  </Button>
+                </div>
+              </div>
+            </div>
             <div>
               <span className="text-text-light">创建时间：</span>
               {new Date(detail.created_at).toLocaleString()}

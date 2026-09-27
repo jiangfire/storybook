@@ -193,7 +193,7 @@ describe('ProjectBugsPage', () => {
     });
   });
 
-  it('tester 能创建缺陷，且初始负责人只包含 developer/admin', async () => {
+  it('tester 能创建缺陷，且初始负责人只包含项目内开发成员', async () => {
     setAuthUser('tester');
     renderPage();
 
@@ -205,7 +205,10 @@ describe('ProjectBugsPage', () => {
     const assigneeSelect = getFieldSelect('初始负责人');
 
     expect(within(assigneeSelect).getByRole('option', { name: /dev@example.com/ })).toBeInTheDocument();
-    expect(within(assigneeSelect).getByRole('option', { name: /admin@example.com/ })).toBeInTheDocument();
+    // 指派口径与故事一致：只有项目内的开发成员可接缺陷
+    expect(
+      within(assigneeSelect).queryByRole('option', { name: /admin@example.com/ })
+    ).not.toBeInTheDocument();
     expect(
       within(assigneeSelect).queryByRole('option', { name: /tester@example.com/ })
     ).not.toBeInTheDocument();
@@ -215,7 +218,7 @@ describe('ProjectBugsPage', () => {
     expect(screen.getAllByRole('option', { name: '处理中' })).toHaveLength(2);
   });
 
-  it('product 不显示创建表单，但会看到可编辑的指派控件', async () => {
+  it('product 能创建缺陷并保留可编辑的状态与指派控件', async () => {
     setAuthUser('product');
     renderPage();
 
@@ -223,10 +226,10 @@ describe('ProjectBugsPage', () => {
       expect(screen.getByText('登录缺陷')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('当前角色没有新建缺陷权限。')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '创建缺陷' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('option', { name: '处理中' })).toHaveLength(1);
-    expect(screen.getAllByRole('option', { name: /dev@example.com/ })).toHaveLength(2);
+    expect(screen.queryByText('当前角色没有新建缺陷权限。')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '创建缺陷' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option', { name: '处理中' })).toHaveLength(2);
+    expect(screen.getAllByRole('option', { name: /dev@example.com/ })).toHaveLength(3);
   });
 
   it('developer 只能编辑状态，指派控件保持只读', async () => {
@@ -299,8 +302,9 @@ describe('ProjectBugsPage', () => {
 
     await screen.findByText('登录缺陷');
 
+    // product 现在也有创建表单，DOM 里先出现的是表单的严重级别，筛选在第二处
     await user.selectOptions(getFieldSelect('状态'), 'open');
-    await user.selectOptions(getFieldSelect('严重级别'), 'high');
+    await user.selectOptions(getFieldSelect('严重级别', 1), 'high');
     await user.selectOptions(getFieldSelect('负责人'), '11');
 
     await waitFor(() => {
@@ -363,10 +367,11 @@ describe('ProjectBugsPage', () => {
       });
     });
 
-    await user.selectOptions(assigneeSelect, '14');
+    // 指派口径统一后，行内可选项只有项目内开发成员（user_id=11）
+    await user.selectOptions(assigneeSelect, '11');
     await waitFor(() => {
       expect(mockedBugService.assignBug).toHaveBeenCalledWith(101, {
-        assigned_to: 14,
+        assigned_to: 11,
       });
     });
     expect(showSuccess).toHaveBeenCalledWith('缺陷指派已更新');

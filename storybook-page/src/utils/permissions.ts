@@ -37,11 +37,11 @@ export function canReleaseStory(user: AuthUser, assignedTo: OptionalUserRef): bo
 }
 
 export function canCreateBug(role?: UserRole): boolean {
-  return role === 'tester' || role === 'admin';
+  return role === 'tester' || role === 'product' || role === 'admin';
 }
 
 export function canUpdateBugStatus(role?: UserRole): boolean {
-  return role === 'developer' || role === 'tester' || role === 'admin';
+  return role === 'developer' || role === 'tester' || role === 'product' || role === 'admin';
 }
 
 export function canAssignBug(role?: UserRole): boolean {
@@ -49,7 +49,8 @@ export function canAssignBug(role?: UserRole): boolean {
 }
 
 export function canReceiveBugAssignments(projectRole?: string): boolean {
-  return projectRole === 'developer' || projectRole === 'admin';
+  // 与故事指派同口径：缺陷只指派给项目内的开发成员
+  return projectRole === 'developer';
 }
 
 export function canCreateTask(role?: UserRole): boolean {
