@@ -13,6 +13,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { useStoryStore } from '../../stores/storyStore';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import BoardColumn from './BoardColumn';
+import { filterBoardColumns, emptyBoardFilters, type BoardFilters } from './boardFilters';
 import type { StoryBoardItem } from '../../types/models';
 import type { StoryStatusChangedMessage } from '../../types/api';
 import { useToast } from '../ui/Toast';
@@ -36,9 +37,11 @@ const COLUMNS = [
 
 interface KanbanBoardProps {
   projectId: number;
+  /** 筛选条件由外层（BoardViewPage）维护；只影响展示，拖拽仍基于全量数据 */
+  filters?: BoardFilters;
 }
 
-export default function KanbanBoard({ projectId }: KanbanBoardProps) {
+export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: KanbanBoardProps) {
   const { boardData, fetchBoardData, updateStoryStatus, isUpdating, isLoading } = useStoryStore();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [localBoardData, setLocalBoardData] = useState(boardData);
@@ -60,6 +63,13 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
   useEffect(() => {
     setLocalBoardData(boardData);
   }, [boardData]);
+
+  // 筛选只影响展示；拖拽/排序逻辑仍基于全量数据（localBoardData），
+  // 因此筛选状态下拖拽排序的位置计算不会被隐藏卡片干扰
+  const visibleBoardData = useMemo(
+    () => filterBoardColumns(localBoardData, filters),
+    [localBoardData, filters]
+  );
 
   // 处理 WebSocket 实时更新
   const handleStoryStatusChanged = useCallback((message: StoryStatusChangedMessage) => {
@@ -237,10 +247,10 @@ export default function KanbanBoard({ projectId }: KanbanBoardProps) {
             <BoardColumn
               key={column.id}
               id={column.id}
-              stories={localBoardData[column.id] || []}
+              stories={visibleBoardData[column.id] || []}
               title={column.title}
               icon={column.icon}
-              count={localBoardData[column.id]?.length || 0}
+              count={visibleBoardData[column.id]?.length || 0}
             />
           ))}
         </div>

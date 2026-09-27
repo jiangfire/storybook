@@ -78,7 +78,7 @@ export default function RegisterPage() {
 
     try {
       await register({ email, password, role });
-      navigate('/projects');
+      navigate('/dashboard');
     } catch {
       // 错误已在 store 中处理
     }

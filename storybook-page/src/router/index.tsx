@@ -140,7 +140,7 @@ const router = createBrowserRouter([
   },
   {
     path: '*',
-    element: <Navigate to="/projects" replace />,
+    element: <Navigate to="/dashboard" replace />,
   },
 ]);
 

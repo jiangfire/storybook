@@ -11,7 +11,7 @@ function renderWithRouter(ui: React.ReactElement, initialEntries = ['/']) {
     <MemoryRouter initialEntries={initialEntries}>
       <Routes>
         <Route path="/" element={ui} />
-        <Route path="/projects" element={<div data-testid="projects-page">Projects</div>} />
+        <Route path="/dashboard" element={<div data-testid="dashboard-page">Dashboard</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -29,7 +29,7 @@ describe('Auth Flow Integration', () => {
     });
   });
 
-  it('用户注册成功后应重定向到项目页', async () => {
+  it('用户注册成功后应重定向到工作台', async () => {
     const user = userEvent.setup();
     renderWithRouter(<RegisterPage />, ['/']);
 
@@ -40,12 +40,12 @@ describe('Auth Flow Integration', () => {
     await user.click(screen.getByRole('button', { name: /注册/ }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('projects-page')).toBeInTheDocument();
+      expect(screen.getByTestId('dashboard-page')).toBeInTheDocument();
     });
     expect(localStorage.getItem('token')).toBeTruthy();
   });
 
-  it('用户登录成功后应重定向到项目页', async () => {
+  it('用户登录成功后应重定向到工作台', async () => {
     const user = userEvent.setup();
     renderWithRouter(<LoginPage />, ['/']);
 
@@ -54,7 +54,7 @@ describe('Auth Flow Integration', () => {
     await user.click(screen.getByRole('button', { name: /登录/ }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('projects-page')).toBeInTheDocument();
+      expect(screen.getByTestId('dashboard-page')).toBeInTheDocument();
     });
     expect(localStorage.getItem('token')).toBeTruthy();
   });

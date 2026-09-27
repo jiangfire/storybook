@@ -24,6 +24,7 @@ import type {
 import type { ProjectRole, User } from '../../types/models';
 import { BurndownSection } from './projectDetail/BurndownSection';
 import { ProjectHeroSection } from './projectDetail/ProjectHeroSection';
+import { ProjectStoriesSection } from './projectDetail/ProjectStoriesSection';
 import { ProjectMembersSection } from './projectDetail/ProjectMembersSection';
 import { ProjectStatusSection } from './projectDetail/ProjectStatusSection';
 import { ProjectTechLeadsSection } from './projectDetail/ProjectTechLeadsSection';
@@ -452,6 +453,8 @@ export default function ProjectDetailPage() {
           canCreateStory={canCreateStory}
         />
       </PageHero>
+
+      <ProjectStoriesSection projectId={projectID} canCreateStory={canCreateStory} />
 
       <SprintManagementSection
         sprintError={sprintError}

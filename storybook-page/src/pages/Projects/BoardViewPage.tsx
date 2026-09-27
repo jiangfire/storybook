@@ -1,17 +1,31 @@
 import { useParams } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useStoryStore } from '../../stores/storyStore';
+import { projectService } from '../../services/projectService';
 import KanbanBoard from '../../components/board/KanbanBoard';
+import BoardFilterBar from '../../components/board/BoardFilterBar';
+import {
+  collectAssignees,
+  countBoardStories,
+  emptyBoardFilters,
+  filterBoardColumns,
+  type BoardFilters,
+} from '../../components/board/boardFilters';
 import StoryForm from '../../components/story/StoryForm';
 import Button from '../../components/ui/Button';
 import { BoardIcon, SprintIcon } from '../../components/ui/AppIcon';
+import type { SprintSummary } from '../../types/api';
 
 export default function BoardViewPage() {
   const { id } = useParams<{ id: string }>();
   const { currentProject, fetchProject } = useProjectStore();
+  const boardData = useStoryStore((state) => state.boardData);
   const { user } = useAuthStore();
   const [isStoryFormOpen, setIsStoryFormOpen] = useState(false);
+  const [sprints, setSprints] = useState<SprintSummary[]>([]);
+  const [filters, setFilters] = useState<BoardFilters>(emptyBoardFilters);
   const projectID = Number(id);
   const isValidProjectID = !Number.isNaN(projectID) && projectID > 0;
   const project = currentProject?.id === projectID ? currentProject : null;
@@ -22,6 +36,34 @@ export default function BoardViewPage() {
       fetchProject(projectID);
     }
   }, [fetchProject, isValidProjectID, projectID]);
+
+  // 冲刺选项供看板筛选使用；失败时静默降级为“全部”
+  useEffect(() => {
+    if (!isValidProjectID) {
+      return;
+    }
+    let cancelled = false;
+    projectService
+      .getSprints(projectID)
+      .then((data) => {
+        if (!cancelled) {
+          setSprints(data.sprints || []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSprints([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isValidProjectID, projectID]);
+
+  const assignees = useMemo(() => collectAssignees(boardData), [boardData]);
+  const visibleBoardData = useMemo(() => filterBoardColumns(boardData, filters), [boardData, filters]);
+  const totalCount = useMemo(() => countBoardStories(boardData), [boardData]);
+  const visibleCount = useMemo(() => countBoardStories(visibleBoardData), [visibleBoardData]);
 
   if (!isValidProjectID) {
     return <div className="p-8 text-danger">项目ID无效</div>;
@@ -63,9 +105,19 @@ export default function BoardViewPage() {
         </div>
       </div>
 
-      {/* 看板 */}
+      {/* 筛选 + 看板 */}
       <div className="flex-1 overflow-hidden p-4 sm:p-6 lg:p-8">
-        <KanbanBoard projectId={project.id} />
+        <BoardFilterBar
+          assignees={assignees}
+          sprints={sprints}
+          filters={filters}
+          onChange={setFilters}
+          totalCount={totalCount}
+          visibleCount={visibleCount}
+        />
+        <div className="h-[calc(100%-4.5rem)]">
+          <KanbanBoard projectId={project.id} filters={filters} />
+        </div>
       </div>
 
       {/* 创建故事弹窗 */}

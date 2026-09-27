@@ -67,6 +67,7 @@ export interface StoryBoardItem {
   priority: number;
   story_points?: number;
   position?: number;
+  sprint_id?: number;
   assigned_to?: User;
   assignee?: User;
   acceptance_criteria?: AcceptanceCriteria[];

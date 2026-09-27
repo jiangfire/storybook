@@ -41,7 +41,7 @@ export default function LoginPage() {
 
     try {
       await login({ email, password });
-      navigate('/projects');
+      navigate('/dashboard');
     } catch {
       // 错误已在 store 中处理
     }

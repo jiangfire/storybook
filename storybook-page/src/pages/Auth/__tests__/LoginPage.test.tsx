@@ -27,7 +27,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/login']}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/projects" element={<div>Projects Page</div>} />
+        <Route path="/dashboard" element={<div>Dashboard Page</div>} />
         <Route path="/register" element={<div>Register Page</div>} />
       </Routes>
     </MemoryRouter>
@@ -60,7 +60,7 @@ describe('LoginPage', () => {
     expect(login).not.toHaveBeenCalled();
   });
 
-  it('登录成功后跳转到项目列表', async () => {
+  it('登录成功后跳转到工作台', async () => {
     const user = userEvent.setup();
     const login = vi.fn(async () => {
       useAuthStore.setState({
@@ -90,7 +90,7 @@ describe('LoginPage', () => {
       });
     });
 
-    expect(await screen.findByText('Projects Page')).toBeInTheDocument();
+    expect(await screen.findByText('Dashboard Page')).toBeInTheDocument();
   });
 
   it('会展示 store 中的登录错误', () => {

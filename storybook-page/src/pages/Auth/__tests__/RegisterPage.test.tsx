@@ -27,7 +27,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/register']}>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/projects" element={<div>Projects Page</div>} />
+        <Route path="/dashboard" element={<div>Dashboard Page</div>} />
         <Route path="/login" element={<div>Login Page</div>} />
       </Routes>
     </MemoryRouter>
@@ -93,7 +93,7 @@ describe('RegisterPage', () => {
       });
     });
 
-    expect(await screen.findByText('Projects Page')).toBeInTheDocument();
+    expect(await screen.findByText('Dashboard Page')).toBeInTheDocument();
   });
 
   it('会展示 store 中的注册错误', () => {
