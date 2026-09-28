@@ -191,6 +191,8 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
           position: targetPosition,
         });
       } catch {
+        // 乐观更新失败时还原拖拽前的列内顺序，提示语才与实际一致。
+        setLocalBoardData((prev) => ({ ...prev, [activeStatus]: stories }));
         showError('排序更新失败，已回滚');
       }
       return;

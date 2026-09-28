@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import type { StoryBoardItem } from '../../../types/models';
 import KanbanBoard from '../KanbanBoard';
 
@@ -166,5 +166,30 @@ describe('KanbanBoard', () => {
       status: 'backlog',
       position: 3072,
     });
+  });
+
+  it('同列重排失败时会还原本地顺序并提示', async () => {
+    setStoryStore({
+      pending: [],
+      backlog: [createStory(2, 'backlog', 1024), createStory(3, 'backlog', 2048)],
+      ready: [],
+      in_progress: [],
+      test: [],
+      done: [],
+    });
+    updateStoryStatus.mockRejectedValueOnce(new Error('network error'));
+
+    render(<KanbanBoard projectId={7} />);
+
+    await act(async () => {
+      await latestDndContextProps?.onDragEnd?.({
+        active: { id: 2 },
+        over: { id: 3 },
+      });
+    });
+
+    expect(showError).toHaveBeenCalledWith('排序更新失败，已回滚');
+    const titles = within(screen.getByTestId('column-backlog')).getAllByText(/^Story \d$/);
+    expect(titles.map((node) => node.textContent)).toEqual(['Story 2', 'Story 3']);
   });
 });
