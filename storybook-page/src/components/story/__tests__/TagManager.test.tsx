@@ -152,6 +152,35 @@ describe('TagManager', () => {
     });
   });
 
+  describe('推荐标签', () => {
+    it('传入 onRequestSuggestions 时显示推荐入口，未传时隐藏', () => {
+      const { rerender } = render(
+        <TagManager tags={[]} onChange={vi.fn()} onRequestSuggestions={vi.fn()} />
+      );
+
+      expect(screen.getByRole('button', { name: '根据标题与描述推荐标签' })).toBeInTheDocument();
+
+      rerender(<TagManager tags={[]} onChange={vi.fn()} />);
+      expect(screen.queryByRole('button', { name: '根据标题与描述推荐标签' })).not.toBeInTheDocument();
+    });
+
+    it('点击推荐标签会追加且过滤已有标签', () => {
+      const onChange = vi.fn();
+      render(
+        <TagManager
+          tags={['auth']}
+          onChange={onChange}
+          suggestions={['auth', 'login', 'security']}
+        />
+      );
+
+      expect(screen.queryByText('+ auth')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('+ login'));
+
+      expect(onChange).toHaveBeenCalledWith(['auth', 'login']);
+    });
+  });
+
   describe('边界条件', () => {
     it('空列表时应该不显示标签', () => {
       render(

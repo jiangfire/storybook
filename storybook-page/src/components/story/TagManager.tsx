@@ -5,9 +5,13 @@ import { XIcon } from '../ui/AppIcon';
 interface TagManagerProps {
   tags: string[];
   onChange: (tags: string[]) => void;
+  /** 可选：来自相似故事的推荐标签（依赖向量服务，未启用时父级不传） */
+  suggestions?: string[];
+  /** 可选：请求推荐标签 */
+  onRequestSuggestions?: () => void;
 }
 
-export const TagManager = ({ tags, onChange }: TagManagerProps) => {
+export const TagManager = ({ tags, onChange, suggestions, onRequestSuggestions }: TagManagerProps) => {
   const [newTag, setNewTag] = useState('');
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -20,6 +24,11 @@ export const TagManager = ({ tags, onChange }: TagManagerProps) => {
 
     onChange([...tags, trimmed]);
     setNewTag('');
+  };
+
+  const handleAddSuggestion = (tag: string) => {
+    if (tags.includes(tag)) return;
+    onChange([...tags, tag]);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -71,6 +80,34 @@ export const TagManager = ({ tags, onChange }: TagManagerProps) => {
           添加
         </button>
       </div>
+
+      {onRequestSuggestions && (
+        <button
+          type="button"
+          onClick={onRequestSuggestions}
+          className="mt-2 text-xs text-text-light transition-colors hover:text-primary"
+        >
+          根据标题与描述推荐标签
+        </button>
+      )}
+
+      {suggestions && suggestions.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-text-light">推荐：</span>
+          {suggestions
+            .filter((tag) => !tags.includes(tag))
+            .map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => handleAddSuggestion(tag)}
+                className="rounded-full border border-border px-2.5 py-0.5 text-xs text-text-light transition-colors hover:border-primary hover:text-primary"
+              >
+                + {tag}
+              </button>
+            ))}
+        </div>
+      )}
     </div>
   );
 };

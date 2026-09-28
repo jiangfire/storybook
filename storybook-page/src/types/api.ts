@@ -566,6 +566,30 @@ export interface SearchCapabilitiesResponse {
   semantic_enabled: boolean;
 }
 
+// 相似故事查重（创建故事前提示重复）
+export interface SimilarStoriesRequest {
+  project_id: number;
+  title: string;
+  description?: string;
+  limit?: number;
+}
+
+export interface SimilarStoriesResponse {
+  similar_stories: SemanticStorySearchItem[];
+}
+
+// 标签建议
+export interface SuggestTagsRequest {
+  title?: string;
+  description?: string;
+  content?: string;
+  limit?: number;
+}
+
+export interface SuggestTagsResponse {
+  tags: string[];
+}
+
 // ===== AI相关 =====
 
 // AI生成故事请求

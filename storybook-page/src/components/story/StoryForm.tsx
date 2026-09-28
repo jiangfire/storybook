@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { storyService } from '../../services/storyService';
 import { projectService } from '../../services/projectService';
+import { searchService } from '../../services/searchService';
 import { useAuthStore } from '../../stores/authStore';
 import { useToast } from '../ui/Toast';
 import { useStoryFormValidation } from '../../hooks/useStoryFormValidation';
 import type {
   AIFormDraft,
   CreateStoryRequest,
+  SemanticStorySearchItem,
   SprintSummary,
   UpdateStoryRequest,
 } from '../../types/api';
@@ -78,6 +80,8 @@ export default function StoryForm({
   const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
   const [sprintError, setSprintError] = useState('');
   const [aiFieldState, setAIFieldState] = useState(initialAIFieldState);
+  const [similarStories, setSimilarStories] = useState<SemanticStorySearchItem[] | null>(null);
+  const [tagSuggestions, setTagSuggestions] = useState<string[] | null>(null);
 
   const loadStoryData = useCallback(async () => {
     if (!storyId) return;
@@ -143,14 +147,47 @@ export default function StoryForm({
     clearErrors();
     setAIFieldState(initialAIFieldState);
     setSelectedSprintID('');
+    setSimilarStories(null);
+    setTagSuggestions(null);
   }, [isOpen, isCreateMode, clearErrors]);
 
-  const handleSubmit = async () => {
+  const handleRequestTagSuggestions = async () => {
+    try {
+      const tags = await searchService.suggestTags({
+        title: formData.title || undefined,
+        description: formData.description || undefined,
+        limit: 8,
+      });
+      setTagSuggestions(tags);
+    } catch {
+      showError('标签推荐不可用（当前部署未启用语义搜索）');
+    }
+  };
+
+  const handleSubmit = async (force = false) => {
     const validationErrors = validate(formData);
     if (Object.keys(validationErrors).length > 0) return;
 
     setIsSubmitting(true);
     try {
+      // 创建前查重：命中相似故事先提示确认；向量服务未启用时静默跳过查重。
+      if (isCreateMode && !force) {
+        try {
+          const similar = await searchService.findSimilarStories({
+            project_id: projectId,
+            title: formData.title,
+            description: formData.description || undefined,
+            limit: 5,
+          });
+          if (similar.length > 0) {
+            setSimilarStories(similar);
+            return;
+          }
+        } catch {
+          // 查重不可用（pgvector 未启用等），不阻塞创建流程。
+        }
+      }
+
       if (isCreateMode) {
         const createRequest: CreateStoryRequest = {
           title: formData.title,
@@ -417,16 +454,48 @@ export default function StoryForm({
               setFormData({ ...formData, tags });
               setAIFieldState((prev) => ({ ...prev, tags: true }));
             }}
+            suggestions={tagSuggestions || undefined}
+            onRequestSuggestions={
+              isCreateMode ? () => void handleRequestTagSuggestions() : undefined
+            }
           />
           </div>
         </section>
+
+        {/* 相似故事查重提示 */}
+        {similarStories && similarStories.length > 0 && (
+          <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-sm">
+            <p className="mb-2 font-medium text-yellow-800">
+              检测到与现有故事可能重复，请确认是否继续创建：
+            </p>
+            <ul className="mb-3 space-y-1">
+              {similarStories.map((story) => (
+                <li key={story.id} className="text-yellow-800">
+                  · {story.title}（相似度 {Math.round(story.similarity * 100)}%）
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setSimilarStories(null)}>
+                返回修改
+              </Button>
+              <Button size="sm" onClick={() => void handleSubmit(true)}>
+                仍要创建
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* 按钮 */}
         <div className="flex justify-end space-x-3 pt-4 border-t border-border">
           <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
             取消
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} isLoading={isSubmitting}>
+          <Button
+            onClick={() => void handleSubmit(false)}
+            disabled={isSubmitting}
+            isLoading={isSubmitting}
+          >
             {isSubmitting ? '保存中...' : isCreateMode ? '创建故事' : '保存更改'}
           </Button>
         </div>

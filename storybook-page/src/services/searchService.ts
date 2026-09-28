@@ -5,6 +5,10 @@ import type {
   SearchParams,
   SearchResponseData,
   SemanticStorySearchResponse,
+  SimilarStoriesRequest,
+  SimilarStoriesResponse,
+  SuggestTagsRequest,
+  SuggestTagsResponse,
 } from '../types/api';
 
 export const searchService = {
@@ -30,5 +34,26 @@ export const searchService = {
       '/api/search/capabilities'
     );
     return response.data.data;
+  },
+
+  /**
+   * 相似故事查重（依赖 pgvector，未启用时接口报错，调用方需降级处理）
+   */
+  async findSimilarStories(
+    data: SimilarStoriesRequest
+  ): Promise<SimilarStoriesResponse['similar_stories']> {
+    const response = await apiClient.post<ApiResponse<SimilarStoriesResponse>>(
+      '/api/stories/similar',
+      data
+    );
+    return response.data.data.similar_stories;
+  },
+
+  /**
+   * 标签建议（依赖 pgvector，未启用时接口报错，调用方需降级处理）
+   */
+  async suggestTags(data: SuggestTagsRequest): Promise<string[]> {
+    const response = await apiClient.post<ApiResponse<SuggestTagsResponse>>('/api/tags/suggest', data);
+    return response.data.data.tags;
   },
 };

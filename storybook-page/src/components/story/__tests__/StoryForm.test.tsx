@@ -6,6 +6,7 @@ import type { SprintSummary } from '../../../types/api';
 import type { Story, User } from '../../../types/models';
 import { aiService } from '../../../services/aiService';
 import { projectService } from '../../../services/projectService';
+import { searchService } from '../../../services/searchService';
 import { storyService } from '../../../services/storyService';
 import { useAuthStore } from '../../../stores/authStore';
 import StoryForm from '../StoryForm';
@@ -51,9 +52,17 @@ vi.mock('../../../services/aiService', () => ({
   },
 }));
 
+vi.mock('../../../services/searchService', () => ({
+  searchService: {
+    findSimilarStories: vi.fn(),
+    suggestTags: vi.fn(),
+  },
+}));
+
 const mockedStoryService = vi.mocked(storyService, { deep: true });
 const mockedProjectService = vi.mocked(projectService, { deep: true });
 const mockedAiService = vi.mocked(aiService, { deep: true });
+const mockedSearchService = vi.mocked(searchService, { deep: true });
 
 const NOW = '2026-03-29T00:00:00Z';
 
@@ -227,6 +236,7 @@ describe('StoryForm', () => {
       updated_at: NOW,
     });
     mockedProjectService.getSprints.mockResolvedValue({ sprints: sprintList });
+    mockedSearchService.findSimilarStories.mockResolvedValue([]);
   });
 
   it('在创建模式下将 AI 共创区放在标题字段之前', () => {
@@ -354,6 +364,54 @@ describe('StoryForm', () => {
     expect(showSuccess).toHaveBeenCalledWith('故事创建成功');
     expect(navigateMock).toHaveBeenCalledWith('/stories/88', { replace: true });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('创建时检测到相似故事会先提示，确认后才创建', async () => {
+    const user = userEvent.setup();
+    mockedSearchService.findSimilarStories.mockResolvedValueOnce([
+      {
+        id: 5,
+        project_id: 1,
+        title: '手机号登录',
+        story_type: 'feature',
+        status: 'done',
+        priority: 2,
+        similarity: 0.92,
+      },
+    ]);
+    renderStoryForm();
+
+    await user.type(screen.getByLabelText(/标题/), '支持手机号登录');
+    await user.click(screen.getByRole('button', { name: '创建故事' }));
+
+    expect(await screen.findByText(/检测到与现有故事可能重复/)).toBeInTheDocument();
+    expect(mockedStoryService.createStory).not.toHaveBeenCalled();
+    expect(mockedSearchService.findSimilarStories).toHaveBeenCalledWith({
+      title: '支持手机号登录',
+      description: undefined,
+      limit: 5,
+      project_id: 1,
+    });
+
+    await user.click(screen.getByRole('button', { name: '仍要创建' }));
+
+    await waitFor(() => {
+      expect(mockedStoryService.createStory).toHaveBeenCalled();
+    });
+  });
+
+  it('查重服务不可用时静默跳过查重不阻塞创建', async () => {
+    const user = userEvent.setup();
+    mockedSearchService.findSimilarStories.mockRejectedValueOnce(new Error('向量搜索服务未启用'));
+    renderStoryForm();
+
+    await user.type(screen.getByLabelText(/标题/), '支持邮箱登录');
+    await user.click(screen.getByRole('button', { name: '创建故事' }));
+
+    await waitFor(() => {
+      expect(mockedStoryService.createStory).toHaveBeenCalled();
+    });
+    expect(screen.queryByText(/检测到与现有故事可能重复/)).not.toBeInTheDocument();
   });
 
   it('创建故事遇到权限或网络错误时会给出明确提示', async () => {
