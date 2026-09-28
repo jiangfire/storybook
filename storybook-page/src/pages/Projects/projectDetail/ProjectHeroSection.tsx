@@ -21,6 +21,8 @@ interface ProjectHeroSectionProps {
   completionRate: number;
   activeMembers: number;
   canCreateStory: boolean;
+  /** 打开项目设置（Owner/管理员可见时由父级传入） */
+  onOpenSettings?: () => void;
 }
 
 function MetricCard({
@@ -54,6 +56,7 @@ export function ProjectHeroSection({
   completionRate,
   activeMembers,
   canCreateStory,
+  onOpenSettings,
 }: ProjectHeroSectionProps) {
   return (
     <div className="space-y-4 px-5 py-5 sm:px-6 lg:px-7 lg:py-6">
@@ -138,6 +141,11 @@ export function ProjectHeroSection({
               <div className="rounded-xl border border-white/70 bg-white/70 px-3 py-2 text-xs text-text-light">
                 当前角色无创建故事权限
               </div>
+            )}
+            {onOpenSettings && (
+              <Button variant="secondary" className="w-full sm:w-auto" onClick={onOpenSettings}>
+                项目设置
+              </Button>
             )}
           </div>
         </div>

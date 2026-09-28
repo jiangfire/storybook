@@ -60,6 +60,30 @@ export const projectService = {
   },
 
   /**
+   * 归档项目
+   */
+  async archiveProject(id: number): Promise<void> {
+    await apiClient.post(`/api/projects/${id}/archive`);
+  },
+
+  /**
+   * 还原归档项目
+   */
+  async unarchiveProject(id: number): Promise<void> {
+    await apiClient.post(`/api/projects/${id}/unarchive`);
+  },
+
+  /**
+   * 导出项目完整 JSON 快照
+   */
+  async exportProject(id: number): Promise<Record<string, unknown>> {
+    const response = await apiClient.get<ApiResponse<Record<string, unknown>>>(
+      `/api/projects/${id}/export`
+    );
+    return response.data.data;
+  },
+
+  /**
    * 获取项目概览
    */
   async getProjectOverview(id: number): Promise<ProjectOverview> {

@@ -695,4 +695,25 @@ describe('ProjectDetailPage', () => {
     expect(showSuccess).toHaveBeenCalledWith('冲刺已取消，故事已退回待办池');
     expect(screen.queryByText(/确认取消「Sprint 1」吗？/)).not.toBeInTheDocument();
   });
+
+  it('项目 Owner 可打开项目设置弹窗', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '项目设置' }));
+
+    expect(await screen.findByText('数据与生命周期')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '导出 JSON 快照' })).toBeInTheDocument();
+  });
+
+  it('非 Owner 成员不显示项目设置入口', async () => {
+    setProjectStore(false);
+    useAuthStore.setState({ user: anotherDeveloper });
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: '项目设置' })).not.toBeInTheDocument();
+  });
 });

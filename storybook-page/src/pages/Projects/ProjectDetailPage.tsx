@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAuthStore } from '../../stores/authStore';
 import { projectService } from '../../services/projectService';
@@ -31,6 +31,7 @@ import { ProjectTechLeadsSection } from './projectDetail/ProjectTechLeadsSection
 import { ReportsSection } from './projectDetail/ReportsSection';
 import { SprintManagementSection } from './projectDetail/SprintManagementSection';
 import { ConfirmActionModal } from './projectDetail/ConfirmActionModal';
+import { ProjectSettingsModal } from './projectDetail/ProjectSettingsModal';
 import { SprintCreateModal } from './projectDetail/SprintCreateModal';
 import { getNextSprintAction } from './projectDetail/sprintHelpers';
 import type { ConfirmActionState, ProjectMemberItem } from './projectDetail/types';
@@ -44,6 +45,7 @@ const emptySprintForm: CreateSprintRequest = {
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const projectID = Number(id);
   const { user } = useAuthStore();
   const { showSuccess, showError } = useToast();
@@ -73,6 +75,7 @@ export default function ProjectDetailPage() {
   const [removingTechLeadID, setRemovingTechLeadID] = useState<number | null>(null);
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
   const [statusUpdatingSprintID, setStatusUpdatingSprintID] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState | null>(null);
@@ -81,6 +84,10 @@ export default function ProjectDetailPage() {
   const project = currentProject?.id === projectID ? currentProject : null;
   const canManageMembers = canManageProjectMembers(project);
   const canManageTechLeads = canManageTechLeadsPermission(user?.role);
+  // 后端口径：项目 Owner 或平台管理员可编辑/归档/导出/删除项目。
+  const canManageProjectSettings =
+    Boolean(project) &&
+    (user?.role === 'admin' || project!.is_owner === true || project!.owner?.id === user?.id);
   const canCreateStory = canCreateStoryPermission(user?.role);
 
   const loadMembers = useCallback(async (pid: number) => {
@@ -481,6 +488,9 @@ export default function ProjectDetailPage() {
           completionRate={completionRate}
           activeMembers={activeMembers}
           canCreateStory={canCreateStory}
+          onOpenSettings={
+            canManageProjectSettings ? () => setIsSettingsOpen(true) : undefined
+          }
         />
       </PageHero>
 
@@ -581,6 +591,19 @@ export default function ProjectDetailPage() {
         onChange={handleSprintFormChange}
         onSubmit={handleCreateSprint}
       />
+
+      {project && (
+        <ProjectSettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          project={project}
+          onSaved={() => {
+            void fetchProject(projectID);
+            void fetchProjectOverview(projectID);
+          }}
+          onDeleted={() => navigate('/projects', { replace: true })}
+        />
+      )}
     </PageContainer>
   );
 }
