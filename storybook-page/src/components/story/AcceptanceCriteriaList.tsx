@@ -312,14 +312,18 @@ export default function AcceptanceCriteriaList({
                 )}
 
                 {/* 添加证据按钮 */}
-                {editable && ac.status === 'passed' && !ac.evidence && !isEditing && (
-                  <button
-                    onClick={() => setEditingAC(ac.id)}
-                    className="mt-2 text-sm text-primary transition-colors hover:text-primary-700"
-                  >
-                    添加证据
-                  </button>
-                )}
+                {editable &&
+                  ac.status === 'passed' &&
+                  !ac.evidence &&
+                  !isEditing &&
+                  !isEditingContent && (
+                    <button
+                      onClick={() => setEditingAC(ac.id)}
+                      className="mt-2 text-sm text-primary transition-colors hover:text-primary-700"
+                    >
+                      添加证据
+                    </button>
+                  )}
 
                 {/* 内容编辑/删除操作 */}
                 {contentEditable && !isEditingContent && (

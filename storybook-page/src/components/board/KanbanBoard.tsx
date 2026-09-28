@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useStoryStore } from '../../stores/storyStore';
+import { useAuthStore } from '../../stores/authStore';
 import { projectService } from '../../services/projectService';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import BoardColumn from './BoardColumn';
@@ -44,6 +45,9 @@ interface KanbanBoardProps {
 
 export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: KanbanBoardProps) {
   const { boardData, fetchBoardData, updateStoryStatus, isUpdating, isLoading } = useStoryStore();
+  const { user } = useAuthStore();
+  // 后端 reorder 端点仅 PM/admin 可用；单条状态更新对故事创建者也开放。
+  const canReorderSprint = user?.role === 'product' || user?.role === 'admin';
   const [activeId, setActiveId] = useState<number | null>(null);
   const [localBoardData, setLocalBoardData] = useState(boardData);
   const { showError } = useToast();
@@ -187,7 +191,10 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
       });
 
       // 整列同属一个冲刺时走批量 reorder 端点一次提交整列顺序；否则退回单条更新。
+      // 整列同属一个冲刺且当前用户可 reorder（后端仅 PM/admin）时走批量端点一次提交整列顺序；
+      // 其余角色退回单条更新，避免开发者排序被 403 回滚。
       const columnSprintID =
+        canReorderSprint &&
         stories.length > 0 &&
         stories.every((story) => story.sprint_id != null && story.sprint_id === stories[0].sprint_id)
           ? stories[0].sprint_id!

@@ -1,7 +1,21 @@
 import { act, render, screen, within } from '@testing-library/react';
 import type { StoryBoardItem } from '../../../types/models';
 import { projectService } from '../../../services/projectService';
+import { useAuthStore } from '../../../stores/authStore';
 import KanbanBoard from '../KanbanBoard';
+
+function setAuthRole(role: 'product' | 'developer') {
+  useAuthStore.setState({
+    user: {
+      id: 1,
+      email: `${role}@example.com`,
+      role,
+      created_at: '2026-03-29T00:00:00Z',
+    },
+    token: 'token',
+    isAuthenticated: true,
+  });
+}
 
 const fetchBoardData = vi.fn();
 const updateStoryStatus = vi.fn();
@@ -104,6 +118,7 @@ describe('KanbanBoard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     latestDndContextProps = null;
+    useAuthStore.setState({ user: null, token: '', isAuthenticated: false });
     setStoryStore({
       pending: [createStory(1, 'pending', 1024)],
       backlog: [createStory(2, 'backlog', 1024)],
@@ -203,6 +218,7 @@ describe('KanbanBoard', () => {
   });
 
   it('整列同属一个冲刺时同列重排走批量 reorder 端点', async () => {
+    setAuthRole('product');
     setStoryStore({
       pending: [],
       backlog: [
@@ -230,5 +246,36 @@ describe('KanbanBoard', () => {
       { story_id: 2, position: 2 },
     ]);
     expect(updateStoryStatus).not.toHaveBeenCalled();
+  });
+
+  it('非 PM/admin 即使整列同冲刺也退回单条排序，避免后端 403', async () => {
+    setAuthRole('developer');
+    setStoryStore({
+      pending: [],
+      backlog: [
+        { ...createStory(2, 'backlog', 1024), sprint_id: 31 },
+        { ...createStory(3, 'backlog', 2048), sprint_id: 31 },
+      ],
+      ready: [],
+      in_progress: [],
+      test: [],
+      done: [],
+    });
+    mockedProjectService.reorderSprintStories.mockResolvedValue({});
+
+    render(<KanbanBoard projectId={7} />);
+
+    await act(async () => {
+      await latestDndContextProps?.onDragEnd?.({
+        active: { id: 2 },
+        over: { id: 3 },
+      });
+    });
+
+    expect(mockedProjectService.reorderSprintStories).not.toHaveBeenCalled();
+    expect(updateStoryStatus).toHaveBeenCalledWith(2, {
+      status: 'backlog',
+      position: 3072,
+    });
   });
 });
