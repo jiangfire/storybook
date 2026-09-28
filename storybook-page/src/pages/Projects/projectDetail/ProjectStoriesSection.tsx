@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { storyService } from '../../../services/storyService';
+import { useWebSocket } from '../../../hooks/useWebSocket';
 import {
   formatStoryStatus,
   formatStoryType,
@@ -55,6 +56,20 @@ export function ProjectStoriesSection({ projectId, canCreateStory }: ProjectStor
   useEffect(() => {
     void loadStories();
   }, [loadStories]);
+
+  // 冲刺完成/取消会把故事退回待办池，监听收尾事件保持列表新鲜（忽略其他项目）
+  useWebSocket(
+    useMemo(
+      () => ({
+        onSprintTerminated: (message) => {
+          if (message.project_id === projectId) {
+            void loadStories();
+          }
+        },
+      }),
+      [projectId, loadStories]
+    )
+  );
 
   return (
     <section className="section-card rounded-[1.8rem] p-4 sm:p-5">

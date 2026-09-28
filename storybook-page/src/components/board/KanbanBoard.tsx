@@ -17,7 +17,7 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import BoardColumn from './BoardColumn';
 import { filterBoardColumns, emptyBoardFilters, type BoardFilters } from './boardFilters';
 import type { StoryBoardItem } from '../../types/models';
-import type { StoryStatusChangedMessage } from '../../types/api';
+import type { StoryCreatedMessage, StoryStatusChangedMessage } from '../../types/api';
 import { useToast } from '../ui/Toast';
 import {
   CheckCircleIcon,
@@ -76,8 +76,11 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
     [localBoardData, filters]
   );
 
-  // 处理 WebSocket 实时更新
+  // 处理 WebSocket 实时更新（忽略其他项目的事件）
   const handleStoryStatusChanged = useCallback((message: StoryStatusChangedMessage) => {
+    if (message.project_id !== projectId) {
+      return;
+    }
     setLocalBoardData((prev: typeof boardData) => {
       const newBoardData = { ...prev };
 
@@ -100,7 +103,7 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
 
       return newBoardData;
     });
-  }, []);
+  }, [projectId]);
 
   const findStatusByStoryId = (data: Record<string, StoryBoardItem[]>, storyId: number) => {
     for (const [status, stories] of Object.entries(data)) {
@@ -238,10 +241,16 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
     : null;
 
   // WebSocket 实时更新
-  // 他人新建/编辑故事时轻量重拉看板，保持列内容与服务端一致
-  const handleStoryListChanged = useCallback(() => {
-    fetchBoardData(projectId);
-  }, [projectId, fetchBoardData]);
+  // 他人新建/编辑故事时轻量重拉看板，保持列内容与服务端一致（忽略其他项目）
+  const handleStoryListChanged = useCallback(
+    (message: StoryCreatedMessage) => {
+      if (message.project_id !== projectId) {
+        return;
+      }
+      fetchBoardData(projectId);
+    },
+    [projectId, fetchBoardData]
+  );
 
   const wsOptions = useMemo(
     () => ({

@@ -209,9 +209,18 @@ export default function ProjectBugsPage() {
     void loadBugs();
   }, [loadBugs]);
 
-  // 他人新建缺陷时实时刷新列表
+  // 他人新建缺陷时实时刷新列表（忽略其他项目）
   useWebSocket(
-    useMemo(() => ({ onBugCreated: () => void loadBugs() }), [loadBugs])
+    useMemo(
+      () => ({
+        onBugCreated: (message) => {
+          if (message.project_id === projectID) {
+            void loadBugs();
+          }
+        },
+      }),
+      [projectID, loadBugs]
+    )
   );
 
   const openBugDetail = useCallback(

@@ -890,6 +890,8 @@ export type WSMessageType =
   | 'story.updated'
   | 'story.deleted'
   | 'task.updated'
+  | 'sprint.closed'
+  | 'sprint.cancelled'
   | 'bug.created'
   | 'notification.new';
 
@@ -910,6 +912,31 @@ export interface StoryStatusChangedMessage {
     id: number;
     email: string;
   };
+}
+
+// 故事创建/更新消息（后端 story_service 广播）
+export interface StoryCreatedMessage {
+  story_id: number;
+  project_id: number;
+  title: string;
+  status: string;
+}
+
+// 冲刺收尾消息（close/cancel 载荷一致）
+export interface SprintTerminatedMessage {
+  sprint_id: number;
+  project_id: number;
+  status: string;
+  actor_id: number;
+}
+
+// 缺陷创建消息（后端 bug_handler 广播）
+export interface BugCreatedMessage {
+  bug_id: number;
+  project_id: number;
+  title: string;
+  severity: string;
+  status: string;
 }
 
 // AC状态更新消息
