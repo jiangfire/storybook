@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-仓库采用 Go 后端与 React 前端同仓结构。`cmd/` 放可执行入口（如 `cmd/server`、`cmd/embedui`、`cmd/mcp`）；`internal/` 放主要业务代码，按 `handler`、`service`、`repository`、`middleware`、`router`、`webui` 等分层；`pkg/mcp` 提供可复用 MCP 能力；`docs/` 保存设计与 API 文档。前端位于 `storybook-page/`，源码在 `storybook-page/src`，公共资源在 `storybook-page/public`。`internal/e2e` 是端到端测试，`internal/webui/dist` 是前端嵌入产物，不要手工修改。
+仓库采用 Go 后端与 React 前端同仓结构。`cmd/` 放可执行入口（如 `cmd/server`、`cmd/embedui`）；`internal/` 放主要业务代码，按 `handler`、`service`、`repository`、`middleware`、`router`、`webui` 等分层；MCP 能力由 HTTP 路由 `/mcp`（`internal/handler/mcp_handler.go`）提供，无独立 MCP 进程；`docs/` 保存设计与 API 文档。前端位于 `storybook-page/`，源码在 `storybook-page/src`，公共资源在 `storybook-page/public`。`internal/e2e` 是端到端测试，`internal/webui/dist` 是前端嵌入产物，不要手工修改。
 
 ## Build, Test, and Development Commands
 后端构建：`go build -o storybook-server ./cmd/server`。后端启动：`./storybook-server`（无参数默认启动 server 子命令，也可用 `./storybook-server server` 显式指定）。其他子命令：`./storybook-server bootstrap-admin --email ...`（创建管理员）、`./storybook-server --help`（帮助）、`./storybook-server version`（版本）。后端全量测试：`go test ./...`。前端开发：`cd storybook-page && pnpm install && pnpm run dev`。前端构建：`cd storybook-page && pnpm run build`。前端 lint 与测试：`pnpm run lint`、`pnpm run test`、`pnpm run test:coverage`。需要单体部署时，优先使用 `cd storybook-page && pnpm run build:embed`；如需保留嵌入目录中的跟踪文件，可改用 `pnpm run build` 后执行 `go run ./cmd/embedui`。
