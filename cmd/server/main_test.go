@@ -103,6 +103,9 @@ func TestRunBackfillEmbeddingsRequiresProvider(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
+	t.Setenv("JWT_SECRET", "test-secret-that-is-at-least-32-bytes!")
+	t.Setenv("DB_DRIVER", "sqlite")
+	t.Setenv("DB_DSN", "file:backfill_cli_test?mode=memory&cache=shared")
 	t.Setenv("EMBEDDING_PROVIDER", "")
 
 	code := run([]string{cmdBackfillEmbedding}, &stdout, &stderr)
