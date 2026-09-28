@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -207,6 +208,11 @@ export default function ProjectBugsPage() {
   useEffect(() => {
     void loadBugs();
   }, [loadBugs]);
+
+  // 他人新建缺陷时实时刷新列表
+  useWebSocket(
+    useMemo(() => ({ onBugCreated: () => void loadBugs() }), [loadBugs])
+  );
 
   const openBugDetail = useCallback(
     async (bugID: number) => {

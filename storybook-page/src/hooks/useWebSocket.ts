@@ -12,6 +12,7 @@ interface UseWebSocketOptions {
   onStoryACUpdated?: (message: StoryACUpdatedMessage) => void;
   onStoryCreated?: (message: unknown) => void;
   onStoryUpdated?: (message: unknown) => void;
+  onBugCreated?: (message: unknown) => void;
   onNotificationNew?: (message: NotificationNewMessage) => void;
 }
 
@@ -160,6 +161,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
             break;
           case 'story.updated':
             options.onStoryUpdated?.(message.data);
+            break;
+          case 'bug.created':
+            options.onBugCreated?.(message.data);
             break;
           case 'notification.new':
             options.onNotificationNew?.(message.data as NotificationNewMessage);

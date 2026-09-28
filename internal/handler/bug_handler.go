@@ -142,6 +142,16 @@ func (h *BugHandler) Create(c *gin.Context) {
 		nil, map[string]any{"title": bug.Title, "severity": bug.Severity, "status": bug.Status}),
 		"write bug activity log", "bug_id", bug.ID, "action", "created")
 
+	if h.events != nil {
+		h.events.BroadcastProject(project.ID, "bug.created", gin.H{
+			"bug_id":     bug.ID,
+			"project_id": project.ID,
+			"title":      bug.Title,
+			"severity":   bug.Severity,
+			"status":     bug.Status,
+		})
+	}
+
 	if bug.AssignedTo != nil {
 		h.notifier.Notify(c.Request.Context(), *bug.AssignedTo, service.NotificationEvent{
 			Type:       model.NotificationBugAssigned,

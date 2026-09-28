@@ -144,6 +144,15 @@ func (s *StoryService) Create(input CreateStoryInput) (*model.UserStory, error) 
 	s.indexStoryIfEnabled(&story)
 	s.notifyStoryReviewRequested(&story, input.UserID, false)
 
+	if s.events != nil {
+		s.events.BroadcastProject(story.ProjectID, "story.created", map[string]any{
+			"story_id":   story.ID,
+			"project_id": story.ProjectID,
+			"title":      story.Title,
+			"status":     story.Status,
+		})
+	}
+
 	return &story, nil
 }
 
@@ -401,6 +410,15 @@ func (s *StoryService) Update(story *model.UserStory, userID uint, input UpdateS
 		s.indexStoryIfEnabled(story)
 	}
 	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "updated", oldFields, newFields), "write story activity log", "story_id", story.ID, "action", "updated")
+
+	if contentChanged && s.events != nil {
+		s.events.BroadcastProject(story.ProjectID, "story.updated", map[string]any{
+			"story_id":   story.ID,
+			"project_id": story.ProjectID,
+			"title":      story.Title,
+			"status":     story.Status,
+		})
+	}
 	return true, nil
 }
 

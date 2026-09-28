@@ -231,11 +231,18 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
     : null;
 
   // WebSocket 实时更新
+  // 他人新建/编辑故事时轻量重拉看板，保持列内容与服务端一致
+  const handleStoryListChanged = useCallback(() => {
+    fetchBoardData(projectId);
+  }, [projectId, fetchBoardData]);
+
   const wsOptions = useMemo(
     () => ({
       onStoryStatusChanged: handleStoryStatusChanged,
+      onStoryCreated: handleStoryListChanged,
+      onStoryUpdated: handleStoryListChanged,
     }),
-    [handleStoryStatusChanged]
+    [handleStoryStatusChanged, handleStoryListChanged]
   );
   const { isConnected: wsConnected } = useWebSocket(wsOptions);
 
