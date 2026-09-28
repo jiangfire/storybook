@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { useStoryStore } from '../../stores/storyStore';
+import { projectService } from '../../services/projectService';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import BoardColumn from './BoardColumn';
 import { filterBoardColumns, emptyBoardFilters, type BoardFilters } from './boardFilters';
@@ -185,11 +186,25 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
         return { ...prev, [activeStatus]: reordered };
       });
 
+      // 整列同属一个冲刺时走批量 reorder 端点一次提交整列顺序；否则退回单条更新。
+      const columnSprintID =
+        stories.length > 0 &&
+        stories.every((story) => story.sprint_id != null && story.sprint_id === stories[0].sprint_id)
+          ? stories[0].sprint_id!
+          : null;
+
       try {
-        await updateStoryStatus(activeId, {
-          status: activeStatus,
-          position: targetPosition,
-        });
+        if (columnSprintID) {
+          await projectService.reorderSprintStories(
+            columnSprintID,
+            reordered.map((story, index) => ({ story_id: story.id, position: index + 1 }))
+          );
+        } else {
+          await updateStoryStatus(activeId, {
+            status: activeStatus,
+            position: targetPosition,
+          });
+        }
       } catch {
         // 乐观更新失败时还原拖拽前的列内顺序，提示语才与实际一致。
         setLocalBoardData((prev) => ({ ...prev, [activeStatus]: stories }));

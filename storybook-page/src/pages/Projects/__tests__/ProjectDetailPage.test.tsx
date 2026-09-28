@@ -36,6 +36,7 @@ vi.mock('../../../services/projectService', () => ({
     updateSprintStatus: vi.fn(),
     closeSprint: vi.fn(),
     cancelSprint: vi.fn(),
+    deleteSprint: vi.fn(),
     getBurndown: vi.fn(),
     getVelocity: vi.fn(),
     getQuality: vi.fn(),
@@ -338,6 +339,7 @@ describe('ProjectDetailPage', () => {
     mockedProjectService.updateSprintStatus.mockResolvedValue({});
     mockedProjectService.closeSprint.mockResolvedValue({});
     mockedProjectService.cancelSprint.mockResolvedValue({});
+    mockedProjectService.deleteSprint.mockResolvedValue({});
     mockedProjectService.getBurndown.mockResolvedValue(burndownData);
     mockedProjectService.getVelocity.mockResolvedValue(velocityData);
     mockedProjectService.getQuality.mockResolvedValue(qualityData);
@@ -694,6 +696,29 @@ describe('ProjectDetailPage', () => {
     });
     expect(showSuccess).toHaveBeenCalledWith('冲刺已取消，故事已退回待办池');
     expect(screen.queryByText(/确认取消「Sprint 1」吗？/)).not.toBeInTheDocument();
+  });
+
+  it('未启动的冲刺可删除，确认后调用删除端点并刷新列表', async () => {
+    const user = userEvent.setup();
+    mockedProjectService.getSprints
+      .mockResolvedValueOnce({ sprints: [{ ...activeSprint, status: 'planned' }] })
+      .mockResolvedValueOnce({ sprints: [] });
+
+    renderPage();
+
+    const sprintSection = getSectionByHeading('冲刺管理');
+    await user.click(await within(sprintSection).findByRole('button', { name: '删除冲刺' }));
+
+    expect(mockedProjectService.deleteSprint).not.toHaveBeenCalled();
+    expect(screen.getByText(/确认删除「Sprint 1」吗？/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '确认删除冲刺' }));
+
+    await waitFor(() => {
+      expect(mockedProjectService.deleteSprint).toHaveBeenCalledWith(31);
+      expect(mockedProjectService.getSprints).toHaveBeenCalledTimes(2);
+    });
+    expect(showSuccess).toHaveBeenCalledWith('冲刺已删除');
   });
 
   it('项目 Owner 可打开项目设置弹窗', async () => {

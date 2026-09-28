@@ -175,6 +175,25 @@ export const projectService = {
   },
 
   /**
+   * 删除冲刺（仅未启动的冲刺可删除，故事自动脱离）
+   */
+  async deleteSprint(id: number) {
+    const response = await apiClient.delete<ApiResponse>(`/api/sprints/${id}`);
+    return response.data.data;
+  },
+
+  /**
+   * 批量更新冲刺内故事顺序（整列一次提交）
+   */
+  async reorderSprintStories(
+    id: number,
+    orders: Array<{ story_id: number; position: number }>
+  ) {
+    const response = await apiClient.post<ApiResponse>(`/api/sprints/${id}/reorder`, { orders });
+    return response.data.data;
+  },
+
+  /**
    * 获取项目燃尽图
    */
   async getBurndown(id: number, sprintId: number): Promise<BurndownReport> {

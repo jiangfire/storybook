@@ -13,6 +13,7 @@ const confirmLabels: Record<ConfirmActionState['kind'], string> = {
   remove_member: '确认移除',
   remove_tech_lead: '确认移除',
   cancel_sprint: '确认取消冲刺',
+  delete_sprint: '确认删除冲刺',
 };
 
 export function ConfirmActionModal({

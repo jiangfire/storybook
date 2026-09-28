@@ -29,4 +29,10 @@ export type ConfirmActionState =
       title: string;
       message: string;
       sprintID: number;
+    }
+  | {
+      kind: 'delete_sprint';
+      title: string;
+      message: string;
+      sprintID: number;
     };

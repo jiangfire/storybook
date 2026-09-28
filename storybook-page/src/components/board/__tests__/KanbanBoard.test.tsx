@@ -1,10 +1,13 @@
 import { act, render, screen, within } from '@testing-library/react';
 import type { StoryBoardItem } from '../../../types/models';
+import { projectService } from '../../../services/projectService';
 import KanbanBoard from '../KanbanBoard';
 
 const fetchBoardData = vi.fn();
 const updateStoryStatus = vi.fn();
 const showError = vi.fn();
+
+const mockedProjectService = vi.mocked(projectService, { deep: true });
 
 let latestDndContextProps:
   | {
@@ -36,6 +39,12 @@ vi.mock('@dnd-kit/core', () => ({
 
 vi.mock('../../../stores/storyStore', () => ({
   useStoryStore: () => storyStoreState,
+}));
+
+vi.mock('../../../services/projectService', () => ({
+  projectService: {
+    reorderSprintStories: vi.fn(),
+  },
 }));
 
 vi.mock('../../../hooks/useWebSocket', () => ({
@@ -191,5 +200,35 @@ describe('KanbanBoard', () => {
     expect(showError).toHaveBeenCalledWith('排序更新失败，已回滚');
     const titles = within(screen.getByTestId('column-backlog')).getAllByText(/^Story \d$/);
     expect(titles.map((node) => node.textContent)).toEqual(['Story 2', 'Story 3']);
+  });
+
+  it('整列同属一个冲刺时同列重排走批量 reorder 端点', async () => {
+    setStoryStore({
+      pending: [],
+      backlog: [
+        { ...createStory(2, 'backlog', 1024), sprint_id: 31 },
+        { ...createStory(3, 'backlog', 2048), sprint_id: 31 },
+      ],
+      ready: [],
+      in_progress: [],
+      test: [],
+      done: [],
+    });
+    mockedProjectService.reorderSprintStories.mockResolvedValue({});
+
+    render(<KanbanBoard projectId={7} />);
+
+    await act(async () => {
+      await latestDndContextProps?.onDragEnd?.({
+        active: { id: 2 },
+        over: { id: 3 },
+      });
+    });
+
+    expect(mockedProjectService.reorderSprintStories).toHaveBeenCalledWith(31, [
+      { story_id: 3, position: 1 },
+      { story_id: 2, position: 2 },
+    ]);
+    expect(updateStoryStatus).not.toHaveBeenCalled();
   });
 });

@@ -322,6 +322,11 @@ export default function ProjectDetailPage() {
         await projectService.cancelSprint(confirmAction.sprintID);
         showSuccess('冲刺已取消，故事已退回待办池');
         await loadSprints(projectID, selectedSprintID);
+      } else if (confirmAction.kind === 'delete_sprint') {
+        setStatusUpdatingSprintID(confirmAction.sprintID);
+        await projectService.deleteSprint(confirmAction.sprintID);
+        showSuccess('冲刺已删除');
+        await loadSprints(projectID, selectedSprintID);
       } else {
         setRemovingTechLeadID(confirmAction.userID);
         await techLeadService.removeTechLead(projectID, confirmAction.userID);
@@ -337,7 +342,9 @@ export default function ProjectDetailPage() {
             ? '成员移除失败'
             : confirmAction.kind === 'cancel_sprint'
               ? '冲刺取消失败'
-              : '技术负责人移除失败'
+              : confirmAction.kind === 'delete_sprint'
+                ? '冲刺删除失败'
+                : '技术负责人移除失败'
         )
       );
     } finally {
@@ -434,6 +441,15 @@ export default function ProjectDetailPage() {
     });
   };
 
+  const handleDeleteSprint = (sprint: SprintSummary) => {
+    setConfirmAction({
+      kind: 'delete_sprint',
+      title: '删除冲刺',
+      message: `确认删除「${sprint.name}」吗？仅未启动的冲刺可删除，关联故事会退回待办池。`,
+      sprintID: sprint.id,
+    });
+  };
+
   if (Number.isNaN(projectID) || projectID <= 0) {
     return <div className="p-8 text-danger">项目ID无效</div>;
   }
@@ -504,6 +520,7 @@ export default function ProjectDetailPage() {
         onSelectSprint={setSelectedSprintID}
         onUpdateSprintStatus={handleUpdateSprintStatus}
         onCancelSprint={handleCancelSprint}
+        onDeleteSprint={handleDeleteSprint}
       />
 
       <BurndownSection

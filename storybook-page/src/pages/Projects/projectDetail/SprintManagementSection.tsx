@@ -11,6 +11,8 @@ interface SprintManagementSectionProps {
   onSelectSprint: (sprintID: number) => void;
   onUpdateSprintStatus: (sprint: SprintSummary) => Promise<void>;
   onCancelSprint: (sprint: SprintSummary) => void;
+  /** 删除冲刺（仅未启动的冲刺显示），由父级弹确认框 */
+  onDeleteSprint: (sprint: SprintSummary) => void;
 }
 
 export function SprintManagementSection({
@@ -21,6 +23,7 @@ export function SprintManagementSection({
   onSelectSprint,
   onUpdateSprintStatus,
   onCancelSprint,
+  onDeleteSprint,
 }: SprintManagementSectionProps) {
   return (
     <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
@@ -74,6 +77,16 @@ export function SprintManagementSection({
                       disabled={statusUpdatingSprintID === sprint.id}
                     >
                       取消冲刺
+                    </Button>
+                  )}
+                  {sprint.status === 'planned' && (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => onDeleteSprint(sprint)}
+                      disabled={statusUpdatingSprintID === sprint.id}
+                    >
+                      删除冲刺
                     </Button>
                   )}
                   {action && (
