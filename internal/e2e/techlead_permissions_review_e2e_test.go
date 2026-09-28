@@ -107,6 +107,19 @@ func TestTechLeadScopedAccessAssignAndReviewE2E(t *testing.T) {
 		t.Fatalf("tech_lead update story status should be forbidden, got: %d %s", updateStatusResp.Code, updateStatusResp.Body)
 	}
 
+	// pending 故事必须先审批通过才能分配负责人（P0 守卫）；
+	// 由技术负责人正常走审批链路，顺带覆盖审批→分配的完整职责流。
+	reviewResp := doJSON(t, r, http.MethodPost, "/api/stories/"+strconv.Itoa(int(story2ID))+"/review", techLeadToken, map[string]any{
+		"approved": true,
+		"comment":  "验收标准清晰，通过",
+	})
+	if reviewResp.Code != http.StatusOK {
+		t.Fatalf("tech_lead review story2 failed: %d %s", reviewResp.Code, reviewResp.Body)
+	}
+	if nestedString(t, reviewResp.JSON, "data", "status") != model.StoryStatusBacklog {
+		t.Fatalf("approve should move story to backlog, got: %s", reviewResp.Body)
+	}
+
 	assignResp := doJSON(t, r, http.MethodPatch, "/api/stories/"+strconv.Itoa(int(story2ID))+"/assignee", techLeadToken, map[string]any{
 		"assigned_to": devID,
 	})
@@ -122,17 +135,6 @@ func TestTechLeadScopedAccessAssignAndReviewE2E(t *testing.T) {
 	})
 	if updateStoryResp.Code != http.StatusForbidden {
 		t.Fatalf("tech_lead update story should be forbidden, got: %d %s", updateStoryResp.Code, updateStoryResp.Body)
-	}
-
-	reviewResp := doJSON(t, r, http.MethodPost, "/api/stories/"+strconv.Itoa(int(story2ID))+"/review", techLeadToken, map[string]any{
-		"approved": true,
-		"comment":  "通过",
-	})
-	if reviewResp.Code != http.StatusOK {
-		t.Fatalf("tech_lead review story failed: %d %s", reviewResp.Code, reviewResp.Body)
-	}
-	if nestedString(t, reviewResp.JSON, "data", "status") != model.StoryStatusBacklog {
-		t.Fatalf("approve should move story to backlog, got: %s", reviewResp.Body)
 	}
 }
 
