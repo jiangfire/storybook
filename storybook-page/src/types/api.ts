@@ -508,6 +508,11 @@ export interface SearchParams {
   q: string;
   type?: 'all' | 'project' | 'story' | 'bug';
   limit?: number;
+  /** 高级过滤：创建时间范围（YYYY-MM-DD） */
+  created_from?: string;
+  created_to?: string;
+  /** 高级过滤：状态（可多选） */
+  status?: string[];
 }
 
 // 搜索结果

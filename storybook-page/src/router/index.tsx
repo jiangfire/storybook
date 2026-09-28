@@ -14,6 +14,7 @@ const ProjectBugsPage = lazy(() => import('../pages/Projects/ProjectBugsPage'));
 const StoryDetailPage = lazy(() => import('../pages/Stories/StoryDetailPage'));
 const StoryCreatePage = lazy(() => import('../pages/Stories/StoryCreatePage'));
 const DashboardPage = lazy(() => import('../pages/Dashboard/DashboardPage'));
+const SearchResultPage = lazy(() => import('../pages/Search/SearchResultPage'));
 const TechLeadReviewPage = lazy(() => import('../pages/TechLead/ReviewPage'));
 const TechLeadWorkloadPage = lazy(() => import('../pages/TechLead/WorkloadPage'));
 const UserManagementPage = lazy(() => import('../pages/Admin/UserManagementPage'));
@@ -45,6 +46,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LoadingSpinner />}>
             <DashboardPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'search',
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <SearchResultPage />
           </Suspense>
         ),
       },

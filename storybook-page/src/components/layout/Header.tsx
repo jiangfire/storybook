@@ -330,6 +330,13 @@ export default function Header() {
       setShowResult(false);
       event.currentTarget.blur();
     }
+    if (event.key === 'Enter') {
+      const q = query.trim();
+      if (q) {
+        setShowResult(false);
+        navigate(`/search?q=${encodeURIComponent(q)}`);
+      }
+    }
   };
 
   const renderBugLink = (projectID: number, bugID: number) =>
@@ -541,6 +548,14 @@ export default function Header() {
                           </SearchSectionPlaceholder>
                         )}
                       </div>
+
+                      <Link
+                        to={`/search?q=${encodeURIComponent(query.trim())}`}
+                        onClick={() => setShowResult(false)}
+                        className="block rounded-xl px-3 py-2 text-center text-sm text-primary transition-colors hover:bg-primary-50"
+                      >
+                        查看全部结果 →
+                      </Link>
                     </div>
                   )}
                 </div>
