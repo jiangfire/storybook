@@ -6,14 +6,24 @@ import {
   InboxIcon,
   WrenchIcon,
 } from '../../../components/ui/AppIcon';
-import { formatSprintStatus } from '../../../utils/formatters';
-import type { QualityReportData, VelocityReportData } from '../../../types/api';
+import { formatSprintStatus, formatStoryStatus } from '../../../utils/formatters';
+import type {
+  CumulativeFlowReport,
+  QualityReportData,
+  TimeMetricReport,
+  ThroughputReport,
+  VelocityReportData,
+} from '../../../types/api';
 
 interface ReportsSectionProps {
   isReportLoading: boolean;
   reportError: string;
   velocity: VelocityReportData | null;
   quality: QualityReportData | null;
+  cumulativeFlow: CumulativeFlowReport | null;
+  cycleTime: TimeMetricReport | null;
+  leadTime: TimeMetricReport | null;
+  throughput: ThroughputReport | null;
   onRefresh: () => void;
 }
 
@@ -151,8 +161,19 @@ export function ReportsSection({
   reportError,
   velocity,
   quality,
+  cumulativeFlow,
+  cycleTime,
+  leadTime,
+  throughput,
   onRefresh,
 }: ReportsSectionProps) {
+  const latestFlowPoint = cumulativeFlow?.points[cumulativeFlow.points.length - 1] ?? null;
+  const flowEntries = latestFlowPoint
+    ? Object.entries(latestFlowPoint.statuses).filter(([, count]) => count > 0)
+    : [];
+  const flowMax = Math.max(...flowEntries.map(([, count]) => count), 1);
+  const throughputMax = Math.max(...(throughput?.points.map((p) => p.completed_count) ?? []), 1);
+
   return (
     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
       <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
@@ -212,6 +233,155 @@ export function ReportsSection({
               data={quality.bugs.severity_breakdown}
               total={quality.bugs.total}
             />
+          </div>
+        )}
+      </div>
+
+      {/* 累计流 */}
+      <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-text">累计流</h2>
+          <p className="mt-1 text-sm text-text-light">
+            {cumulativeFlow ? `${cumulativeFlow.from} 至 ${cumulativeFlow.to} 每日各状态存量。` : '每日各状态故事存量。'}
+          </p>
+        </div>
+        {isReportLoading && <div className="state-panel state-panel-loading">报表加载中...</div>}
+        {!isReportLoading && reportError && <div className="state-panel state-panel-error">{reportError}</div>}
+        {!isReportLoading && !reportError && (!cumulativeFlow || flowEntries.length === 0) && (
+          <div className="state-panel state-panel-empty">暂无累计流数据</div>
+        )}
+        {!isReportLoading && !reportError && cumulativeFlow && flowEntries.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs text-text-light">截至 {latestFlowPoint?.date} 的状态分布</div>
+            {flowEntries.map(([status, count]) => (
+              <div key={status} className="flex items-center gap-3">
+                <span className="w-16 shrink-0 text-xs text-text-light">
+                  {formatStoryStatus(status)}
+                </span>
+                <div className="h-2 flex-1 rounded-full bg-secondary-100">
+                  <div
+                    className="h-2 rounded-full bg-primary"
+                    style={{ width: `${(count / flowMax) * 100}%` }}
+                  />
+                </div>
+                <span className="w-8 shrink-0 text-right text-xs text-text">{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 吞吐量 */}
+      <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-text">吞吐量</h2>
+          <p className="mt-1 text-sm text-text-light">
+            {throughput
+              ? `按${throughput.interval === 'day' ? '日' : '周'}统计完成故事数，窗口内共完成 ${throughput.total_completed} 个。`
+              : '按周期统计完成故事数。'}
+          </p>
+        </div>
+        {isReportLoading && <div className="state-panel state-panel-loading">报表加载中...</div>}
+        {!isReportLoading && reportError && <div className="state-panel state-panel-error">{reportError}</div>}
+        {!isReportLoading && !reportError && (!throughput || throughput.total_completed === 0) && (
+          <div className="state-panel state-panel-empty">暂无吞吐量数据</div>
+        )}
+        {!isReportLoading && !reportError && throughput && throughput.total_completed > 0 && (
+          <div className="space-y-2">
+            {throughput.points.map((point) => (
+              <div key={point.period_start} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 text-xs text-text-light">{point.period_start}</span>
+                <div className="h-2 flex-1 rounded-full bg-secondary-100">
+                  <div
+                    className="h-2 rounded-full bg-success"
+                    style={{ width: `${(point.completed_count / throughputMax) * 100}%` }}
+                  />
+                </div>
+                <span className="w-8 shrink-0 text-right text-xs text-text">
+                  {point.completed_count}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 周期时间 */}
+      <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-text">周期时间</h2>
+          <p className="mt-1 text-sm text-text-light">从开始开发到完成的平均耗时。</p>
+        </div>
+        {isReportLoading && <div className="state-panel state-panel-loading">报表加载中...</div>}
+        {!isReportLoading && reportError && <div className="state-panel state-panel-error">{reportError}</div>}
+        {!isReportLoading && !reportError && (!cycleTime || cycleTime.sample_size === 0) && (
+          <div className="state-panel state-panel-empty">暂无周期时间数据</div>
+        )}
+        {!isReportLoading && !reportError && cycleTime && cycleTime.sample_size > 0 && (
+          <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="section-block rounded-[1.2rem] p-3">
+                <div className="text-xs text-text-light">平均周期</div>
+                <div className="mt-1 text-xl font-semibold text-text">
+                  {cycleTime.average_days.toFixed(1)} 天
+                </div>
+              </div>
+              <div className="section-block rounded-[1.2rem] p-3">
+                <div className="text-xs text-text-light">样本数</div>
+                <div className="mt-1 text-xl font-semibold text-text">{cycleTime.sample_size}</div>
+              </div>
+            </div>
+            <div className="text-xs text-text-light">耗时最长的故事：</div>
+            {cycleTime.per_story.slice(0, 3).map((item) => (
+              <div key={item.story_id} className="section-block rounded-[1.2rem] px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">#{item.story_id} {item.title}</span>
+                  <span className="shrink-0 text-xs text-text-light">
+                    {item.days.toFixed(1)} 天
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* 前置时间 */}
+      <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-text">前置时间</h2>
+          <p className="mt-1 text-sm text-text-light">从故事创建到完成的平均耗时。</p>
+        </div>
+        {isReportLoading && <div className="state-panel state-panel-loading">报表加载中...</div>}
+        {!isReportLoading && reportError && <div className="state-panel state-panel-error">{reportError}</div>}
+        {!isReportLoading && !reportError && (!leadTime || leadTime.sample_size === 0) && (
+          <div className="state-panel state-panel-empty">暂无前置时间数据</div>
+        )}
+        {!isReportLoading && !reportError && leadTime && leadTime.sample_size > 0 && (
+          <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="section-block rounded-[1.2rem] p-3">
+                <div className="text-xs text-text-light">平均前置</div>
+                <div className="mt-1 text-xl font-semibold text-text">
+                  {leadTime.average_days.toFixed(1)} 天
+                </div>
+              </div>
+              <div className="section-block rounded-[1.2rem] p-3">
+                <div className="text-xs text-text-light">样本数</div>
+                <div className="mt-1 text-xl font-semibold text-text">{leadTime.sample_size}</div>
+              </div>
+            </div>
+            <div className="text-xs text-text-light">耗时最长的故事：</div>
+            {leadTime.per_story.slice(0, 3).map((item) => (
+              <div key={item.story_id} className="section-block rounded-[1.2rem] px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">#{item.story_id} {item.title}</span>
+                  <span className="shrink-0 text-xs text-text-light">
+                    {item.days.toFixed(1)} 天
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

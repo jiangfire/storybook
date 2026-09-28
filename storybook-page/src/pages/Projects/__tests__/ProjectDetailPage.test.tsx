@@ -40,6 +40,10 @@ vi.mock('../../../services/projectService', () => ({
     getBurndown: vi.fn(),
     getVelocity: vi.fn(),
     getQuality: vi.fn(),
+    getCumulativeFlow: vi.fn(),
+    getCycleTime: vi.fn(),
+    getLeadTime: vi.fn(),
+    getThroughput: vi.fn(),
   },
 }));
 
@@ -343,6 +347,41 @@ describe('ProjectDetailPage', () => {
     mockedProjectService.getBurndown.mockResolvedValue(burndownData);
     mockedProjectService.getVelocity.mockResolvedValue(velocityData);
     mockedProjectService.getQuality.mockResolvedValue(qualityData);
+    mockedProjectService.getCumulativeFlow.mockResolvedValue({
+      project_id: 1,
+      from: '2026-03-01',
+      to: '2026-03-29',
+      statuses: ['backlog', 'done'],
+      points: [{ date: '2026-03-29', statuses: { backlog: 1, done: 2 } }],
+    });
+    mockedProjectService.getCycleTime.mockResolvedValue({
+      project_id: 1,
+      metric: 'cycle_time',
+      from: '2026-01-01',
+      to: '2026-03-29',
+      sample_size: 2,
+      average_hours: 96,
+      average_days: 4,
+      per_story: [{ story_id: 12, title: '支持邮箱登录', hours: 120, days: 5 }],
+    });
+    mockedProjectService.getLeadTime.mockResolvedValue({
+      project_id: 1,
+      metric: 'lead_time',
+      from: '2026-01-01',
+      to: '2026-03-29',
+      sample_size: 2,
+      average_hours: 240,
+      average_days: 10,
+      per_story: [],
+    });
+    mockedProjectService.getThroughput.mockResolvedValue({
+      project_id: 1,
+      interval: 'week',
+      from: '2026-02-01',
+      to: '2026-03-29',
+      total_completed: 3,
+      points: [{ period_start: '2026-03-23', period_end: '2026-03-29', completed_count: 2 }],
+    });
     mockedTechLeadService.getProjectTechLeads.mockResolvedValue({ tech_leads: [] });
     mockedTechLeadService.addTechLead.mockResolvedValue({});
     mockedTechLeadService.removeTechLead.mockResolvedValue({});
@@ -653,6 +692,12 @@ describe('ProjectDetailPage', () => {
     expect(within(qualitySection).getByText('缺陷状态分布')).toBeInTheDocument();
     expect(within(qualitySection).getByText('严重')).toBeInTheDocument();
     expect(within(burndownSection).getByText('已燃尽: 12 点')).toBeInTheDocument();
+
+    // 四张新报表也一并渲染
+    expect(within(getSectionByHeading('累计流')).getByText(/截至 2026-03-29/)).toBeInTheDocument();
+    expect(within(getSectionByHeading('吞吐量')).getByText(/共完成 3 个/)).toBeInTheDocument();
+    expect(within(getSectionByHeading('周期时间')).getByText('4.0 天')).toBeInTheDocument();
+    expect(within(getSectionByHeading('前置时间')).getByText('10.0 天')).toBeInTheDocument();
 
     await user.click(within(velocitySection).getByRole('button', { name: '刷新' }));
 

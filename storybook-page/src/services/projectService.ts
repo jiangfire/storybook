@@ -12,6 +12,9 @@ import type {
   SprintSummary,
   VelocityReportData,
   QualityReportData,
+  CumulativeFlowReport,
+  TimeMetricReport,
+  ThroughputReport,
   ProjectMembersResponse,
   ProjectMemberCandidatesResponse,
 } from '../types/api';
@@ -210,6 +213,47 @@ export const projectService = {
   async getVelocity(id: number): Promise<VelocityReportData> {
     const response = await apiClient.get<ApiResponse<VelocityReportData>>(
       `/api/projects/${id}/reports/velocity`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 获取累计流报表（每日各状态故事数）
+   */
+  async getCumulativeFlow(id: number): Promise<CumulativeFlowReport> {
+    const response = await apiClient.get<ApiResponse<CumulativeFlowReport>>(
+      `/api/projects/${id}/reports/cumulative-flow`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 获取周期时间报表（开始开发到完成的平均耗时）
+   */
+  async getCycleTime(id: number): Promise<TimeMetricReport> {
+    const response = await apiClient.get<ApiResponse<TimeMetricReport>>(
+      `/api/projects/${id}/reports/cycle-time`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 获取前置时间报表（创建到完成的平均耗时）
+   */
+  async getLeadTime(id: number): Promise<TimeMetricReport> {
+    const response = await apiClient.get<ApiResponse<TimeMetricReport>>(
+      `/api/projects/${id}/reports/lead-time`
+    );
+    return response.data.data;
+  },
+
+  /**
+   * 获取吞吐量报表（按周/日统计完成数）
+   */
+  async getThroughput(id: number, interval: 'week' | 'day' = 'week'): Promise<ThroughputReport> {
+    const response = await apiClient.get<ApiResponse<ThroughputReport>>(
+      `/api/projects/${id}/reports/throughput`,
+      { params: { interval } }
     );
     return response.data.data;
   },

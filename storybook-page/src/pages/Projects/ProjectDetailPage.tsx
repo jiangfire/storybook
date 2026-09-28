@@ -17,8 +17,11 @@ import {
 import type {
   BurndownReport,
   CreateSprintRequest,
+  CumulativeFlowReport,
   QualityReportData,
   SprintSummary,
+  ThroughputReport,
+  TimeMetricReport,
   VelocityReportData,
 } from '../../types/api';
 import type { ProjectRole, User } from '../../types/models';
@@ -61,6 +64,10 @@ export default function ProjectDetailPage() {
   const [isBurndownLoading, setIsBurndownLoading] = useState(false);
   const [velocity, setVelocity] = useState<VelocityReportData | null>(null);
   const [quality, setQuality] = useState<QualityReportData | null>(null);
+  const [cumulativeFlow, setCumulativeFlow] = useState<CumulativeFlowReport | null>(null);
+  const [cycleTime, setCycleTime] = useState<TimeMetricReport | null>(null);
+  const [leadTime, setLeadTime] = useState<TimeMetricReport | null>(null);
+  const [throughput, setThroughput] = useState<ThroughputReport | null>(null);
   const [isReportLoading, setIsReportLoading] = useState(false);
   const [reportError, setReportError] = useState('');
   const [memberCandidates, setMemberCandidates] = useState<User[]>([]);
@@ -171,15 +178,29 @@ export default function ProjectDetailPage() {
     try {
       setIsReportLoading(true);
       setReportError('');
-      const [velocityData, qualityData] = await Promise.all([
-        projectService.getVelocity(pid),
-        projectService.getQuality(pid),
-      ]);
+      // 四张新报表用 allSettled：单张失败不拖垮整体，失败的留空显示"暂无数据"。
+      const [velocityData, qualityData, flowSettled, cycleSettled, leadSettled, throughputSettled] =
+        await Promise.all([
+          projectService.getVelocity(pid),
+          projectService.getQuality(pid),
+          projectService.getCumulativeFlow(pid).catch(() => null),
+          projectService.getCycleTime(pid).catch(() => null),
+          projectService.getLeadTime(pid).catch(() => null),
+          projectService.getThroughput(pid).catch(() => null),
+        ]);
       setVelocity(velocityData);
       setQuality(qualityData);
+      setCumulativeFlow(flowSettled);
+      setCycleTime(cycleSettled);
+      setLeadTime(leadSettled);
+      setThroughput(throughputSettled);
     } catch (err: unknown) {
       setVelocity(null);
       setQuality(null);
+      setCumulativeFlow(null);
+      setCycleTime(null);
+      setLeadTime(null);
+      setThroughput(null);
       setReportError(getErrorMessage(err, '报表数据加载失败'));
     } finally {
       setIsReportLoading(false);
@@ -540,6 +561,10 @@ export default function ProjectDetailPage() {
         reportError={reportError}
         velocity={velocity}
         quality={quality}
+        cumulativeFlow={cumulativeFlow}
+        cycleTime={cycleTime}
+        leadTime={leadTime}
+        throughput={throughput}
         onRefresh={() => void loadReports(projectID)}
       />
 

@@ -501,6 +501,37 @@ export interface QualityReportData {
   };
 }
 
+// 累计流报表（每日各状态故事数）
+export interface CumulativeFlowReport {
+  project_id: number;
+  from: string;
+  to: string;
+  statuses: string[];
+  points: Array<{ date: string; statuses: Record<string, number> }>;
+}
+
+// 周期/前置时间报表
+export interface TimeMetricReport {
+  project_id: number;
+  metric: string;
+  from: string;
+  to: string;
+  sample_size: number;
+  average_hours: number;
+  average_days: number;
+  per_story: Array<{ story_id: number; title: string; hours: number; days: number }>;
+}
+
+// 吞吐量报表（按周期统计完成故事数）
+export interface ThroughputReport {
+  project_id: number;
+  interval: string;
+  from: string;
+  to: string;
+  total_completed: number;
+  points: Array<{ period_start: string; period_end: string; completed_count: number }>;
+}
+
 // ===== 搜索相关 =====
 
 // 搜索查询参数
