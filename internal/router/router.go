@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/storybook/internal/metrics"
 	"github.com/jiangfire/storybook/internal/middleware"
-	"github.com/jiangfire/storybook/internal/model"
 	"github.com/jiangfire/storybook/internal/webui"
 	"github.com/jiangfire/storybook/internal/wiring"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -195,7 +194,7 @@ func New(c *wiring.Container) *gin.Engine {
 
 		// 技术负责人专用接口
 		techlead := protected.Group("/techlead")
-		techlead.Use(middleware.RequireRoles(model.RoleTechLead, model.RoleAdmin))
+		techlead.Use(middleware.RequireRouteRoles("techlead"))
 		{
 			techlead.GET("/pending-stories", c.TechLead.ListPendingStories)
 			techlead.GET("/workload", c.TechLead.ListWorkload)
@@ -207,9 +206,9 @@ func New(c *wiring.Container) *gin.Engine {
 		protected.DELETE("/projects/:id/techleads/:userID", projectAccess, c.TechLead.RemoveTechLead)
 		protected.GET("/projects/:id/techleads", projectAccess, c.TechLead.ListProjectTechLeads)
 
-		// 管理员配置
+		// 管理员配置（修正历史冲突：此前路由放行 tech_lead 但 handler 再拒）
 		admin := protected.Group("/admin")
-		admin.Use(middleware.RequireRoles(model.RoleTechLead, model.RoleAdmin))
+		admin.Use(middleware.RequireRouteRoles("admin.ai"))
 		{
 			admin.GET("/ai/config", c.AI.GetConfig)
 			admin.PUT("/ai/config", c.AI.UpsertConfig)
@@ -217,7 +216,7 @@ func New(c *wiring.Container) *gin.Engine {
 		}
 
 		userAdmin := protected.Group("/admin/users")
-		userAdmin.Use(middleware.RequireRoles(model.RoleAdmin))
+		userAdmin.Use(middleware.RequireRouteRoles("admin.users"))
 		{
 			userAdmin.GET("", c.UserManagement.ListUsers)
 			userAdmin.POST("", c.UserManagement.CreateUser)
