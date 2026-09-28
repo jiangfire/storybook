@@ -135,6 +135,22 @@ export const projectService = {
   },
 
   /**
+   * 完成冲刺（事务性收尾：未完成故事自动退回待办池）
+   */
+  async closeSprint(id: number) {
+    const response = await apiClient.post<ApiResponse>(`/api/sprints/${id}/close`);
+    return response.data.data;
+  },
+
+  /**
+   * 取消冲刺（全部故事退回待办池，冲刺不可恢复）
+   */
+  async cancelSprint(id: number) {
+    const response = await apiClient.post<ApiResponse>(`/api/sprints/${id}/cancel`);
+    return response.data.data;
+  },
+
+  /**
    * 获取项目燃尽图
    */
   async getBurndown(id: number, sprintId: number): Promise<BurndownReport> {

@@ -368,7 +368,7 @@ export interface SprintSummary {
   goal?: string;
   start_date: string;
   end_date: string;
-  status: 'planned' | 'active' | 'completed';
+  status: 'planned' | 'active' | 'completed' | 'cancelled';
   total_stories: number;
   done_stories: number;
   created_at: string;
@@ -457,7 +457,7 @@ export interface BurndownReport {
 export interface VelocitySprintItem {
   sprint_id: number;
   name: string;
-  status: 'planned' | 'active' | 'completed';
+  status: 'planned' | 'active' | 'completed' | 'cancelled';
   start_date: string;
   end_date: string;
   story_count: number;

@@ -34,6 +34,8 @@ vi.mock('../../../services/projectService', () => ({
     getSprints: vi.fn(),
     createSprint: vi.fn(),
     updateSprintStatus: vi.fn(),
+    closeSprint: vi.fn(),
+    cancelSprint: vi.fn(),
     getBurndown: vi.fn(),
     getVelocity: vi.fn(),
     getQuality: vi.fn(),
@@ -334,6 +336,8 @@ describe('ProjectDetailPage', () => {
       updated_at: NOW,
     });
     mockedProjectService.updateSprintStatus.mockResolvedValue({});
+    mockedProjectService.closeSprint.mockResolvedValue({});
+    mockedProjectService.cancelSprint.mockResolvedValue({});
     mockedProjectService.getBurndown.mockResolvedValue(burndownData);
     mockedProjectService.getVelocity.mockResolvedValue(velocityData);
     mockedProjectService.getQuality.mockResolvedValue(qualityData);
@@ -659,12 +663,36 @@ describe('ProjectDetailPage', () => {
     await user.click(within(sprintSection).getByRole('button', { name: '完成冲刺' }));
 
     await waitFor(() => {
-      expect(mockedProjectService.updateSprintStatus).toHaveBeenCalledWith(31, {
-        status: 'completed',
-      });
+      expect(mockedProjectService.closeSprint).toHaveBeenCalledWith(31);
       expect(mockedProjectService.getBurndown.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
-    expect(showSuccess).toHaveBeenCalledWith('冲刺已更新为已完成');
+    expect(showSuccess).toHaveBeenCalledWith('冲刺已完成，未完成故事已退回待办池');
+  });
+
+  it('取消冲刺前会弹确认框，确认后调用取消端点并刷新列表', async () => {
+    const user = userEvent.setup();
+    const cancelledSprint: SprintSummary = { ...activeSprint, status: 'cancelled' };
+    mockedProjectService.getSprints
+      .mockResolvedValueOnce({ sprints: [activeSprint] })
+      .mockResolvedValueOnce({ sprints: [cancelledSprint] });
+
+    renderPage();
+
+    const sprintSection = getSectionByHeading('冲刺管理');
+    const cancelButton = await within(sprintSection).findByRole('button', { name: '取消冲刺' });
+    await user.click(cancelButton);
+
+    expect(mockedProjectService.cancelSprint).not.toHaveBeenCalled();
+    expect(screen.getByText(/确认取消「Sprint 1」吗？/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '确认取消冲刺' }));
+
+    await waitFor(() => {
+      expect(mockedProjectService.cancelSprint).toHaveBeenCalledWith(31);
+      expect(mockedProjectService.getSprints).toHaveBeenCalledTimes(2);
+    });
+    expect(showSuccess).toHaveBeenCalledWith('冲刺已取消，故事已退回待办池');
+    expect(screen.queryByText(/确认取消「Sprint 1」吗？/)).not.toBeInTheDocument();
   });
 });

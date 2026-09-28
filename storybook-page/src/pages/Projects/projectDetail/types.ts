@@ -23,4 +23,10 @@ export type ConfirmActionState =
       title: string;
       message: string;
       userID: number;
+    }
+  | {
+      kind: 'cancel_sprint';
+      title: string;
+      message: string;
+      sprintID: number;
     };

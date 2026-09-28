@@ -110,6 +110,7 @@ export function formatSprintStatus(status: string): string {
     planned: '未开始',
     active: '进行中',
     completed: '已完成',
+    cancelled: '已取消',
   };
   return labels[status] || status;
 }

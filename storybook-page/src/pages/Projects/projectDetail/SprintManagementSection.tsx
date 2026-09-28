@@ -1,7 +1,7 @@
 import Button from '../../../components/ui/Button';
 import { formatSprintStatus } from '../../../utils/formatters';
 import type { SprintSummary } from '../../../types/api';
-import { getNextSprintAction, getSprintStatusClass } from './sprintHelpers';
+import { canCancelSprint, getNextSprintAction, getSprintStatusClass } from './sprintHelpers';
 
 interface SprintManagementSectionProps {
   sprintError: string;
@@ -10,6 +10,7 @@ interface SprintManagementSectionProps {
   onCreateSprint: () => void;
   onSelectSprint: (sprintID: number) => void;
   onUpdateSprintStatus: (sprint: SprintSummary) => Promise<void>;
+  onCancelSprint: (sprint: SprintSummary) => void;
 }
 
 export function SprintManagementSection({
@@ -19,6 +20,7 @@ export function SprintManagementSection({
   onCreateSprint,
   onSelectSprint,
   onUpdateSprintStatus,
+  onCancelSprint,
 }: SprintManagementSectionProps) {
   return (
     <div className="section-card rounded-[1.8rem] p-4 sm:p-5">
@@ -64,13 +66,25 @@ export function SprintManagementSection({
                   <Button size="sm" variant="secondary" onClick={() => onSelectSprint(sprint.id)}>
                     查看燃尽图
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => void onUpdateSprintStatus(sprint)}
-                    isLoading={statusUpdatingSprintID === sprint.id}
-                  >
-                    {action.label}
-                  </Button>
+                  {canCancelSprint(sprint.status) && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => onCancelSprint(sprint)}
+                      disabled={statusUpdatingSprintID === sprint.id}
+                    >
+                      取消冲刺
+                    </Button>
+                  )}
+                  {action && (
+                    <Button
+                      size="sm"
+                      onClick={() => void onUpdateSprintStatus(sprint)}
+                      isLoading={statusUpdatingSprintID === sprint.id}
+                    >
+                      {action.label}
+                    </Button>
+                  )}
                 </div>
               </div>
             );

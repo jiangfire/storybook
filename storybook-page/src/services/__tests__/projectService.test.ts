@@ -31,7 +31,10 @@ describe('projectService', () => {
   });
 
   it('createSprint / updateSprintStatus / reports 接口路径正确', async () => {
-    mockedApi.post.mockResolvedValueOnce({ data: { data: { id: 7 } } });
+    mockedApi.post
+      .mockResolvedValueOnce({ data: { data: { id: 7 } } })
+      .mockResolvedValueOnce({ data: { data: { id: 7, status: 'completed' } } })
+      .mockResolvedValueOnce({ data: { data: { id: 7, status: 'cancelled' } } });
     mockedApi.patch.mockResolvedValueOnce({ data: { data: { ok: true } } });
     mockedApi.get
       .mockResolvedValueOnce({ data: { data: { sprints: [] } } })
@@ -55,6 +58,8 @@ describe('projectService', () => {
       end_date: '2026-04-05',
     });
     await projectService.updateSprintStatus(7, { status: 'active' });
+    await projectService.closeSprint(7);
+    await projectService.cancelSprint(7);
     await projectService.getSprints(1);
     await projectService.getBurndown(1, 7);
     await projectService.getVelocity(1);
@@ -66,6 +71,8 @@ describe('projectService', () => {
       end_date: '2026-04-05',
     });
     expect(mockedApi.patch).toHaveBeenCalledWith('/api/sprints/7/status', { status: 'active' });
+    expect(mockedApi.post).toHaveBeenNthCalledWith(2, '/api/sprints/7/close');
+    expect(mockedApi.post).toHaveBeenNthCalledWith(3, '/api/sprints/7/cancel');
     expect(mockedApi.get).toHaveBeenNthCalledWith(1, '/api/projects/1/sprints');
     expect(mockedApi.get).toHaveBeenNthCalledWith(2, '/api/projects/1/reports/burndown', {
       params: { sprint_id: 7 },

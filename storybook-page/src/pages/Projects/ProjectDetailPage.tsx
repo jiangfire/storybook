@@ -310,6 +310,11 @@ export default function ProjectDetailPage() {
         showSuccess('成员移除成功');
         await loadMembers(projectID);
         await loadMemberCandidates(projectID);
+      } else if (confirmAction.kind === 'cancel_sprint') {
+        setStatusUpdatingSprintID(confirmAction.sprintID);
+        await projectService.cancelSprint(confirmAction.sprintID);
+        showSuccess('冲刺已取消，故事已退回待办池');
+        await loadSprints(projectID, selectedSprintID);
       } else {
         setRemovingTechLeadID(confirmAction.userID);
         await techLeadService.removeTechLead(projectID, confirmAction.userID);
@@ -321,12 +326,17 @@ export default function ProjectDetailPage() {
       showError(
         getErrorMessage(
           error,
-          confirmAction.kind === 'remove_member' ? '成员移除失败' : '技术负责人移除失败'
+          confirmAction.kind === 'remove_member'
+            ? '成员移除失败'
+            : confirmAction.kind === 'cancel_sprint'
+              ? '冲刺取消失败'
+              : '技术负责人移除失败'
         )
       );
     } finally {
       setRemovingMemberUserID(null);
       setRemovingTechLeadID(null);
+      setStatusUpdatingSprintID(null);
     }
   };
 
@@ -365,7 +375,9 @@ export default function ProjectDetailPage() {
     }
   };
 
-  const isConfirmSubmitting = Boolean(removingMemberUserID || removingTechLeadID);
+  const isConfirmSubmitting = Boolean(
+    removingMemberUserID || removingTechLeadID || statusUpdatingSprintID
+  );
   const handleCloseConfirmModal = () => {
     if (!isConfirmSubmitting) {
       setConfirmAction(null);
@@ -383,10 +395,18 @@ export default function ProjectDetailPage() {
 
   const handleUpdateSprintStatus = async (sprint: SprintSummary) => {
     const action = getNextSprintAction(sprint.status);
+    if (!action) {
+      return;
+    }
     try {
       setStatusUpdatingSprintID(sprint.id);
-      await projectService.updateSprintStatus(sprint.id, { status: action.target });
-      showSuccess(`冲刺已更新为${formatSprintStatus(action.target)}`);
+      if (action.kind === 'close') {
+        await projectService.closeSprint(sprint.id);
+        showSuccess('冲刺已完成，未完成故事已退回待办池');
+      } else {
+        await projectService.updateSprintStatus(sprint.id, { status: action.target });
+        showSuccess(`冲刺已更新为${formatSprintStatus(action.target)}`);
+      }
       await loadSprints(projectID, selectedSprintID);
       if (selectedSprintID === sprint.id) {
         await loadBurndown(projectID, sprint.id);
@@ -396,6 +416,15 @@ export default function ProjectDetailPage() {
     } finally {
       setStatusUpdatingSprintID(null);
     }
+  };
+
+  const handleCancelSprint = (sprint: SprintSummary) => {
+    setConfirmAction({
+      kind: 'cancel_sprint',
+      title: '取消冲刺',
+      message: `确认取消「${sprint.name}」吗？冲刺内全部故事（含已完成）都会退回待办池，取消后冲刺无法恢复。`,
+      sprintID: sprint.id,
+    });
   };
 
   if (Number.isNaN(projectID) || projectID <= 0) {
@@ -464,6 +493,7 @@ export default function ProjectDetailPage() {
         onCreateSprint={() => setIsCreateSprintOpen(true)}
         onSelectSprint={setSelectedSprintID}
         onUpdateSprintStatus={handleUpdateSprintStatus}
+        onCancelSprint={handleCancelSprint}
       />
 
       <BurndownSection

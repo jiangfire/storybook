@@ -9,6 +9,12 @@ interface ConfirmActionModalProps {
   onConfirm: () => void;
 }
 
+const confirmLabels: Record<ConfirmActionState['kind'], string> = {
+  remove_member: '确认移除',
+  remove_tech_lead: '确认移除',
+  cancel_sprint: '确认取消冲刺',
+};
+
 export function ConfirmActionModal({
   confirmAction,
   isSubmitting,
@@ -23,8 +29,12 @@ export function ConfirmActionModal({
           <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
             取消
           </Button>
-          <Button variant="danger" onClick={onConfirm} isLoading={isSubmitting}>
-            确认移除
+          <Button
+            variant="danger"
+            onClick={onConfirm}
+            isLoading={isSubmitting}
+          >
+            {confirmAction ? confirmLabels[confirmAction.kind] : '确认'}
           </Button>
         </div>
       </div>
