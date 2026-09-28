@@ -71,9 +71,11 @@ describe('StoryCard', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
     expect(screen.getByTitle('dev@example.com')).toHaveTextContent('D');
 
-    await user.click(screen.getByRole('button', { name: '详情' }));
+    // 标题整体可点击进入详情；拖拽把手独立渲染且不触发导航
+    await user.click(screen.getByRole('button', { name: '登录故事' }));
 
     expect(navigate).toHaveBeenCalledWith('/stories/18');
+    expect(screen.getByRole('button', { name: '拖拽排序 登录故事' })).toBeInTheDocument();
   });
 
   it('无负责人时显示未分配，并从验收标准明细计算进度', () => {

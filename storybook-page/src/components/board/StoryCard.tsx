@@ -10,6 +10,7 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom';
+import { GripIcon } from '../ui/AppIcon';
 
 interface StoryCardProps {
   story: StoryBoardItem;
@@ -40,17 +41,26 @@ export default function StoryCard({ story }: StoryCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className="bg-white rounded-lg shadow-sm border border-border p-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200"
+      className="bg-white rounded-lg shadow-sm border border-border p-4 transition-all duration-200 hover:shadow-md"
     >
-      {/* 类型标签 */}
+      {/* 类型标签 + 拖拽把手 */}
       <div className="flex items-center justify-between mb-3">
-        <span
-          className={`text-xs px-2 py-1 rounded-full font-medium ${getStoryTypeColor(story.story_type)}`}
-        >
-          {formatStoryType(story.story_type)}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            aria-label={`拖拽排序 ${story.title}`}
+            className="touch-none rounded p-0.5 text-text-light transition-colors hover:bg-secondary-100 hover:text-text active:cursor-grabbing cursor-grab"
+          >
+            <GripIcon size={14} />
+          </button>
+          <span
+            className={`text-xs px-2 py-1 rounded-full font-medium ${getStoryTypeColor(story.story_type)}`}
+          >
+            {formatStoryType(story.story_type)}
+          </span>
+        </div>
 
         <span
           className={`rounded-full px-2 py-1 text-xs font-medium ${getPriorityColor(story.priority ?? 0)}`}
@@ -60,7 +70,13 @@ export default function StoryCard({ story }: StoryCardProps) {
       </div>
 
       {/* 标题 */}
-      <h4 className="font-medium text-text mb-3 line-clamp-2 min-h-[2.5rem]">{story.title}</h4>
+      <button
+        type="button"
+        onClick={() => navigate(`/stories/${story.id}`)}
+        className="block w-full text-left font-medium text-text mb-3 line-clamp-2 min-h-[2.5rem]"
+      >
+        {story.title}
+      </button>
 
       {/* 验收标准进度 */}
       {acTotal > 0 && (
@@ -89,17 +105,6 @@ export default function StoryCard({ story }: StoryCardProps) {
               <span className="text-sm font-medium text-text">{story.story_points}</span>
             </div>
           )}
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/stories/${story.id}`);
-            }}
-            className="rounded-md bg-primary-50 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary-100"
-          >
-            详情
-          </button>
         </div>
 
         {/* 负责人 */}
