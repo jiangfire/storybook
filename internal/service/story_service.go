@@ -253,6 +253,14 @@ func (s *StoryService) UrgeReview(story *model.UserStory, userID uint) error {
 		return NewValidationError(ValidationIssue{Field: "status", Message: "只有待审批状态的故事可以催审"})
 	}
 
+	// 同一故事 5 分钟内只允许催审一次，防止连续调用刷审批人通知。
+	var lastUrge model.ActivityLog
+	err := s.db.Where("entity_type = ? AND entity_id = ? AND action = ?", "story", story.ID, "review_urged").
+		Order("created_at DESC").First(&lastUrge).Error
+	if err == nil && time.Since(lastUrge.CreatedAt) < 5*time.Minute {
+		return NewValidationError(ValidationIssue{Field: "story", Message: "催审太频繁，同一故事 5 分钟内只能催审一次"})
+	}
+
 	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, "review_urged", nil, map[string]any{
 		"review_status": story.ReviewStatus,
 	}), "write story activity log", "story_id", story.ID, "action", "review_urged")
@@ -697,7 +705,13 @@ func (s *StoryService) Release(story *model.UserStory, userID uint, role string)
 		nil,
 		func(current *model.UserStory) {
 			current.AssignedTo = nil
-			current.Status = model.StoryStatusReady
+			// 释放只回退一档（test→in_progress→ready），避免 backlog/test 直接跳到 ready。
+			switch current.Status {
+			case model.StoryStatusInProgress:
+				current.Status = model.StoryStatusReady
+			case model.StoryStatusTest:
+				current.Status = model.StoryStatusInProgress
+			}
 		},
 	)
 	if err != nil {
