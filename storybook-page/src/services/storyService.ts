@@ -8,6 +8,8 @@ import type {
   BoardData,
   UpdateStoryStatusRequest,
   UpdateACStatusRequest,
+  AddACRequest,
+  UpdateACRequest,
   ActivityListParams,
   ActivityListResponse,
   AddCodeRefRequest,
@@ -139,6 +141,27 @@ export const storyService = {
    */
   async updateACStatus(storyId: number, acId: string, data: UpdateACStatusRequest): Promise<void> {
     await apiClient.patch(`/api/stories/${storyId}/acceptance-criteria/${acId}`, data);
+  },
+
+  /**
+   * 新增验收标准
+   */
+  async addAC(storyId: number, data: AddACRequest): Promise<void> {
+    await apiClient.post(`/api/stories/${storyId}/ac`, data);
+  },
+
+  /**
+   * 更新验收标准内容（描述/引用/备注/顺序）
+   */
+  async updateAC(storyId: number, acId: string, data: UpdateACRequest): Promise<void> {
+    await apiClient.put(`/api/stories/${storyId}/ac/${acId}`, data);
+  },
+
+  /**
+   * 删除验收标准
+   */
+  async deleteAC(storyId: number, acId: string): Promise<void> {
+    await apiClient.delete(`/api/stories/${storyId}/ac/${acId}`);
   },
 
   /**

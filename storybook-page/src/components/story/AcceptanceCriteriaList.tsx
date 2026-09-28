@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { AcceptanceCriteria, ACStatus } from '../../types/models';
 import { useStoryStore } from '../../stores/storyStore';
+import { storyService } from '../../services/storyService';
+import { useToast } from '../ui/Toast';
 import { cn } from '../../utils/cn';
 import { CheckCircleIcon, ClipboardIcon, XIcon } from '../ui/AppIcon';
 import Button from '../ui/Button';
@@ -9,7 +11,19 @@ interface AcceptanceCriteriaListProps {
   storyId: number;
   criteria: AcceptanceCriteria[];
   editable?: boolean;
+  /** 允许增/改/删 AC 内容（产品经理/管理员） */
+  contentEditable?: boolean;
+  /** AC 内容变更后通知父级刷新故事 */
+  onChanged?: () => void;
 }
+
+interface ACFormState {
+  description: string;
+  ref: string;
+  notes: string;
+}
+
+const emptyACForm: ACFormState = { description: '', ref: '', notes: '' };
 
 const statusConfig: Record<
   ACStatus,
@@ -44,10 +58,19 @@ export default function AcceptanceCriteriaList({
   storyId,
   criteria,
   editable = true,
+  contentEditable = false,
+  onChanged,
 }: AcceptanceCriteriaListProps) {
   const { updateACStatus, isUpdating } = useStoryStore();
+  const { showError } = useToast();
   const [editingAC, setEditingAC] = useState<string | null>(null);
   const [evidence, setEvidence] = useState('');
+
+  const [isAdding, setIsAdding] = useState(false);
+  const [addingForm, setAddingForm] = useState<ACFormState>(emptyACForm);
+  const [editingContentId, setEditingContentId] = useState<string | null>(null);
+  const [editingForm, setEditingForm] = useState<ACFormState>(emptyACForm);
+  const [isContentSubmitting, setIsContentSubmitting] = useState(false);
 
   const handleStatusChange = async (acId: string, newStatus: ACStatus) => {
     try {
@@ -67,11 +90,120 @@ export default function AcceptanceCriteriaList({
     }
   };
 
+  const handleAddAC = async () => {
+    const description = addingForm.description.trim();
+    if (!description) {
+      showError('请填写验收标准描述');
+      return;
+    }
+    try {
+      setIsContentSubmitting(true);
+      await storyService.addAC(storyId, {
+        description,
+        ref: addingForm.ref.trim() || undefined,
+        notes: addingForm.notes.trim() || undefined,
+      });
+      setIsAdding(false);
+      setAddingForm(emptyACForm);
+      onChanged?.();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : '新增验收标准失败');
+    } finally {
+      setIsContentSubmitting(false);
+    }
+  };
+
+  const startEditContent = (ac: AcceptanceCriteria) => {
+    setEditingContentId(ac.id);
+    setEditingForm({ description: ac.description, ref: ac.ref || '', notes: ac.notes || '' });
+  };
+
+  const handleUpdateAC = async () => {
+    if (!editingContentId) {
+      return;
+    }
+    const description = editingForm.description.trim();
+    if (!description) {
+      showError('请填写验收标准描述');
+      return;
+    }
+    try {
+      setIsContentSubmitting(true);
+      await storyService.updateAC(storyId, editingContentId, {
+        description,
+        ref: editingForm.ref.trim() || undefined,
+        notes: editingForm.notes.trim() || undefined,
+      });
+      setEditingContentId(null);
+      setEditingForm(emptyACForm);
+      onChanged?.();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : '更新验收标准失败');
+    } finally {
+      setIsContentSubmitting(false);
+    }
+  };
+
+  const handleDeleteAC = async (ac: AcceptanceCriteria) => {
+    if (!window.confirm(`确认删除该验收标准吗？\n${ac.description}`)) {
+      return;
+    }
+    try {
+      setIsContentSubmitting(true);
+      await storyService.deleteAC(storyId, ac.id);
+      onChanged?.();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : '删除验收标准失败');
+    } finally {
+      setIsContentSubmitting(false);
+    }
+  };
+
+  const renderACForm = (
+    form: ACFormState,
+    setForm: (form: ACFormState) => void,
+    onSubmit: () => void,
+    onCancel: () => void
+  ) => (
+    <div className="mt-3 space-y-2 rounded-lg border border-border bg-secondary-50 p-3">
+      <textarea
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        placeholder="验收标准描述（如：用户输入手机号后可收到验证码）"
+        className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+        rows={2}
+      />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <input
+          value={form.ref}
+          onChange={(e) => setForm({ ...form, ref: e.target.value })}
+          placeholder="引用（可选，如 REQ-101）"
+          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        <input
+          value={form.notes}
+          onChange={(e) => setForm({ ...form, notes: e.target.value })}
+          placeholder="备注（可选）"
+          className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+      </div>
+      <div className="flex space-x-2">
+        <Button size="sm" onClick={onSubmit} isLoading={isContentSubmitting}>
+          保存
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onCancel} disabled={isContentSubmitting}>
+          取消
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-3">
       {criteria.map((ac) => {
         const config = statusConfig[ac.status];
         const isEditing = editingAC === ac.id;
+        const isEditingContent = editingContentId === ac.id;
         const StatusIcon = config.icon;
 
         return (
@@ -135,6 +267,11 @@ export default function AcceptanceCriteriaList({
                   </div>
                 )}
 
+                {/* 备注 */}
+                {ac.notes && (
+                  <div className="mt-1 text-xs text-text-light">备注：{ac.notes}</div>
+                )}
+
                 {/* 证据 */}
                 {ac.evidence && (
                   <div className="mt-2 p-2 bg-white rounded border border-border text-sm">
@@ -183,11 +320,60 @@ export default function AcceptanceCriteriaList({
                     添加证据
                   </button>
                 )}
+
+                {/* 内容编辑/删除操作 */}
+                {contentEditable && !isEditingContent && (
+                  <div className="mt-2 flex gap-3 text-xs text-text-light">
+                    <button
+                      onClick={() => startEditContent(ac)}
+                      className="transition-colors hover:text-primary"
+                    >
+                      编辑
+                    </button>
+                    <button
+                      onClick={() => void handleDeleteAC(ac)}
+                      className="transition-colors hover:text-danger"
+                    >
+                      删除
+                    </button>
+                  </div>
+                )}
+
+                {/* 内容编辑表单 */}
+                {isEditingContent &&
+                  renderACForm(
+                    editingForm,
+                    setEditingForm,
+                    handleUpdateAC,
+                    () => {
+                      setEditingContentId(null);
+                      setEditingForm(emptyACForm);
+                    }
+                  )}
               </div>
             </div>
           </div>
         );
       })}
+
+      {/* 新增验收标准 */}
+      {contentEditable && (
+        <div>
+          {!isAdding ? (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="text-sm text-primary transition-colors hover:text-primary-700"
+            >
+              + 新增验收标准
+            </button>
+          ) : (
+            renderACForm(addingForm, setAddingForm, handleAddAC, () => {
+              setIsAdding(false);
+              setAddingForm(emptyACForm);
+            })
+          )}
+        </div>
+      )}
 
       {/* 统计信息 */}
       <div className="pt-3 border-t border-border">

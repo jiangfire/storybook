@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useStoryStore } from '../../../stores/storyStore';
+import { storyService } from '../../../services/storyService';
 import AcceptanceCriteriaList from '../AcceptanceCriteriaList';
 
 vi.mock('../../../stores/storyStore', async () => {
@@ -10,8 +11,36 @@ vi.mock('../../../stores/storyStore', async () => {
   return actual;
 });
 
+vi.mock('../../../services/storyService', () => ({
+  storyService: {
+    addAC: vi.fn(),
+    updateAC: vi.fn(),
+    deleteAC: vi.fn(),
+  },
+}));
+
+vi.mock('../../ui/Toast', () => ({
+  useToast: () => ({
+    showError: vi.fn(),
+    showSuccess: vi.fn(),
+  }),
+}));
+
+const mockedStoryService = vi.mocked(storyService, { deep: true });
+
+const oneAC = [
+  {
+    id: 'ac-1',
+    description: 'Given 用户已登录',
+    ref: 'REQ-1',
+    status: 'pending' as const,
+    order: 1,
+  },
+];
+
 describe('AcceptanceCriteriaList', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useStoryStore.setState({
       updateACStatus: vi.fn(async () => {}),
       isUpdating: false,
@@ -23,19 +52,7 @@ describe('AcceptanceCriteriaList', () => {
     const updateACStatus = vi.fn(async () => {});
     useStoryStore.setState({ updateACStatus });
 
-    render(
-      <AcceptanceCriteriaList
-        storyId={12}
-        criteria={[
-          {
-            id: 'ac-1',
-            description: 'Given 用户已登录',
-            status: 'pending',
-            order: 1,
-          },
-        ]}
-      />
-    );
+    render(<AcceptanceCriteriaList storyId={12} criteria={oneAC} />);
 
     await user.click(screen.getByRole('button', { name: '过' }));
 
@@ -50,14 +67,7 @@ describe('AcceptanceCriteriaList', () => {
     render(
       <AcceptanceCriteriaList
         storyId={12}
-        criteria={[
-          {
-            id: 'ac-1',
-            description: 'Given 用户已登录',
-            status: 'passed',
-            order: 1,
-          },
-        ]}
+        criteria={[{ ...oneAC[0], status: 'passed' as const, ref: undefined }]}
       />
     );
 
@@ -90,5 +100,84 @@ describe('AcceptanceCriteriaList', () => {
     expect(screen.getByText('Given 用户已登录')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '待' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '添加证据' })).not.toBeInTheDocument();
+  });
+
+  it('contentEditable 下可新增验收标准并回调刷新', async () => {
+    const user = userEvent.setup();
+    mockedStoryService.addAC.mockResolvedValue(undefined);
+    const onChanged = vi.fn();
+
+    render(
+      <AcceptanceCriteriaList storyId={12} criteria={[]} contentEditable onChanged={onChanged} />
+    );
+
+    await user.click(screen.getByRole('button', { name: '+ 新增验收标准' }));
+    await user.type(
+      screen.getByPlaceholderText('验收标准描述（如：用户输入手机号后可收到验证码）'),
+      '用户可用手机号登录'
+    );
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    expect(mockedStoryService.addAC).toHaveBeenCalledWith(12, {
+      description: '用户可用手机号登录',
+      ref: undefined,
+      notes: undefined,
+    });
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('contentEditable 下可编辑验收标准内容', async () => {
+    const user = userEvent.setup();
+    mockedStoryService.updateAC.mockResolvedValue(undefined);
+    const onChanged = vi.fn();
+
+    render(
+      <AcceptanceCriteriaList storyId={12} criteria={oneAC} contentEditable onChanged={onChanged} />
+    );
+
+    await user.click(screen.getByRole('button', { name: '编辑' }));
+    const textarea = screen.getByPlaceholderText(
+      '验收标准描述（如：用户输入手机号后可收到验证码）'
+    );
+    await user.clear(textarea);
+    await user.type(textarea, '更严格的标准');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    expect(mockedStoryService.updateAC).toHaveBeenCalledWith(12, 'ac-1', {
+      description: '更严格的标准',
+      ref: 'REQ-1',
+      notes: undefined,
+    });
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('contentEditable 下删除验收标准前需要确认', async () => {
+    const user = userEvent.setup();
+    mockedStoryService.deleteAC.mockResolvedValue(undefined);
+    const onChanged = vi.fn();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
+
+    render(
+      <AcceptanceCriteriaList storyId={12} criteria={oneAC} contentEditable onChanged={onChanged} />
+    );
+
+    await user.click(screen.getByRole('button', { name: '删除' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(mockedStoryService.deleteAC).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValueOnce(true);
+    await user.click(screen.getByRole('button', { name: '删除' }));
+
+    expect(mockedStoryService.deleteAC).toHaveBeenCalledWith(12, 'ac-1');
+    expect(onChanged).toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('默认不渲染内容编辑入口', () => {
+    render(<AcceptanceCriteriaList storyId={12} criteria={oneAC} />);
+
+    expect(screen.queryByRole('button', { name: '+ 新增验收标准' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '编辑' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument();
   });
 });

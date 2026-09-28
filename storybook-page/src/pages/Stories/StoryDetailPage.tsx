@@ -259,6 +259,8 @@ export default function StoryDetailPage() {
   const canReleaseCurrentStory = canReleaseStoryPermission(user, currentStory.assigned_to);
   const canEditStory =
     user?.role === 'product' || user?.role === 'admin' || user?.id === currentStory.created_by.id;
+  // AC 内容增/改/删走专用端点，后端拒绝 tech_lead（审批人不得改被审内容）。
+  const canEditACContent = user?.role === 'product' || user?.role === 'admin';
   const developerMembers = members.filter((m) => m.role_in_project === 'developer');
 
   const handleSprintChange = async (value: string) => {
@@ -530,6 +532,8 @@ export default function StoryDetailPage() {
             <AcceptanceCriteriaList
               storyId={currentStory.id}
               criteria={currentStory.acceptance_criteria}
+              contentEditable={canEditACContent}
+              onChanged={() => void fetchStory(currentStory.id)}
             />
           </div>
 

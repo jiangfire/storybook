@@ -153,6 +153,21 @@ export interface UpdateACStatusRequest {
   evidence?: string;
 }
 
+// 新增验收标准请求
+export interface AddACRequest {
+  description: string;
+  ref?: string;
+  notes?: string;
+}
+
+// 更新验收标准内容请求
+export interface UpdateACRequest {
+  description?: string;
+  ref?: string;
+  notes?: string;
+  order?: number;
+}
+
 // 活动历史查询参数
 export interface ActivityListParams {
   action?: string;

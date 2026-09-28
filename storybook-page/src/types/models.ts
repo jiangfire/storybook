@@ -31,6 +31,7 @@ export interface AcceptanceCriteria {
   status: ACStatus;
   evidence?: string;
   order: number;
+  notes?: string;
 }
 
 // 用户故事
