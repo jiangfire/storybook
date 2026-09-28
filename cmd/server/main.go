@@ -24,16 +24,18 @@ import (
 )
 
 const (
-	cmdServer         = "server"
-	cmdBootstrapAdmin = "bootstrap-admin"
+	cmdServer            = "server"
+	cmdBootstrapAdmin    = "bootstrap-admin"
+	cmdBackfillEmbedding = "backfill-embeddings"
 )
 
 var (
-	binName = "storybook"
-	version = "dev"
+	binName  = "storybook"
+	version  = "dev"
 	commands = []struct{ name, short string }{
 		{cmdServer, "启动 HTTP 服务器（默认子命令）"},
 		{cmdBootstrapAdmin, "创建或提升管理员账户"},
+		{cmdBackfillEmbedding, "为存量故事批量生成语义向量（需 postgres+pgvector 与 embedding 配置）"},
 	}
 )
 
@@ -51,6 +53,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runServerWithArgs(args[1:], stdout, stderr)
 	case cmdBootstrapAdmin:
 		return runBootstrapAdmin(args[1:], stdout, stderr)
+	case cmdBackfillEmbedding:
+		return runBackfillEmbeddings(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		printUsage(stdout)
 		return 0
@@ -232,5 +236,70 @@ func runBootstrapAdmin(args []string, stdout, stderr io.Writer) int {
 		result.RoleChanged,
 		result.PasswordChanged,
 	)
+	return 0
+}
+
+// runBackfillEmbeddings 为存量故事一次性生成语义向量。向量索引只随故事的
+// 增改写入，配置 pgvector 之前的存量故事需要本命令回填后才能被语义搜索
+// 与相似查重命中。默认只处理 embedding 为空的故事，--force 可全量重算。
+func runBackfillEmbeddings(args []string, stdout, stderr io.Writer) int {
+	config.LoadDotEnv()
+	fs := flag.NewFlagSet(cmdBackfillEmbedding, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	force := fs.Bool("force", false, "re-generate embeddings even if a story already has one")
+
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "load config failed: %v\n", err)
+		return 1
+	}
+	if cfg.EmbeddingProvider == "" {
+		fmt.Fprintln(stderr, "未配置 EMBEDDING_PROVIDER，向量回填不可用（支持 openai/ollama/mock）")
+		return 1
+	}
+
+	logger, err := logging.New(cfg.LogLevel, cfg.LogFormat, stdout)
+	if err != nil {
+		fmt.Fprintf(stderr, "create logger failed: %v\n", err)
+		return 1
+	}
+
+	db, err := database.Connect(cfg)
+	if err != nil {
+		logger.Error("connect database failed", "driver", cfg.DBDriver, "error", err)
+		return 1
+	}
+
+	vectorSvc := wiring.BuildVectorService(cfg, db, logger)
+	if vectorSvc == nil {
+		fmt.Fprintln(stderr, "向量服务不可用：需要 postgres + pgvector 且 embedding 配置有效（详见启动日志）")
+		return 1
+	}
+
+	query := db.Model(&model.UserStory{})
+	if !*force {
+		query = query.Where("embedding IS NULL")
+	}
+	var stories []model.UserStory
+	if err := query.Find(&stories).Error; err != nil {
+		fmt.Fprintf(stderr, "load stories failed: %v\n", err)
+		return 1
+	}
+	if len(stories) == 0 {
+		fmt.Fprintln(stdout, "没有需要回填的故事")
+		return 0
+	}
+
+	fmt.Fprintf(stdout, "待回填故事 %d 条（provider=%s, force=%t）\n", len(stories), cfg.EmbeddingProvider, *force)
+	if err := vectorSvc.BatchIndexStories(context.Background(), stories); err != nil {
+		fmt.Fprintf(stderr, "backfill failed: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "回填完成：%d 条\n", len(stories))
 	return 0
 }

@@ -98,3 +98,18 @@ func TestRunBootstrapAdminDoesNotRequireJWTSecret(t *testing.T) {
 		t.Fatalf("bootstrap should not require JWT_SECRET, stderr=%q", stderr.String())
 	}
 }
+
+func TestRunBackfillEmbeddingsRequiresProvider(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	t.Setenv("EMBEDDING_PROVIDER", "")
+
+	code := run([]string{cmdBackfillEmbedding}, &stdout, &stderr)
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "未配置 EMBEDDING_PROVIDER") {
+		t.Fatalf("expected missing provider error, got %q", stderr.String())
+	}
+}

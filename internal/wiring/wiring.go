@@ -63,7 +63,7 @@ func Build(cfg *config.Config, db *gorm.DB, logger *slog.Logger, tokenManager *a
 	}
 
 	c.Hub = realtime.NewHub(db)
-	c.Vector = buildVectorService(cfg, db, logger)
+	c.Vector = BuildVectorService(cfg, db, logger)
 
 	// Repositories — 供不需要直接操作 db 的 handler 注入使用。
 	userRepo := repository.NewUserRepository(db)
@@ -120,10 +120,10 @@ func Build(cfg *config.Config, db *gorm.DB, logger *slog.Logger, tokenManager *a
 	return c, nil
 }
 
-// buildVectorService 在 cfg.EmbeddingProvider 设置且 db 为 postgres 时
+// BuildVectorService 在 cfg.EmbeddingProvider 设置且 db 为 postgres 时
 // 初始化向量服务。失败仅记日志、返回 nil，让搜索退化为纯 SQL。
-// 行为与原 router.buildVectorService 完全等价，只把 os.Getenv 替换为 cfg 字段。
-func buildVectorService(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.VectorService {
+// 供 HTTP 装配与 backfill-embeddings 子命令共用。
+func BuildVectorService(cfg *config.Config, db *gorm.DB, logger *slog.Logger) service.VectorService {
 	provider := cfg.EmbeddingProvider
 	if provider == "" {
 		return nil
