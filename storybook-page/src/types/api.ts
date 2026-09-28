@@ -760,6 +760,48 @@ export interface INVESTCheckData {
   suggestions: string[];
 }
 
+// AI 优化验收标准（返回建议，不落库）
+export interface AIRefineACData {
+  story_id: number;
+  original_ac: string[];
+  suggested: string[];
+  raw: string;
+}
+
+// 干系人摘要
+export interface AISummaryData {
+  story_id: number;
+  summary: string;
+}
+
+// 翻译结果
+export interface AITranslateData {
+  story_id: number;
+  language: 'en' | 'zh';
+  translated: {
+    title: string;
+    description: string;
+    ac: string[];
+  };
+  raw: string;
+}
+
+// DoR 检查（确定性规则，不依赖 LLM）
+export interface AIDoRCheckData {
+  story_id: number;
+  ready: boolean;
+  score: number;
+  passed: number;
+  total: number;
+  checks: Array<{
+    key: string;
+    title: string;
+    pass: boolean;
+    message: string;
+  }>;
+  suggestions: string[];
+}
+
 // 检查结果
 export interface CheckResult {
   score: number;

@@ -8,6 +8,7 @@ import ActivityTimeline from '../../components/story/ActivityTimeline';
 import StoryTasksPanel from '../../components/story/StoryTasksPanel';
 import StoryTestCasesPanel from '../../components/story/StoryTestCasesPanel';
 import StoryForm from '../../components/story/StoryForm';
+import { StoryAIPanel } from '../../components/story/StoryAIPanel';
 import Button from '../../components/ui/Button';
 import { StoryDetailSkeleton } from '../../components/ui/Skeleton';
 import { projectService } from '../../services/projectService';
@@ -605,21 +606,11 @@ export default function StoryDetailPage() {
 
           {canUseAIInStory && (
             <>
-              <div className="bg-white rounded-xl border border-primary-100 p-6">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-text">模型辅助</h2>
-                  <p className="text-sm text-text-light">
-                    当前详情页未接入直接模型操作；模型草稿生成在创建/编辑故事表单中使用。
-                  </p>
-                </div>
-                {canEditStory && (
-                  <div className="mt-4">
-                    <Button variant="secondary" size="sm" onClick={() => setIsEditOpen(true)}>
-                      打开编辑表单
-                    </Button>
-                  </div>
-                )}
-              </div>
+              <StoryAIPanel
+                storyId={currentStory.id}
+                canRefineAC={canEditACContent}
+                onACChanged={() => void fetchStory(currentStory.id)}
+              />
 
               <div className="bg-white rounded-xl border border-border p-6 space-y-4">
                 <div className="space-y-1">

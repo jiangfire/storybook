@@ -10,6 +10,10 @@ import type {
   ApiResponse,
   AIStoryChatRequest,
   AIStoryChatResponse,
+  AIRefineACData,
+  AISummaryData,
+  AITranslateData,
+  AIDoRCheckData,
   INVESTCheckData,
 } from '../types/api';
 
@@ -66,6 +70,43 @@ export const aiService = {
   async checkInvest(storyId: number): Promise<INVESTCheckData> {
     const response = await apiClient.get<ApiResponse<INVESTCheckData>>(
       `/api/ai/stories/${storyId}/invest-check`
+    );
+    return response.data.data;
+  },
+
+  /** 根据反馈优化验收标准（返回建议列表，不直接落库） */
+  async refineAC(storyId: number, feedback: string): Promise<AIRefineACData> {
+    const response = await apiClient.post<ApiResponse<AIRefineACData>>(
+      `/api/ai/stories/${storyId}/refine-ac`,
+      { feedback },
+      { timeout: 60000 }
+    );
+    return response.data.data;
+  },
+
+  /** 干系人摘要 */
+  async summarizeStory(storyId: number): Promise<AISummaryData> {
+    const response = await apiClient.get<ApiResponse<AISummaryData>>(
+      `/api/ai/stories/${storyId}/summary`,
+      { timeout: 45000 }
+    );
+    return response.data.data;
+  },
+
+  /** 翻译故事（title/description/AC） */
+  async translateStory(storyId: number, language: 'en' | 'zh'): Promise<AITranslateData> {
+    const response = await apiClient.post<ApiResponse<AITranslateData>>(
+      `/api/ai/stories/${storyId}/translate`,
+      { language },
+      { timeout: 60000 }
+    );
+    return response.data.data;
+  },
+
+  /** DoR（准备就绪）检查，不依赖 LLM */
+  async checkDoR(storyId: number): Promise<AIDoRCheckData> {
+    const response = await apiClient.get<ApiResponse<AIDoRCheckData>>(
+      `/api/ai/stories/${storyId}/dor-check`
     );
     return response.data.data;
   },
