@@ -23,6 +23,8 @@ interface StoryState {
   updateStoryStatus: (storyId: number, data: UpdateStoryStatusRequest) => Promise<void>;
   claimStory: (storyId: number) => Promise<void>;
   releaseStory: (storyId: number) => Promise<void>;
+  /** WS 推送的 AC 变更：静默替换当前故事（无 loading、不动看板） */
+  applyFreshStory: (story: Story) => void;
   updateACStatus: (
     storyId: number,
     acId: string,
@@ -222,6 +224,13 @@ export const useStoryStore = create<StoryState>((set, get) => ({
     } catch (error: unknown) {
       set({ error: getErrorMessage(error), isUpdating: false });
       throw error;
+    }
+  },
+
+  applyFreshStory: (story) => {
+    const { currentStory } = get();
+    if (currentStory && currentStory.id === story.id) {
+      set({ currentStory: story });
     }
   },
 

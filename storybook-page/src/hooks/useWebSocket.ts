@@ -149,6 +149,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           case 'story.ac_updated':
             options.onStoryACUpdated?.(message.data as StoryACUpdatedMessage);
             break;
+          case 'story.ac_added':
+          case 'story.ac_edited':
+          case 'story.ac_removed':
+            // 三类事件与 ac_updated 载荷一致（story_id/ac_id/actor），统一走 AC 同步回调
+            options.onStoryACUpdated?.(message.data as StoryACUpdatedMessage);
+            break;
           case 'story.created':
             options.onStoryCreated?.(message.data);
             break;

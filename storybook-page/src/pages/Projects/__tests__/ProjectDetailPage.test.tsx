@@ -271,6 +271,12 @@ function getSectionByHeading(name: string) {
   return section;
 }
 
+/** 成员/技术负责人配置默认折叠，交互前先展开 */
+async function expandProjectConfig() {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: /项目配置/ }));
+}
+
 function getDateInputs() {
   const inputs = Array.from(document.querySelectorAll('input[type="date"]'));
   if (inputs.length < 2) {
@@ -352,6 +358,8 @@ describe('ProjectDetailPage', () => {
       expect(mockedProjectService.getProjectMemberCandidates).toHaveBeenCalledWith(1);
     });
 
+    await expandProjectConfig();
+
     const memberSection = getSectionByHeading('项目成员');
     expect(within(memberSection).getByRole('button', { name: '添加成员' })).toBeInTheDocument();
 
@@ -369,6 +377,8 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => {
       expect(mockedProjectService.getProjectMembers).toHaveBeenCalledWith(1);
     });
+
+    await expandProjectConfig();
 
     const memberSection = getSectionByHeading('项目成员');
     expect(mockedProjectService.getProjectMemberCandidates).not.toHaveBeenCalled();
@@ -417,6 +427,8 @@ describe('ProjectDetailPage', () => {
       .mockResolvedValueOnce({ users: [] });
 
     renderPage();
+
+    await expandProjectConfig();
 
     const userSelect = await waitFor(() => {
       const select = getSelectByDefaultOptionInSection('项目成员', '选择用户');
@@ -486,6 +498,8 @@ describe('ProjectDetailPage', () => {
 
     renderPage();
 
+    await expandProjectConfig();
+
     const memberSection = getSectionByHeading('项目成员');
     expect(await within(memberSection).findByText('newdev@example.com')).toBeInTheDocument();
 
@@ -527,6 +541,8 @@ describe('ProjectDetailPage', () => {
     await waitFor(() => {
       expect(mockedUserManagementService.getUsers).toHaveBeenCalledWith({ page: 1, limit: 100 });
     });
+
+    await expandProjectConfig();
 
     const techLeadSection = getSectionByHeading('项目技术负责人');
     const techLeadSelect = within(techLeadSection).getByRole('combobox');

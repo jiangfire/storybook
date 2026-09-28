@@ -766,6 +766,9 @@ export interface DashboardData {
 export type WSMessageType =
   | 'story.status_changed'
   | 'story.ac_updated'
+  | 'story.ac_added'
+  | 'story.ac_edited'
+  | 'story.ac_removed'
   | 'story.created'
   | 'story.updated'
   | 'story.deleted'

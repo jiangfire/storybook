@@ -55,8 +55,19 @@ vi.mock('../../../services/techLeadService', () => ({
   },
 }));
 
+// 捕获 WS 订阅回调，模拟他人推送的实时事件
+const wsOptionsStack: Array<Record<string, (...args: unknown[]) => void>> = [];
+
+vi.mock('../../../hooks/useWebSocket', () => ({
+  useWebSocket: (options: Record<string, (...args: unknown[]) => void>) => {
+    wsOptionsStack.push(options);
+    return { isConnected: true, connectionError: null, reconnect: vi.fn(), disconnect: vi.fn() };
+  },
+}));
+
 vi.mock('../../../services/storyService', () => ({
   storyService: {
+    getStory: vi.fn(),
     planToSprint: vi.fn(),
     assignStory: vi.fn(),
     resubmitReview: vi.fn(),
@@ -192,6 +203,7 @@ function getSprintSelect() {
 describe('StoryDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    wsOptionsStack.length = 0;
     localStorage.clear();
 
     mockedProjectService.getSprints.mockResolvedValue({ sprints: [] });
@@ -454,6 +466,63 @@ describe('StoryDetailPage', () => {
     expect(
       await screen.findByText(/当前项目还没有技术负责人，请尽快前往项目详情页添加审批人/)
     ).toBeInTheDocument();
+  });
+
+  it('他人更新验收标准时实时刷新当前故事', async () => {
+    mockedStoryService.getStory.mockResolvedValue(
+      createStory({
+        acceptance_criteria: [
+          { id: 'ac-1', description: 'Given 用户已注册', status: 'passed', order: 1 },
+          { id: 'ac-2', description: 'Given 未注册用户', status: 'pending', order: 2 },
+        ],
+      })
+    );
+
+    setAuthUser('product', 7);
+    setStoryStore(createStory());
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockedProjectService.getProjectMembers).toHaveBeenCalled();
+    });
+
+    // 模拟他人（id=55）推送的 AC 状态变更
+    const options = wsOptionsStack[wsOptionsStack.length - 1];
+    options.onStoryACUpdated({
+      story_id: 18,
+      ac_id: 'ac-2',
+      ac_status: 'pending',
+      actor: { id: 55, email: 'peer@example.com' },
+    } as never);
+
+    await waitFor(() => {
+      expect(mockedStoryService.getStory).toHaveBeenCalledWith(18);
+    });
+    expect(await screen.findByText('AC:2')).toBeInTheDocument();
+  });
+
+  it('自己触发的 AC 事件回声不会重复拉取', async () => {
+    setAuthUser('product', 7);
+    setStoryStore(createStory());
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(mockedProjectService.getProjectMembers).toHaveBeenCalled();
+    });
+    mockedStoryService.getStory.mockClear();
+
+    const options = wsOptionsStack[wsOptionsStack.length - 1];
+    options.onStoryACUpdated({
+      story_id: 18,
+      ac_id: 'ac-1',
+      ac_status: 'passed',
+      actor: { id: 7, email: 'pm@example.com' },
+    } as never);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockedStoryService.getStory).not.toHaveBeenCalled();
   });
 
   it('待审批故事可以催审并收到已提醒反馈', async () => {

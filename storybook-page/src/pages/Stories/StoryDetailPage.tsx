@@ -14,7 +14,13 @@ import { projectService } from '../../services/projectService';
 import { storyService } from '../../services/storyService';
 import { techLeadService } from '../../services/techLeadService';
 import { aiService } from '../../services/aiService';
-import type { AISplitStoryData, INVESTCheckData, SprintSummary } from '../../types/api';
+import type {
+  AISplitStoryData,
+  INVESTCheckData,
+  SprintSummary,
+  StoryACUpdatedMessage,
+} from '../../types/api';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { getErrorMessage } from '../../utils/error';
 import {
   canClaimStory as canClaimStoryPermission,
@@ -174,6 +180,28 @@ export default function StoryDetailPage() {
       cancelled = true;
     };
   }, [currentStory?.project_id, currentStory?.status]);
+
+  // AC 实时同步：他人勾选/新增/修改验收标准时，静默刷新当前故事（无 loading）；
+  // 自己操作的广播回声直接跳过，避免打断正在进行的编辑
+  useWebSocket({
+    onStoryACUpdated: (message: StoryACUpdatedMessage) => {
+      const current = useStoryStore.getState().currentStory;
+      if (!current || message.story_id !== current.id) {
+        return;
+      }
+      if (message.actor?.id === user?.id) {
+        return;
+      }
+      void (async () => {
+        try {
+          const fresh = await storyService.getStory(current.id);
+          useStoryStore.getState().applyFreshStory(fresh);
+        } catch {
+          // 静默失败：下次进入详情会拉取最新数据
+        }
+      })();
+    },
+  });
 
   if (!currentStory) {
     return <StoryDetailSkeleton />;

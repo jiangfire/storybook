@@ -72,6 +72,7 @@ export default function ProjectDetailPage() {
   const [isAddingTechLead, setIsAddingTechLead] = useState(false);
   const [removingTechLeadID, setRemovingTechLeadID] = useState<number | null>(null);
   const [isCreateSprintOpen, setIsCreateSprintOpen] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isSprintSubmitting, setIsSprintSubmitting] = useState(false);
   const [statusUpdatingSprintID, setStatusUpdatingSprintID] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmActionState | null>(null);
@@ -485,35 +486,54 @@ export default function ProjectDetailPage() {
         onRefresh={() => void loadReports(projectID)}
       />
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <ProjectStatusSection statusBreakdown={statusBreakdown} />
-        <ProjectMembersSection
-          canManageMembers={canManageMembers}
-          memberError={memberError}
-          members={members}
-          availableMemberUsers={availableMemberUsers}
-          selectedMemberUserID={selectedMemberUserID}
-          selectedMemberRole={selectedMemberRole}
-          isAddingMember={isAddingMember}
-          removingMemberUserID={removingMemberUserID}
-          onSelectedMemberUserIDChange={setSelectedMemberUserID}
-          onSelectedMemberRoleChange={setSelectedMemberRole}
-          onAddMember={() => void handleAddMember()}
-          onRemoveMember={handleRemoveMember}
-        />
-      </div>
+      <ProjectStatusSection statusBreakdown={statusBreakdown} />
 
-      <ProjectTechLeadsSection
-        canManageTechLeads={canManageTechLeads}
-        techLeads={techLeads}
-        availableTechLeadUsers={availableTechLeadUsers}
-        selectedTechLeadUserID={selectedTechLeadUserID}
-        isAddingTechLead={isAddingTechLead}
-        removingTechLeadID={removingTechLeadID}
-        onSelectedTechLeadUserIDChange={setSelectedTechLeadUserID}
-        onAddTechLead={() => void handleAddTechLead()}
-        onRemoveTechLead={handleRemoveTechLead}
-      />
+      {/* 低频配置折叠收起：高频的进度浏览不被成员/审批人管理操作稀释 */}
+      <section className="section-card rounded-[1.8rem] p-4 sm:p-5">
+        <button
+          type="button"
+          onClick={() => setIsConfigOpen((open) => !open)}
+          aria-expanded={isConfigOpen}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          <div>
+            <h2 className="text-lg font-semibold text-text">项目配置</h2>
+            <p className="mt-1 text-sm text-text-light">成员与技术负责人管理（低频操作）</p>
+          </div>
+          <span className="rounded-xl border border-border bg-white px-3 py-1.5 text-sm text-text-light transition-colors hover:border-primary-200 hover:text-primary">
+            {isConfigOpen ? '收起' : '展开'}
+          </span>
+        </button>
+        {isConfigOpen && (
+          <div className="mt-4 space-y-3">
+            <ProjectMembersSection
+              canManageMembers={canManageMembers}
+              memberError={memberError}
+              members={members}
+              availableMemberUsers={availableMemberUsers}
+              selectedMemberUserID={selectedMemberUserID}
+              selectedMemberRole={selectedMemberRole}
+              isAddingMember={isAddingMember}
+              removingMemberUserID={removingMemberUserID}
+              onSelectedMemberUserIDChange={setSelectedMemberUserID}
+              onSelectedMemberRoleChange={setSelectedMemberRole}
+              onAddMember={() => void handleAddMember()}
+              onRemoveMember={handleRemoveMember}
+            />
+            <ProjectTechLeadsSection
+              canManageTechLeads={canManageTechLeads}
+              techLeads={techLeads}
+              availableTechLeadUsers={availableTechLeadUsers}
+              selectedTechLeadUserID={selectedTechLeadUserID}
+              isAddingTechLead={isAddingTechLead}
+              removingTechLeadID={removingTechLeadID}
+              onSelectedTechLeadUserIDChange={setSelectedTechLeadUserID}
+              onAddTechLead={() => void handleAddTechLead()}
+              onRemoveTechLead={handleRemoveTechLead}
+            />
+          </div>
+        )}
+      </section>
 
       <ConfirmActionModal
         confirmAction={confirmAction}
