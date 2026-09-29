@@ -12,7 +12,10 @@ var (
 	ErrNoProgressPermission = errors.New("no_progress_permission")
 	ErrACNotFound           = errors.New("ac_not_found")
 	ErrACCorrupted          = errors.New("ac_corrupted")
-	ErrNoSplittableAC       = errors.New("no_splittable_ac")
+	// ErrACConcurrentModify 表示乐观锁重试次数耗尽仍无法写入 AC 变更，
+	// 调用方应让客户端刷新后重试。
+	ErrACConcurrentModify = errors.New("ac_concurrent_modify")
+	ErrNoSplittableAC     = errors.New("no_splittable_ac")
 )
 
 type ValidationIssue struct {

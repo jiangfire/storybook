@@ -86,7 +86,9 @@ jobs:
           }
 
           build_bundle linux amd64 "" tar.gz
+          build_bundle linux arm64 "" tar.gz
           build_bundle darwin amd64 "" tar.gz
+          build_bundle darwin arm64 "" tar.gz
           build_bundle windows amd64 ".exe" zip
 
       - name: Upload release artifact

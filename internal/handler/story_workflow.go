@@ -134,6 +134,10 @@ func (h *StoryHandler) UpdateACStatus(c *gin.Context) {
 			api.NotFound(c, "AC不存在")
 			return
 		}
+		if errors.Is(err, service.ErrACConcurrentModify) {
+			api.Conflict(c, "验收标准已被他人修改，请刷新后重试")
+			return
+		}
 		if errors.Is(err, service.ErrACCorrupted) {
 			api.Internal(c, "AC数据损坏")
 			return
@@ -212,6 +216,10 @@ func (h *StoryHandler) AddAC(c *gin.Context) {
 			api.BadRequest(c, items[0].Message)
 			return
 		}
+		if errors.Is(err, service.ErrACConcurrentModify) {
+			api.Conflict(c, "验收标准已被他人修改，请刷新后重试")
+			return
+		}
 		if errors.Is(err, service.ErrACCorrupted) {
 			api.Internal(c, "AC数据损坏")
 			return
@@ -259,6 +267,10 @@ func (h *StoryHandler) UpdateAC(c *gin.Context) {
 			api.NotFound(c, "AC不存在")
 			return
 		}
+		if errors.Is(err, service.ErrACConcurrentModify) {
+			api.Conflict(c, "验收标准已被他人修改，请刷新后重试")
+			return
+		}
 		if errors.Is(err, service.ErrACCorrupted) {
 			api.Internal(c, "AC数据损坏")
 			return
@@ -289,6 +301,10 @@ func (h *StoryHandler) DeleteAC(c *gin.Context) {
 	if err := h.storySvc.RemoveAC(story, userID, acID, actorFromContext(c, userID)); err != nil {
 		if errors.Is(err, service.ErrACNotFound) {
 			api.NotFound(c, "AC不存在")
+			return
+		}
+		if errors.Is(err, service.ErrACConcurrentModify) {
+			api.Conflict(c, "验收标准已被他人修改，请刷新后重试")
 			return
 		}
 		if errors.Is(err, service.ErrACCorrupted) {

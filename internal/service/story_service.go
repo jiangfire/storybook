@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -465,31 +466,59 @@ func (s *StoryService) UpdateStatus(story *model.UserStory, userID uint, newStat
 	return nil
 }
 
-// mutateAC executes the common AC mutation skeleton: parse → apply fn → marshal →
-// save → activity log. The caller supplies a closure that performs the actual
-// business logic and returns old/new values for auditing.
+// errACNoChange 是 mutateAC 的内部信号：fn 在最新数据上判定无可写字段，
+// 跳过落库与活动日志但仍视为成功。
+var errACNoChange = errors.New("ac: no change")
+
+// mutateAC executes the common AC mutation skeleton: re-read fresh state →
+// apply fn → optimistic-locked column update (retry on conflict) → activity
+// log. 并发编辑以乐观锁保护：只更新 acceptance_criteria 列，故事的其他字段
+// 永远不会被本路径的旧快照回滚；版本冲突时重读最新数据重试，重试耗尽返回
+// ErrACConcurrentModify。
 func (s *StoryService) mutateAC(
 	story *model.UserStory, userID uint, action string,
 	fn func(criteria []model.AcceptanceCriterion) (newCriteria []model.AcceptanceCriterion, oldValue, newValue map[string]any, err error),
 ) error {
-	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
-	if err != nil {
-		return ErrACCorrupted
-	}
+	const maxAttempts = 3
+	var lastConflict error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		var fresh model.UserStory
+		if err := s.db.Select("id", "project_id", "acceptance_criteria", "version").
+			First(&fresh, story.ID).Error; err != nil {
+			return err
+		}
+		criteria, err := model.ParseAcceptanceCriteria(fresh.AcceptanceCriteria)
+		if err != nil {
+			return ErrACCorrupted
+		}
 
-	newCriteria, oldValue, newValue, err := fn(criteria)
-	if err != nil {
-		return err
-	}
+		newCriteria, oldValue, newValue, err := fn(criteria)
+		if err != nil {
+			if errors.Is(err, errACNoChange) {
+				return nil
+			}
+			return err
+		}
 
-	story.AcceptanceCriteria = model.MarshalJSON(newCriteria)
-	if err := s.db.Save(story).Error; err != nil {
-		return err
+		res := s.db.Model(&model.UserStory{}).
+			Where("id = ? AND version = ?", story.ID, fresh.Version).
+			Updates(map[string]any{
+				"acceptance_criteria": model.MarshalJSON(newCriteria),
+				"updated_at":          time.Now(),
+				"version":             gorm.Expr("version + 1"),
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 1 {
+			story.AcceptanceCriteria = model.MarshalJSON(newCriteria)
+			logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, action, oldValue, newValue),
+				"write story activity log", "story_id", story.ID, "action", action)
+			return nil
+		}
+		lastConflict = ErrACConcurrentModify
 	}
-
-	logging.LogIfErr(WriteActivityLog(s.db, &story.ProjectID, userID, "story", story.ID, action, oldValue, newValue),
-		"write story activity log", "story_id", story.ID, "action", action)
-	return nil
+	return lastConflict
 }
 
 // broadcastAC sends a project-scoped WebSocket event when AC data changes.
@@ -563,26 +592,9 @@ func (s *StoryService) AddAC(story *model.UserStory, userID uint, description, r
 
 // UpdateAC selectively edits an existing AC's content fields (description, ref,
 // notes, order). Status changes go through UpdateACStatus to keep the verified
-// audit trail intact.
+// audit trail intact. 字段应用发生在 mutateAC 重读出的最新数据上，
+// 并发新增/编辑的其他 AC 不会被本操作覆盖。
 func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string, description, ref, notes *string, order *int, actor any) (model.AcceptanceCriterion, error) {
-	criteria, err := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
-	if err != nil {
-		return model.AcceptanceCriterion{}, ErrACCorrupted
-	}
-	idx := -1
-	for i := range criteria {
-		if criteria[i].ID == acID {
-			idx = i
-			break
-		}
-	}
-	if idx < 0 {
-		return model.AcceptanceCriterion{}, ErrACNotFound
-	}
-
-	oldValue := map[string]any{"description": criteria[idx].Description, "ref": criteria[idx].Ref, "notes": criteria[idx].Notes, "order": criteria[idx].Order}
-	changed := false
-
 	if description != nil {
 		desc := strings.TrimSpace(*description)
 		if desc == "" {
@@ -591,39 +603,59 @@ func (s *StoryService) UpdateAC(story *model.UserStory, userID uint, acID string
 		if len(desc) > 500 {
 			return model.AcceptanceCriterion{}, NewValidationError(ValidationIssue{Field: "description", Message: "description最多500字符"})
 		}
-		if criteria[idx].Description != desc {
-			criteria[idx].Description = desc
-			changed = true
-		}
-	}
-	if ref != nil {
-		if v := strings.TrimSpace(*ref); criteria[idx].Ref != v {
-			criteria[idx].Ref = v
-			changed = true
-		}
-	}
-	if notes != nil {
-		if v := strings.TrimSpace(*notes); criteria[idx].Notes != v {
-			criteria[idx].Notes = v
-			changed = true
-		}
-	}
-	if order != nil && *order > 0 && criteria[idx].Order != *order {
-		criteria[idx].Order = *order
-		changed = true
 	}
 
-	if !changed {
-		return criteria[idx], nil
-	}
+	var result model.AcceptanceCriterion
+	err := s.mutateAC(story, userID, "ac_edited", func(criteria []model.AcceptanceCriterion) ([]model.AcceptanceCriterion, map[string]any, map[string]any, error) {
+		idx := -1
+		for i := range criteria {
+			if criteria[i].ID == acID {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			return nil, nil, nil, ErrACNotFound
+		}
 
-	if err = s.mutateAC(story, userID, "ac_edited", func(_ []model.AcceptanceCriterion) ([]model.AcceptanceCriterion, map[string]any, map[string]any, error) {
+		oldValue := map[string]any{"description": criteria[idx].Description, "ref": criteria[idx].Ref, "notes": criteria[idx].Notes, "order": criteria[idx].Order}
+		changed := false
+
+		if description != nil {
+			desc := strings.TrimSpace(*description)
+			if criteria[idx].Description != desc {
+				criteria[idx].Description = desc
+				changed = true
+			}
+		}
+		if ref != nil {
+			if v := strings.TrimSpace(*ref); criteria[idx].Ref != v {
+				criteria[idx].Ref = v
+				changed = true
+			}
+		}
+		if notes != nil {
+			if v := strings.TrimSpace(*notes); criteria[idx].Notes != v {
+				criteria[idx].Notes = v
+				changed = true
+			}
+		}
+		if order != nil && *order > 0 && criteria[idx].Order != *order {
+			criteria[idx].Order = *order
+			changed = true
+		}
+
+		result = criteria[idx]
+		if !changed {
+			return nil, nil, nil, errACNoChange
+		}
 		return criteria, oldValue, map[string]any{"ac_id": acID, "description": criteria[idx].Description, "ref": criteria[idx].Ref, "notes": criteria[idx].Notes, "order": criteria[idx].Order}, nil
-	}); err != nil {
+	})
+	if err != nil {
 		return model.AcceptanceCriterion{}, err
 	}
 	s.broadcastAC(story.ProjectID, "story.ac_edited", story.ID, acID, actor, nil)
-	return criteria[idx], nil
+	return result, nil
 }
 
 // RemoveAC drops a single criterion by ID. Order of the remaining items is
