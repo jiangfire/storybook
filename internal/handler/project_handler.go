@@ -288,6 +288,8 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 		"name":        project.Name,
 		"description": project.Description,
 		"agile_mode":  project.AgileMode,
+		"archived":    project.Archived,
+		"archived_at": project.ArchivedAt,
 		"owner":       owner,
 		"members":     memberPayload,
 		"statistics": gin.H{
@@ -304,8 +306,9 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	project := middleware.MustProject(c)
 	userID := middleware.MustUserID(c)
 
-	if !middleware.IsProjectOwner(c) {
-		api.Forbidden(c, "仅项目Owner可更新项目")
+	role, _ := middleware.CurrentRole(c)
+	if !middleware.IsProjectOwner(c) && role != model.RoleAdmin {
+		api.Forbidden(c, "仅项目Owner或管理员可更新项目")
 		return
 	}
 
@@ -431,8 +434,9 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 	project := middleware.MustProject(c)
 
-	if !middleware.IsProjectOwner(c) {
-		api.Forbidden(c, "仅项目Owner可删除项目")
+	role, _ := middleware.CurrentRole(c)
+	if !middleware.IsProjectOwner(c) && role != model.RoleAdmin {
+		api.Forbidden(c, "仅项目Owner或管理员可删除项目")
 		return
 	}
 
