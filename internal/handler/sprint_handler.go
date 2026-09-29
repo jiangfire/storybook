@@ -229,6 +229,7 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 	}
 
 	oldSprintID := story.SprintID
+	var plannedSprintName string
 
 	if req.SprintID != nil {
 		sprint, err := h.sprintRepo.FindByID(*req.SprintID)
@@ -244,6 +245,7 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 			api.BadRequest(c, "冲刺不属于当前项目")
 			return
 		}
+		plannedSprintName = sprint.Name
 		story.SprintID = req.SprintID
 	} else {
 		story.SprintID = nil
@@ -257,6 +259,30 @@ func (h *SprintHandler) AssignStory(c *gin.Context) {
 	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "story", story.ID, "sprint_assigned",
 		map[string]any{"sprint_id": oldSprintID}, map[string]any{"sprint_id": story.SprintID}),
 		"write story sprint-assignment log", "story_id", story.ID, "sprint_id", story.SprintID)
+
+	// 冲刺规划变化影响故事负责人的工作安排：划入/移出都通知（操作者自己除外）
+	if story.AssignedTo != nil && *story.AssignedTo != userID {
+		notifTitle := "你的故事已移出冲刺"
+		sprintEntityID := oldSprintID
+		if req.SprintID != nil {
+			notifTitle = "你的故事已规划进冲刺 " + plannedSprintName
+			sprintEntityID = req.SprintID
+		}
+		ev := service.NotificationEvent{
+			Title:     notifTitle,
+			Body:      story.Title,
+			ActorID:   &userID,
+			ProjectID: &story.ProjectID,
+		}
+		if sprintEntityID != nil {
+			ev.EntityType = model.NotificationEntitySprint
+			ev.EntityID = *sprintEntityID
+		} else {
+			ev.EntityType = model.NotificationEntityStory
+			ev.EntityID = story.ID
+		}
+		h.notifier.Notify(c.Request.Context(), *story.AssignedTo, ev)
+	}
 
 	api.Success(c, "故事冲刺规划成功", gin.H{
 		"story_id":   story.ID,
@@ -296,6 +322,15 @@ func (h *SprintHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	// 删除会把冲刺内故事退回待办池：先收集受影响故事的负责人，删除后精准通知
+	var affectedAssignees []uint
+	if err := h.db.Model(&model.UserStory{}).
+		Where("sprint_id = ? AND assigned_to IS NOT NULL AND assigned_to <> ?", sprint.ID, userID).
+		Distinct().Pluck("assigned_to", &affectedAssignees).Error; err != nil {
+		api.Internal(c, "服务器内部错误")
+		return
+	}
+
 	if err := h.sprintRepo.DeleteWithClearStories(sprint.ID); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
@@ -304,6 +339,22 @@ func (h *SprintHandler) Delete(c *gin.Context) {
 	logging.LogIfErr(service.WriteActivityLog(h.db, &sprint.ProjectID, userID, "sprint", sprint.ID, "deleted",
 		map[string]any{"name": sprint.Name, "status": sprint.Status}, nil),
 		"write sprint activity log", "sprint_id", sprint.ID, "action", "deleted")
+
+	if len(affectedAssignees) > 0 {
+		h.notifier.NotifyMany(c.Request.Context(), affectedAssignees, service.NotificationEvent{
+			Type:       model.NotificationSprintDeleted,
+			EntityType: model.NotificationEntitySprint,
+			EntityID:   sprint.ID,
+			ProjectID:  &sprint.ProjectID,
+			ActorID:    &userID,
+			Title:      "冲刺已删除，相关故事已退回待办池",
+			Body:       sprint.Name,
+			Metadata: gin.H{
+				"sprint_id":  sprint.ID,
+				"project_id": sprint.ProjectID,
+			},
+		})
+	}
 
 	if h.events != nil {
 		h.events.BroadcastProject(sprint.ProjectID, "sprint.deleted", gin.H{

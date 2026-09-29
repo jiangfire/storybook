@@ -252,13 +252,26 @@ export default function KanbanBoard({ projectId, filters = emptyBoardFilters }: 
     [projectId, fetchBoardData]
   );
 
+  // 冲刺删除（故事退回待办池）与其他端重排也改变看板内容
+  const handleSprintChanged = useCallback(
+    (message: { project_id: number }) => {
+      if (message.project_id !== projectId) {
+        return;
+      }
+      fetchBoardData(projectId);
+    },
+    [projectId, fetchBoardData]
+  );
+
   const wsOptions = useMemo(
     () => ({
       onStoryStatusChanged: handleStoryStatusChanged,
       onStoryCreated: handleStoryListChanged,
       onStoryUpdated: handleStoryListChanged,
+      onSprintDeleted: handleSprintChanged,
+      onSprintReordered: handleSprintChanged,
     }),
-    [handleStoryStatusChanged, handleStoryListChanged]
+    [handleStoryStatusChanged, handleStoryListChanged, handleSprintChanged]
   );
   const { isConnected: wsConnected } = useWebSocket(wsOptions);
 

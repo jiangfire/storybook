@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useProjectStore } from '../../stores/projectStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import { projectService } from '../../services/projectService';
 import { techLeadService } from '../../services/techLeadService';
 import { userManagementService } from '../../services/userManagementService';
@@ -234,6 +235,21 @@ export default function ProjectDetailPage() {
     loadReports,
     loadSprints,
   ]);
+
+  // 实时同步：他人删除冲刺刷新列表；项目被删则离开页面
+  useWebSocket({
+    onSprintDeleted: () => {
+      if (!Number.isNaN(projectID) && projectID > 0) {
+        void loadSprints(projectID, null);
+      }
+    },
+    onProjectDeleted: (message) => {
+      if (message.project_id === projectID) {
+        showSuccess('该项目已被删除');
+        navigate('/projects');
+      }
+    },
+  });
 
   useEffect(() => {
     if (Number.isNaN(projectID) || projectID <= 0) {

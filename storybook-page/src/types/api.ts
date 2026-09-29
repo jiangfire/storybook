@@ -904,6 +904,9 @@ export type WSMessageType =
   | 'task.updated'
   | 'sprint.closed'
   | 'sprint.cancelled'
+  | 'sprint.deleted'
+  | 'sprint.reordered'
+  | 'project.deleted'
   | 'bug.created'
   | 'notification.new';
 
@@ -940,6 +943,27 @@ export interface SprintTerminatedMessage {
   project_id: number;
   status: string;
   actor_id: number;
+}
+
+// 冲刺删除消息（故事已退回待办池）
+export interface SprintDeletedMessage {
+  sprint_id: number;
+  project_id: number;
+  deleted_by: number;
+}
+
+// 冲刺内故事重排消息
+export interface SprintReorderedMessage {
+  sprint_id: number;
+  project_id: number;
+  orders: Array<{ story_id: number; position: number }>;
+  actor_id: number;
+}
+
+// 项目删除消息（级联软删，浏览该项目的用户需离开页面）
+export interface ProjectDeletedMessage {
+  project_id: number;
+  deleted_by: number;
 }
 
 // 缺陷创建消息（后端 bug_handler 广播）

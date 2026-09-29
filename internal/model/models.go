@@ -88,6 +88,7 @@ const (
 	NotificationBugAssigned            = "bug.assigned"
 	NotificationSprintStarted          = "sprint.started"
 	NotificationSprintCompleted        = "sprint.completed"
+	NotificationSprintDeleted          = "sprint.deleted"
 
 	NotificationEntityStory  = "story"
 	NotificationEntityTask   = "task"

@@ -155,4 +155,40 @@ describe('useWebSocket 单例共享', () => {
     expect(wsInstances).toHaveLength(2);
     expect(wsInstances[1].closed).toBe(false);
   });
+
+  it('分发 sprint.deleted/reordered 与 project.deleted 事件', async () => {
+    await loadFreshModule();
+    const onSprintDeleted = vi.fn();
+    const onSprintReordered = vi.fn();
+    const onProjectDeleted = vi.fn();
+
+    function MultiSubscriber() {
+      const { useWebSocket } = hooksModule!;
+      useWebSocket({ onSprintDeleted, onSprintReordered, onProjectDeleted });
+      return <div>multi</div>;
+    }
+
+    render(<MultiSubscriber />);
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+
+    act(() => {
+      wsInstances[0].simulateMessage(
+        fakeMessage('sprint.deleted', { sprint_id: 3, project_id: 7, deleted_by: 1 })
+      );
+      wsInstances[0].simulateMessage(
+        fakeMessage('sprint.reordered', { sprint_id: 3, project_id: 7, orders: [], actor_id: 1 })
+      );
+      wsInstances[0].simulateMessage(
+        fakeMessage('project.deleted', { project_id: 7, deleted_by: 1 })
+      );
+    });
+
+    expect(onSprintDeleted).toHaveBeenCalledWith(
+      expect.objectContaining({ sprint_id: 3, project_id: 7 })
+    );
+    expect(onSprintReordered).toHaveBeenCalledWith(expect.objectContaining({ sprint_id: 3 }));
+    expect(onProjectDeleted).toHaveBeenCalledWith(expect.objectContaining({ project_id: 7 }));
+  });
 });

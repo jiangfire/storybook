@@ -5,6 +5,9 @@ import type {
   StoryCreatedMessage,
   StoryStatusChangedMessage,
   SprintTerminatedMessage,
+  SprintDeletedMessage,
+  SprintReorderedMessage,
+  ProjectDeletedMessage,
   BugCreatedMessage,
   NotificationNewMessage,
 } from '../types/api';
@@ -16,6 +19,9 @@ interface UseWebSocketOptions {
   onStoryCreated?: (message: StoryCreatedMessage) => void;
   onStoryUpdated?: (message: StoryCreatedMessage) => void;
   onSprintTerminated?: (message: SprintTerminatedMessage) => void;
+  onSprintDeleted?: (message: SprintDeletedMessage) => void;
+  onSprintReordered?: (message: SprintReorderedMessage) => void;
+  onProjectDeleted?: (message: ProjectDeletedMessage) => void;
   onBugCreated?: (message: BugCreatedMessage) => void;
   onNotificationNew?: (message: NotificationNewMessage) => void;
 }
@@ -154,6 +160,15 @@ function dispatchMessage(options: UseWebSocketOptions, message: WSMessage) {
     case 'sprint.cancelled':
       // close/cancel 载荷一致（sprint_id/project_id/status/actor_id）
       options.onSprintTerminated?.(message.data as SprintTerminatedMessage);
+      break;
+    case 'sprint.deleted':
+      options.onSprintDeleted?.(message.data as SprintDeletedMessage);
+      break;
+    case 'sprint.reordered':
+      options.onSprintReordered?.(message.data as SprintReorderedMessage);
+      break;
+    case 'project.deleted':
+      options.onProjectDeleted?.(message.data as ProjectDeletedMessage);
       break;
     case 'bug.created':
       options.onBugCreated?.(message.data as BugCreatedMessage);
