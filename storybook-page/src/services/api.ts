@@ -6,11 +6,16 @@ const BASE_URL =
   import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '');
 
 // 创建 Axios 实例
+// 数组参数序列化为重复键（status=a&status=b）而非 axios 默认的 status[]，
+// 与后端 gin 的 c.QueryArray("status") 读取口径对齐。
 const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
+  },
+  paramsSerializer: {
+    indexes: null,
   },
 });
 

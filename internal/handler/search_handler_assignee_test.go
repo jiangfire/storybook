@@ -18,7 +18,7 @@ import (
 // assigneeTestEnv 组装 /api/search/assignees 的最小测试环境。
 type assigneeTestEnv struct {
 	router *gin.Engine
-	body   map[string]any
+	db     *gorm.DB
 }
 
 func setupAssigneeTest(t *testing.T, callerID uint, callerRole string) assigneeTestEnv {
@@ -58,7 +58,7 @@ func setupAssigneeTest(t *testing.T, callerID uint, callerRole string) assigneeT
 		c.Next()
 	}, handler.AssigneeCandidates)
 
-	return assigneeTestEnv{router: router}
+	return assigneeTestEnv{router: router, db: db}
 }
 
 func (e assigneeTestEnv) get(t *testing.T) map[string]any {
@@ -89,6 +89,18 @@ func TestSearchAssignees_ListsMembersOfAccessibleProjects(t *testing.T) {
 
 	// u1 可见 p1：候选 = p1 的成员与 owner（u1、u2），不包含 p2 的 u3，也不含无关用户 u4
 	assert.ElementsMatch(t, []string{"pm@test.dev", "dev@test.dev"}, usersWithEmails(body))
+}
+
+func TestSearchAssignees_ExcludesSoftDeletedMembers(t *testing.T) {
+	env := setupAssigneeTest(t, 1, model.RoleProduct)
+
+	// u2 被移出项目（软删成员行），不应再出现在候选中
+	require.NoError(t, env.db.Where("project_id = ? AND user_id = ?", 1, 2).
+		Delete(&model.ProjectMember{}).Error)
+
+	body := env.get(t)
+
+	assert.ElementsMatch(t, []string{"pm@test.dev"}, usersWithEmails(body))
 }
 
 func TestSearchAssignees_EmptyWhenCallerHasNoAccessibleProjects(t *testing.T) {

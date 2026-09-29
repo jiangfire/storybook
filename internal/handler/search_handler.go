@@ -52,7 +52,7 @@ func (h *SearchHandler) AssigneeCandidates(c *gin.Context) {
 
 	var rows []model.User
 	if err := h.db.Model(&model.User{}).
-		Where("id IN (SELECT user_id FROM project_members WHERE project_id IN ?)", projectIDs).
+		Where("id IN (SELECT user_id FROM project_members WHERE project_id IN ? AND deleted_at IS NULL)", projectIDs).
 		Or("id IN (SELECT owner_id FROM projects WHERE id IN ?)", projectIDs).
 		Order("email ASC").
 		Find(&rows).Error; err != nil {

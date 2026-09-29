@@ -172,7 +172,8 @@ func (h *SearchHandler) convertSimilarStoriesToResponse(stories []service.Simila
 
 // filterAndConvertStories 过滤并转换故事（单一职责）
 func (h *SearchHandler) filterAndConvertStories(stories []service.SimilarStory, minSimilarity float64) []gin.H {
-	var filtered []gin.H
+	// 预分配为非 nil 空切片，避免空结果序列化成 null 导致前端类型契约失真
+	filtered := make([]gin.H, 0)
 	for _, story := range stories {
 		if story.Similarity >= minSimilarity {
 			if us, ok := story.Story.(model.UserStory); ok {
