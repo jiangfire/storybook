@@ -23,12 +23,15 @@ var RouteRoleMatrix = map[string][]string{
 	"admin.users": {model.RoleAdmin},
 	"techlead":    {model.RoleTechLead, model.RoleAdmin},
 
-	// —— AI（product/admin）——
+	// —— AI（product/admin，与前端 canUseStoryAI 面板口径一致）——
 	"ai.generate-story": {model.RoleProduct, model.RoleAdmin},
 	"ai.story-chat":     {model.RoleProduct, model.RoleAdmin},
 	"ai.split-story":    {model.RoleProduct, model.RoleAdmin},
 	"ai.invest-check":   {model.RoleProduct, model.RoleAdmin},
 	"ai.refine-ac":      {model.RoleProduct, model.RoleAdmin},
+	"ai.summary":        {model.RoleProduct, model.RoleAdmin},
+	"ai.translate":      {model.RoleProduct, model.RoleAdmin},
+	"ai.dor-check":      {model.RoleProduct, model.RoleAdmin},
 
 	// —— 用户故事 ——
 	"stories.create":    {model.RoleProduct, model.RoleAdmin},
@@ -38,9 +41,10 @@ var RouteRoleMatrix = map[string][]string{
 	"stories.claim":     {model.RoleDeveloper, model.RoleAdmin},
 	"stories.release":   nonTechLeadRoles,
 	"stories.ac-status": nonTechLeadRoles,
-	"stories.ac-add":    nonTechLeadRoles,
-	"stories.ac-update": nonTechLeadRoles,
-	"stories.ac-delete": nonTechLeadRoles,
+	// AC 内容增/改/删是审批对象内容，按 P3 决策记录仅 PM/admin（与前端 canEditACContent 一致）
+	"stories.ac-add":    {model.RoleProduct, model.RoleAdmin},
+	"stories.ac-update": {model.RoleProduct, model.RoleAdmin},
+	"stories.ac-delete": {model.RoleProduct, model.RoleAdmin},
 	"stories.archive":   nonTechLeadRoles,
 	"stories.restore":   nonTechLeadRoles,
 	"stories.assign":    {model.RoleProduct, model.RoleTechLead, model.RoleAdmin},

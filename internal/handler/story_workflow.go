@@ -195,7 +195,9 @@ func (h *StoryHandler) AddAC(c *gin.Context) {
 	story := middleware.MustStory(c)
 	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
-	if denyTechLeadStoryMutation(c, role) {
+	// AC 是审批对象内容：按 P3 决策记录仅 PM/admin 可增改删（denyTechLead 不够严）
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可维护验收标准内容")
 		return
 	}
 
@@ -227,7 +229,8 @@ func (h *StoryHandler) UpdateAC(c *gin.Context) {
 	story := middleware.MustStory(c)
 	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
-	if denyTechLeadStoryMutation(c, role) {
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可维护验收标准内容")
 		return
 	}
 
@@ -272,7 +275,8 @@ func (h *StoryHandler) DeleteAC(c *gin.Context) {
 	story := middleware.MustStory(c)
 	userID := middleware.MustUserID(c)
 	role, _ := middleware.CurrentRole(c)
-	if denyTechLeadStoryMutation(c, role) {
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可维护验收标准内容")
 		return
 	}
 

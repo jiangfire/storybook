@@ -71,6 +71,9 @@ func TestRouteRoleMatrixMatchesHandlerInlineGuards(t *testing.T) {
 		"ai.split-story":    {model.RoleProduct, model.RoleAdmin},
 		"ai.invest-check":   {model.RoleProduct, model.RoleAdmin},
 		"ai.refine-ac":      {model.RoleProduct, model.RoleAdmin},
+		"ai.summary":        {model.RoleProduct, model.RoleAdmin},
+		"ai.translate":      {model.RoleProduct, model.RoleAdmin},
+		"ai.dor-check":      {model.RoleProduct, model.RoleAdmin},
 
 		// 用户故事
 		"stories.create":    {model.RoleProduct, model.RoleAdmin},
@@ -80,9 +83,10 @@ func TestRouteRoleMatrixMatchesHandlerInlineGuards(t *testing.T) {
 		"stories.claim":     {model.RoleDeveloper, model.RoleAdmin},
 		"stories.release":   nonTechLeadRoles,
 		"stories.ac-status": nonTechLeadRoles,
-		"stories.ac-add":    nonTechLeadRoles,
-		"stories.ac-update": nonTechLeadRoles,
-		"stories.ac-delete": nonTechLeadRoles,
+		// AC 内容增/改/删按 P3 决策记录仅 PM/admin
+		"stories.ac-add":    {model.RoleProduct, model.RoleAdmin},
+		"stories.ac-update": {model.RoleProduct, model.RoleAdmin},
+		"stories.ac-delete": {model.RoleProduct, model.RoleAdmin},
 		"stories.archive":   nonTechLeadRoles,
 		"stories.restore":   nonTechLeadRoles,
 		"stories.assign":    {model.RoleProduct, model.RoleTechLead, model.RoleAdmin},

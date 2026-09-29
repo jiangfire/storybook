@@ -189,9 +189,9 @@ func New(c *wiring.Container) *gin.Engine {
 		protected.POST("/ai/stories/:id/split", aiLimiter.Middleware(), middleware.RequireRouteRoles("ai.split-story"), storyAccess, c.AI.SplitStory)
 		protected.GET("/ai/stories/:id/invest-check", aiLimiter.Middleware(), middleware.RequireRouteRoles("ai.invest-check"), storyAccess, c.AI.INVESTCheck)
 		protected.POST("/ai/stories/:id/refine-ac", aiLimiter.Middleware(), middleware.RequireRouteRoles("ai.refine-ac"), storyAccess, c.AI.RefineAC)
-		protected.GET("/ai/stories/:id/summary", aiLimiter.Middleware(), storyAccess, c.AI.SummarizeStory)
-		protected.POST("/ai/stories/:id/translate", aiLimiter.Middleware(), storyAccess, c.AI.TranslateStory)
-		protected.GET("/ai/stories/:id/dor-check", aiLimiter.Middleware(), storyAccess, c.AI.DoRCheck)
+		protected.GET("/ai/stories/:id/summary", aiLimiter.Middleware(), middleware.RequireRouteRoles("ai.summary"), storyAccess, c.AI.SummarizeStory)
+		protected.POST("/ai/stories/:id/translate", aiLimiter.Middleware(), middleware.RequireRouteRoles("ai.translate"), storyAccess, c.AI.TranslateStory)
+		protected.GET("/ai/stories/:id/dor-check", aiLimiter.Middleware(), middleware.RequireRouteRoles("ai.dor-check"), storyAccess, c.AI.DoRCheck)
 
 		// 技术负责人专用接口
 		techlead := protected.Group("/techlead")

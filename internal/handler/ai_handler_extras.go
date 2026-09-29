@@ -86,6 +86,12 @@ func (h *AIHandler) RefineAC(c *gin.Context) {
 // SummarizeStory returns a 2-3 sentence stakeholder summary of the story so
 // product can drop it into a status update without reading the full description.
 func (h *AIHandler) SummarizeStory(c *gin.Context) {
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可使用故事摘要")
+		return
+	}
+
 	story := middleware.MustStory(c)
 
 	criteria, _ := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
@@ -127,6 +133,12 @@ func (h *AIHandler) SummarizeStory(c *gin.Context) {
 // TranslateStory returns title+description+AC translated into the requested
 // language. Source is whichever language the story is currently in.
 func (h *AIHandler) TranslateStory(c *gin.Context) {
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可使用故事翻译")
+		return
+	}
+
 	story := middleware.MustStory(c)
 
 	var req translateStoryRequest
@@ -190,6 +202,12 @@ Output requirements:
 // It runs without invoking the LLM so it's always available; the rate-limited
 // AI endpoint group still fronts it for consistency with other AI helpers.
 func (h *AIHandler) DoRCheck(c *gin.Context) {
+	role, _ := middleware.CurrentRole(c)
+	if role != model.RoleProduct && role != model.RoleAdmin {
+		api.Forbidden(c, "仅产品经理或管理员可使用就绪度检查")
+		return
+	}
+
 	story := middleware.MustStory(c)
 
 	criteria, _ := model.ParseAcceptanceCriteria(story.AcceptanceCriteria)
