@@ -3,6 +3,8 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -51,4 +53,93 @@ func TestRequireRouteRolesPanicsOnUnknownKey(t *testing.T) {
 		}
 	}()
 	RequireRouteRoles("not.registered")
+}
+
+// TestRouteRoleMatrixMatchesHandlerInlineGuards 是矩阵的口径台账：
+// 每个 key 的允许集必须与 handler 内联角色守卫（纵深防御层）完全一致。
+// 新增带角色约束的路由时，在此登记期望值，先红后绿。
+func TestRouteRoleMatrixMatchesHandlerInlineGuards(t *testing.T) {
+	expected := map[string][]string{
+		// 组级
+		"admin.ai":    {model.RoleAdmin},
+		"admin.users": {model.RoleAdmin},
+		"techlead":    {model.RoleTechLead, model.RoleAdmin},
+
+		// AI（仅 product/admin）
+		"ai.generate-story": {model.RoleProduct, model.RoleAdmin},
+		"ai.story-chat":     {model.RoleProduct, model.RoleAdmin},
+		"ai.split-story":    {model.RoleProduct, model.RoleAdmin},
+		"ai.invest-check":   {model.RoleProduct, model.RoleAdmin},
+		"ai.refine-ac":      {model.RoleProduct, model.RoleAdmin},
+
+		// 用户故事
+		"stories.create":    {model.RoleProduct, model.RoleAdmin},
+		"stories.update":    nonTechLeadRoles,
+		"stories.delete":    nonTechLeadRoles,
+		"stories.status":    nonTechLeadRoles,
+		"stories.claim":     {model.RoleDeveloper, model.RoleAdmin},
+		"stories.release":   nonTechLeadRoles,
+		"stories.ac-status": nonTechLeadRoles,
+		"stories.ac-add":    nonTechLeadRoles,
+		"stories.ac-update": nonTechLeadRoles,
+		"stories.ac-delete": nonTechLeadRoles,
+		"stories.archive":   nonTechLeadRoles,
+		"stories.restore":   nonTechLeadRoles,
+		"stories.assign":    {model.RoleProduct, model.RoleTechLead, model.RoleAdmin},
+		"stories.review":    {model.RoleTechLead, model.RoleAdmin},
+		"stories.code-refs": {model.RoleDeveloper, model.RoleAdmin},
+
+		// 子任务
+		"tasks.create":        {model.RoleProduct, model.RoleDeveloper, model.RoleAdmin},
+		"tasks.split-from-ac": {model.RoleProduct, model.RoleAdmin},
+		"tasks.claim":         {model.RoleDeveloper, model.RoleAdmin},
+		"tasks.code-refs":     {model.RoleDeveloper, model.RoleAdmin},
+
+		// 测试用例
+		"testcases.create": {model.RoleTester, model.RoleAdmin},
+		"testcases.status": {model.RoleTester, model.RoleAdmin},
+
+		// 冲刺（仅 product/admin）
+		"sprints.create":       {model.RoleProduct, model.RoleAdmin},
+		"sprints.status":       {model.RoleProduct, model.RoleAdmin},
+		"sprints.assign-story": {model.RoleProduct, model.RoleAdmin},
+		"sprints.close":        {model.RoleProduct, model.RoleAdmin},
+		"sprints.cancel":       {model.RoleProduct, model.RoleAdmin},
+		"sprints.reorder":      {model.RoleProduct, model.RoleAdmin},
+		"sprints.delete":       {model.RoleProduct, model.RoleAdmin},
+
+		// 缺陷
+		"bugs.create": {model.RoleTester, model.RoleAdmin, model.RoleProduct},
+		"bugs.status": nonTechLeadRoles,
+		"bugs.assign": {model.RoleProduct, model.RoleAdmin},
+
+		// 项目技术负责人管理
+		"techleads.add":    {model.RoleAdmin, model.RoleProduct},
+		"techleads.remove": {model.RoleAdmin, model.RoleProduct},
+
+		// MCP
+		"mcp.stats.ac-completion": {model.RoleProduct, model.RoleAdmin},
+	}
+
+	for key, roles := range expected {
+		got, ok := RouteRoleMatrix[key]
+		if !ok {
+			t.Errorf("route key %q 未登记到 RouteRoleMatrix", key)
+			continue
+		}
+		want := append([]string(nil), roles...)
+		gotCopy := append([]string(nil), got...)
+		sort.Strings(want)
+		sort.Strings(gotCopy)
+		if !reflect.DeepEqual(want, gotCopy) {
+			t.Errorf("route key %q 角色口径不一致: want %v, got %v", key, want, gotCopy)
+		}
+	}
+
+	// 反向校验：矩阵中不允许出现台账之外的孤儿 key
+	for key := range RouteRoleMatrix {
+		if _, ok := expected[key]; !ok {
+			t.Errorf("RouteRoleMatrix 存在台账未收录的 key %q，请在测试期望中登记或删除该 key", key)
+		}
+	}
 }
