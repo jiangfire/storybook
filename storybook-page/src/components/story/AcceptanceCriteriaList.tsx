@@ -131,8 +131,9 @@ export default function AcceptanceCriteriaList({
       setIsContentSubmitting(true);
       await storyService.updateAC(storyId, editingContentId, {
         description,
-        ref: editingForm.ref.trim() || undefined,
-        notes: editingForm.notes.trim() || undefined,
+        // 始终发送字符串：空串表示清除字段（undefined 会被序列化丢弃，导致清空失效）
+        ref: editingForm.ref.trim(),
+        notes: editingForm.notes.trim(),
       });
       setEditingContentId(null);
       setEditingForm(emptyACForm);

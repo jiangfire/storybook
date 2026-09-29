@@ -146,9 +146,37 @@ describe('AcceptanceCriteriaList', () => {
     expect(mockedStoryService.updateAC).toHaveBeenCalledWith(12, 'ac-1', {
       description: '更严格的标准',
       ref: 'REQ-1',
-      notes: undefined,
+      notes: '',
     });
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('contentEditable 下清空引用/备注后保存发送空串以清除字段', async () => {
+    const user = userEvent.setup();
+    mockedStoryService.updateAC.mockResolvedValue(undefined);
+
+    const withExtras = [
+      {
+        id: 'ac-1',
+        description: 'Given 用户已登录',
+        ref: 'REQ-1',
+        notes: '旧备注',
+        status: 'pending' as const,
+        order: 1,
+      },
+    ];
+    render(<AcceptanceCriteriaList storyId={12} criteria={withExtras} contentEditable />);
+
+    await user.click(screen.getByRole('button', { name: '编辑' }));
+    await user.clear(screen.getByPlaceholderText('引用（可选，如 REQ-101）'));
+    await user.clear(screen.getByPlaceholderText('备注（可选）'));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    expect(mockedStoryService.updateAC).toHaveBeenCalledWith(12, 'ac-1', {
+      description: 'Given 用户已登录',
+      ref: '',
+      notes: '',
+    });
   });
 
   it('contentEditable 下删除验收标准前需要确认', async () => {

@@ -537,4 +537,15 @@ describe('StoryForm', () => {
     expect(await screen.findByText('仅产品经理可规划冲刺')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '更新冲刺' })).toBeDisabled();
   });
+
+  it('标题与描述均为空时推荐标签会提示先填写且不发请求', async () => {
+    const user = userEvent.setup();
+    setAuthUser('product');
+    renderStoryForm();
+
+    await user.click(screen.getByRole('button', { name: '根据标题与描述推荐标签' }));
+
+    expect(showError).toHaveBeenCalledWith('请先填写标题或描述，再推荐标签');
+    expect(mockedSearchService.suggestTags).not.toHaveBeenCalled();
+  });
 });

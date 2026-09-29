@@ -152,6 +152,11 @@ export default function StoryForm({
   }, [isOpen, isCreateMode, clearErrors]);
 
   const handleRequestTagSuggestions = async () => {
+    // 后端要求 title/description 至少一项非空，先本地拦截避免误导性报错
+    if (!formData.title.trim() && !formData.description.trim()) {
+      showError('请先填写标题或描述，再推荐标签');
+      return;
+    }
     try {
       const tags = await searchService.suggestTags({
         title: formData.title || undefined,
@@ -160,7 +165,7 @@ export default function StoryForm({
       });
       setTagSuggestions(tags);
     } catch {
-      showError('标签推荐不可用（当前部署未启用语义搜索）');
+      showError('标签推荐失败，请稍后再试');
     }
   };
 
