@@ -24,6 +24,15 @@ type ProjectHandler struct {
 	userRepo     repository.UserRepo
 	storyRepo    repository.StoryRepo
 	activityRepo repository.ActivityRepo
+	events       service.EventPublisher
+}
+
+// WithEvents 注入实时事件发布器（删除项目时广播 project.deleted）。
+func (h *ProjectHandler) WithEvents(e service.EventPublisher) *ProjectHandler {
+	if e != nil {
+		h.events = e
+	}
+	return h
 }
 
 func NewProjectHandler(db *gorm.DB) *ProjectHandler {
@@ -433,6 +442,7 @@ func (h *ProjectHandler) GetOverview(c *gin.Context) {
 
 func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 	project := middleware.MustProject(c)
+	userID := middleware.MustUserID(c)
 
 	role, _ := middleware.CurrentRole(c)
 	if !middleware.IsProjectOwner(c) && role != model.RoleAdmin {
@@ -440,9 +450,20 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 
-	if err := h.projectRepo.Delete(project.ID); err != nil {
+	if err := h.projectRepo.DeleteCascade(project.ID); err != nil {
 		api.Internal(c, "服务器内部错误")
 		return
+	}
+
+	logging.LogIfErr(service.WriteActivityLog(h.db, &project.ID, userID, "project", project.ID, "deleted",
+		map[string]any{"name": project.Name}, nil),
+		"write project activity log", "project_id", project.ID, "action", "deleted")
+
+	if h.events != nil {
+		h.events.BroadcastProject(project.ID, "project.deleted", gin.H{
+			"project_id": project.ID,
+			"deleted_by": userID,
+		})
 	}
 
 	api.Success(c, "项目删除成功", gin.H{"id": project.ID})

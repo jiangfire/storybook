@@ -36,6 +36,44 @@ func (r *ProjectRepository) ExistsByOwnerAndName(ownerID uint, name string, excl
 	return count > 0, nil
 }
 
+// DeleteCascade 事务性级联软删项目的全部子资源（看板列、成员、技术负责人、
+// 冲刺、故事、任务、缺陷、按故事关联的测试用例、项目通知），项目本体一并软删。
+// 活动日志不删，保留为审计线索。
+func (r *ProjectRepository) DeleteCascade(projectID uint) error {
+	tx := r.DB().Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	steps := []func() error{
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.BoardColumn{}).Error },
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.ProjectMember{}).Error },
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.ProjectTechLead{}).Error },
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.Sprint{}).Error },
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.UserStory{}).Error },
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.Task{}).Error },
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.BugReport{}).Error },
+		// 测试用例挂在故事下（无 project_id 列），按项目故事的 ID 关联删除
+		func() error {
+			return tx.Where("story_id IN (?)",
+				tx.Model(&model.UserStory{}).Select("id").Where("project_id = ?", projectID),
+			).Delete(&model.TestCase{}).Error
+		},
+		func() error { return tx.Where("project_id = ?", projectID).Delete(&model.Notification{}).Error },
+		func() error { return tx.Delete(&model.Project{}, projectID).Error },
+	}
+	for _, step := range steps {
+		if err := step(); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit().Error
+}
+
 func (r *ProjectRepository) CreateWithTransaction(project *model.Project, member *model.ProjectMember, columns []model.BoardColumn) error {
 	tx := r.DB().Begin()
 	if err := tx.Create(project).Error; err != nil {

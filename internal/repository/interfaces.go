@@ -62,6 +62,7 @@ type ProjectRepo interface {
 	FindByID(id uint) (*model.Project, error)
 	Save(item *model.Project) error
 	Delete(id uint) error
+	DeleteCascade(projectID uint) error
 
 	// project_repo.go 自有方法
 	ExistsByOwnerAndName(ownerID uint, name string, excludeID ...uint) (bool, error)

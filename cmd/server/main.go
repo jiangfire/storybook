@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jiangfire/storybook/internal/auth"
+	"github.com/jiangfire/storybook/internal/backup"
 	"github.com/jiangfire/storybook/internal/bootstrap"
 	"github.com/jiangfire/storybook/internal/config"
 	"github.com/jiangfire/storybook/internal/database"
@@ -27,6 +28,7 @@ const (
 	cmdServer            = "server"
 	cmdBootstrapAdmin    = "bootstrap-admin"
 	cmdBackfillEmbedding = "backfill-embeddings"
+	cmdBackup            = "backup"
 )
 
 var (
@@ -36,6 +38,7 @@ var (
 		{cmdServer, "启动 HTTP 服务器（默认子命令）"},
 		{cmdBootstrapAdmin, "创建或提升管理员账户"},
 		{cmdBackfillEmbedding, "为存量故事批量生成语义向量（需 postgres+pgvector 与 embedding 配置）"},
+		{cmdBackup, "备份数据库（SQLite 在线快照 / Postgres 委托 pg_dump）"},
 	}
 )
 
@@ -55,6 +58,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runBootstrapAdmin(args[1:], stdout, stderr)
 	case cmdBackfillEmbedding:
 		return runBackfillEmbeddings(args[1:], stdout, stderr)
+	case cmdBackup:
+		return runBackup(args[1:], stdout, stderr)
 	case "help", "-h", "--help":
 		printUsage(stdout)
 		return 0
@@ -301,5 +306,50 @@ func runBackfillEmbeddings(args []string, stdout, stderr io.Writer) int {
 	}
 
 	fmt.Fprintf(stdout, "回填完成：%d 条\n", len(stories))
+	return 0
+}
+
+// runBackup 生成数据库备份快照。SQLite 使用 VACUUM INTO 在线快照（服务运行中
+// 也可执行）；Postgres 委托 pg_dump。目标文件已存在时拒绝覆盖，避免误写坏旧备份。
+func runBackup(args []string, stdout, stderr io.Writer) int {
+	config.LoadDotEnv()
+	fs := flag.NewFlagSet(cmdBackup, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	output := fs.String("output", "", "备份目标文件路径；缺省为当前目录下 storybook-backup-<时间戳>.db/.sql")
+
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(stderr, "load config failed: %v\n", err)
+		return 1
+	}
+	if cfg.DBDriver != "sqlite" && cfg.DBDriver != "postgres" {
+		fmt.Fprintf(stderr, "不支持的数据库驱动: %s（支持 sqlite/postgres）\n", cfg.DBDriver)
+		return 1
+	}
+
+	dest := *output
+	if dest == "" {
+		dest = backup.DefaultDest(cfg.DBDriver)
+	}
+
+	db, err := database.Connect(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "connect database failed: %v\n", err)
+		return 1
+	}
+	if sqlDB, err := db.DB(); err == nil {
+		defer func() { _ = sqlDB.Close() }()
+	}
+
+	if err := backup.Run(db, cfg.DBDriver, cfg.DBDSN, dest); err != nil {
+		fmt.Fprintf(stderr, "backup failed: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "备份完成: %s（driver=%s）\n", dest, cfg.DBDriver)
 	return 0
 }

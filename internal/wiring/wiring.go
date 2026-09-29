@@ -78,7 +78,7 @@ func Build(cfg *config.Config, db *gorm.DB, logger *slog.Logger, tokenManager *a
 	taskSvc := service.NewTaskService(db, c.Hub)
 
 	c.Auth = handler.NewAuthHandler(userRepo, tokenManager)
-	c.Project = handler.NewProjectHandler(db)
+	c.Project = handler.NewProjectHandler(db).WithEvents(c.Hub)
 	c.Story = handler.NewStoryHandlerWithVector(db, c.Hub, c.Vector)
 	c.Me = handler.NewMeHandler(userRepo, storyRepo, taskRepo, repository.NewBugRepository(db))
 	c.AI = handler.NewAIHandler(db)
