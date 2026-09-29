@@ -6,7 +6,7 @@ import { getErrorMessage } from '../../utils/error';
 import { PageContainer, PageHero } from '../../components/page/PageLayout';
 import Button from '../../components/ui/Button';
 import { formatStoryStatus, formatBugStatus } from '../../utils/formatters';
-import type { SearchResponseData } from '../../types/api';
+import type { SearchAssigneeCandidate, SearchResponseData } from '../../types/api';
 
 const SEARCH_TYPES = [
   { value: 'all', label: '全部' },
@@ -38,15 +38,31 @@ export default function SearchResultPage() {
   const type = (searchParams.get('type') ?? 'all') as (typeof SEARCH_TYPES)[number]['value'];
   const createdFrom = searchParams.get('created_from') ?? '';
   const createdTo = searchParams.get('created_to') ?? '';
+  const assigneeParam = searchParams.get('assignee') ?? '';
   const statuses = searchParams.getAll('status');
 
   const [input, setInput] = useState(q);
   const [data, setData] = useState<SearchResponseData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [assigneeCandidates, setAssigneeCandidates] = useState<SearchAssigneeCandidate[]>([]);
 
   useEffect(() => {
     setInput(q);
   }, [q]);
+
+  // 负责人候选加载失败不阻塞搜索，只是下拉为空
+  useEffect(() => {
+    let cancelled = false;
+    searchService
+      .listAssignees()
+      .then((users) => {
+        if (!cancelled) setAssigneeCandidates(users);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const runSearch = useCallback(async () => {
     if (!q.trim()) {
@@ -62,6 +78,7 @@ export default function SearchResultPage() {
         created_from: createdFrom || undefined,
         created_to: createdTo || undefined,
         status: statuses.length > 0 ? statuses : undefined,
+        assignee: assigneeParam ? Number(assigneeParam) : undefined,
       });
       setData(result);
     } catch (error: unknown) {
@@ -72,7 +89,7 @@ export default function SearchResultPage() {
     }
     // statuses 是数组引用，用 join 稳定依赖
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, type, createdFrom, createdTo, statuses.join(',')]);
+  }, [q, type, createdFrom, createdTo, assigneeParam, statuses.join(',')]);
 
   useEffect(() => {
     void runSearch();
@@ -175,6 +192,26 @@ export default function SearchResultPage() {
                 className="rounded-lg border border-border px-2 py-1 text-sm"
                 aria-label="创建结束日期"
               />
+            </div>
+            <div className="flex items-center gap-1.5 text-text-light">
+              <span>负责人</span>
+              <select
+                value={assigneeParam}
+                onChange={(e) => updateParam('assignee', e.target.value)}
+                className="max-w-48 rounded-lg border border-border bg-white px-2 py-1 text-sm text-text"
+                aria-label="负责人"
+              >
+                <option value="">全部</option>
+                {assigneeCandidates.map((u) => (
+                  <option key={u.id} value={String(u.id)}>
+                    {u.email}
+                  </option>
+                ))}
+                {assigneeParam &&
+                  !assigneeCandidates.some((u) => String(u.id) === assigneeParam) && (
+                    <option value={assigneeParam}>用户 #{assigneeParam}</option>
+                  )}
+              </select>
             </div>
           </div>
 

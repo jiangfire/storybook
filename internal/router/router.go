@@ -118,6 +118,7 @@ func New(c *wiring.Container) *gin.Engine {
 		protected.POST("/notifications/mark-all-read", c.Notification.MarkAllRead)
 		protected.GET("/search", c.Search.Search)
 		protected.GET("/search/capabilities", c.Search.Capabilities)
+		protected.GET("/search/assignees", c.Search.AssigneeCandidates)
 
 		// 语义搜索（向量搜索）
 		protected.GET("/search/semantic", c.Search.SearchSemantic)

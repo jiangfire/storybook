@@ -18,6 +18,7 @@ vi.mock('../../../services/searchService', () => ({
     search: vi.fn(),
     searchSemanticStories: vi.fn(),
     getCapabilities: vi.fn(),
+    listAssignees: vi.fn(),
   },
 }));
 
@@ -37,6 +38,10 @@ function renderPage(initialEntry = '/search?q=登录') {
 describe('SearchResultPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockedSearchService.listAssignees.mockResolvedValue([
+      { id: 2, email: 'dev@test.dev' },
+      { id: 3, email: 'qa@test.dev' },
+    ]);
     mockedSearchService.search.mockResolvedValue({
       projects: [{ id: 3, name: '登录重构', description: '', created_at: '2026-01-01T00:00:00Z' }],
       stories: [
@@ -83,6 +88,39 @@ describe('SearchResultPage', () => {
       expect(mockedSearchService.search).toHaveBeenLastCalledWith(
         expect.objectContaining({ type: 'story', status: ['in_progress'] })
       );
+    });
+  });
+
+  it('URL 带 assignee 时按负责人过滤并在下拉中选中', async () => {
+    renderPage('/search?q=登录&assignee=2');
+
+    expect(await screen.findByText('#12 支持手机号登录')).toBeInTheDocument();
+    expect(mockedSearchService.search).toHaveBeenCalledWith(
+      expect.objectContaining({ q: '登录', assignee: 2 })
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText('负责人')).toHaveValue('2');
+    });
+  });
+
+  it('切换负责人下拉会更新过滤并重新搜索，清除后不再携带', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText('#12 支持手机号登录');
+
+    await user.selectOptions(screen.getByLabelText('负责人'), '3');
+    await waitFor(() => {
+      expect(mockedSearchService.search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: '登录', assignee: 3 })
+      );
+    });
+
+    await user.selectOptions(screen.getByLabelText('负责人'), '');
+    await waitFor(() => {
+      const lastCall = mockedSearchService.search.mock.lastCall?.[0];
+      expect(lastCall).toMatchObject({ q: '登录' });
+      expect(lastCall?.assignee).toBeUndefined();
     });
   });
 

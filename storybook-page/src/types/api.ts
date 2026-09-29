@@ -544,6 +544,8 @@ export interface SearchParams {
   created_to?: string;
   /** 高级过滤：状态（可多选） */
   status?: string[];
+  /** 高级过滤：负责人用户 ID */
+  assignee?: number;
 }
 
 // 搜索结果
@@ -582,6 +584,16 @@ export interface SearchResponseData {
     status: string;
     updated_at: string;
   }>;
+}
+
+// 搜索负责人候选（可访问项目的成员/Owner 去重）
+export interface SearchAssigneeCandidate {
+  id: number;
+  email: string;
+}
+
+export interface SearchAssigneesResponse {
+  users: SearchAssigneeCandidate[];
 }
 
 export interface SemanticStorySearchItem {

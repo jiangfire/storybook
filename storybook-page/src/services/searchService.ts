@@ -1,6 +1,7 @@
 import apiClient from './api';
 import type {
   ApiResponse,
+  SearchAssigneesResponse,
   SearchCapabilitiesResponse,
   SearchParams,
   SearchResponseData,
@@ -34,6 +35,16 @@ export const searchService = {
       '/api/search/capabilities'
     );
     return response.data.data;
+  },
+
+  /**
+   * 负责人过滤候选：可访问项目的成员/Owner（去重）
+   */
+  async listAssignees(): Promise<SearchAssigneesResponse['users']> {
+    const response = await apiClient.get<ApiResponse<SearchAssigneesResponse>>(
+      '/api/search/assignees'
+    );
+    return response.data.data.users;
   },
 
   /**

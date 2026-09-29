@@ -48,6 +48,39 @@ describe('searchService', () => {
     });
   });
 
+  it('search 会携带 assignee 负责人过滤参数', async () => {
+    mockedApiClient.get.mockResolvedValue({
+      data: {
+        data: {
+          projects: [],
+          stories: [],
+          bugs: [],
+        },
+      },
+    });
+
+    await searchService.search({ q: 'login', assignee: 5 });
+
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/api/search', {
+      params: { q: 'login', assignee: 5 },
+    });
+  });
+
+  it('listAssignees 会命中负责人候选接口并返回用户列表', async () => {
+    mockedApiClient.get.mockResolvedValue({
+      data: {
+        data: {
+          users: [{ id: 2, email: 'dev@test.dev' }],
+        },
+      },
+    });
+
+    const users = await searchService.listAssignees();
+
+    expect(mockedApiClient.get).toHaveBeenCalledWith('/api/search/assignees');
+    expect(users).toEqual([{ id: 2, email: 'dev@test.dev' }]);
+  });
+
   it('getCapabilities 会命中能力接口', async () => {
     mockedApiClient.get.mockResolvedValue({
       data: {
