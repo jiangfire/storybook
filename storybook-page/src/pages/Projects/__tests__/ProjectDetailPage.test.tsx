@@ -717,6 +717,20 @@ describe('ProjectDetailPage', () => {
     expect(showSuccess).toHaveBeenCalledWith('冲刺已完成，未完成故事已退回待办池');
   });
 
+  it('velocity/quality 报表失败不拖垮其余报表', async () => {
+    mockedProjectService.getVelocity.mockRejectedValue(new Error('boom'));
+    mockedProjectService.getQuality.mockRejectedValue(new Error('boom'));
+
+    renderPage();
+
+    // 单张失败静默降级：不出现整体错误，其余报表照常渲染
+    await waitFor(() => {
+      expect(screen.queryByText('报表数据加载失败')).not.toBeInTheDocument();
+    });
+    expect(within(getSectionByHeading('累计流')).getByText(/截至 2026-03-29/)).toBeInTheDocument();
+    expect(within(getSectionByHeading('周期时间')).getByText('4.0 天')).toBeInTheDocument();
+  });
+
   it('取消冲刺前会弹确认框，确认后调用取消端点并刷新列表', async () => {
     const user = userEvent.setup();
     const cancelledSprint: SprintSummary = { ...activeSprint, status: 'cancelled' };

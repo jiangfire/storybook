@@ -31,6 +31,7 @@ export const StoryAIPanel = ({ storyId, canRefineAC, onACChanged }: StoryAIPanel
   const [refineSuggestions, setRefineSuggestions] = useState<string[] | null>(null);
   const [appliedIndices, setAppliedIndices] = useState<number[]>([]);
   const [isRefineLoading, setIsRefineLoading] = useState(false);
+  const [applyingIndex, setApplyingIndex] = useState<number | null>(null);
 
   const handleDoRCheck = async () => {
     try {
@@ -85,6 +86,11 @@ export const StoryAIPanel = ({ storyId, canRefineAC, onACChanged }: StoryAIPanel
   };
 
   const handleApplySuggestion = async (index: number, description: string) => {
+    // in-flight 防抖：请求期间禁用按钮，双击不会重复添加同一条 AC
+    if (applyingIndex !== null) {
+      return;
+    }
+    setApplyingIndex(index);
     try {
       await storyService.addAC(storyId, { description });
       setAppliedIndices((prev) => [...prev, index]);
@@ -92,6 +98,8 @@ export const StoryAIPanel = ({ storyId, canRefineAC, onACChanged }: StoryAIPanel
       onACChanged?.();
     } catch (error) {
       showError(error instanceof Error ? error.message : '添加验收标准失败');
+    } finally {
+      setApplyingIndex(null);
     }
   };
 
@@ -219,7 +227,8 @@ export const StoryAIPanel = ({ storyId, canRefineAC, onACChanged }: StoryAIPanel
                     <Button
                       size="sm"
                       variant="secondary"
-                      disabled={appliedIndices.includes(index)}
+                      disabled={appliedIndices.includes(index) || applyingIndex === index}
+                      isLoading={applyingIndex === index}
                       onClick={() => void handleApplySuggestion(index, suggestion)}
                     >
                       {appliedIndices.includes(index) ? '已添加' : '添加'}

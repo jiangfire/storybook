@@ -143,4 +143,33 @@ describe('StoryAIPanel', () => {
     expect(showError).toHaveBeenCalledWith('请先描述优化方向（至少 2 个字符）');
     expect(mockedAiService.refineAC).not.toHaveBeenCalled();
   });
+
+  it('应用建议请求进行中时禁用按钮，双击不会重复添加', async () => {
+    const user = userEvent.setup();
+    mockedAiService.refineAC.mockResolvedValue({
+      story_id: 12,
+      original_ac: [],
+      suggested: ['Given 有效邮箱 When 提交 Then 收到验证码'],
+      raw: '',
+    });
+    let resolveAdd!: () => void;
+    mockedStoryService.addAC.mockImplementation(
+      () => new Promise<void>((resolve) => { resolveAdd = resolve; })
+    );
+
+    render(<StoryAIPanel storyId={12} canRefineAC />);
+
+    await user.type(screen.getByPlaceholderText(/描述优化方向/), '改成 Given/When/Then 格式');
+    await user.click(screen.getByRole('button', { name: '生成建议' }));
+
+    const applyButton = await screen.findByRole('button', { name: '添加' });
+    await user.click(applyButton);
+
+    // 请求 in-flight 期间按钮不可用，双击不会发出第二次 addAC
+    expect(mockedStoryService.addAC).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '添加' })).not.toBeInTheDocument();
+
+    resolveAdd();
+    expect(await screen.findByRole('button', { name: '已添加' })).toBeDisabled();
+  });
 });

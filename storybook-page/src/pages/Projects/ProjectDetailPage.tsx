@@ -180,11 +180,12 @@ export default function ProjectDetailPage() {
     try {
       setIsReportLoading(true);
       setReportError('');
-      // 四张新报表用 allSettled：单张失败不拖垮整体，失败的留空显示"暂无数据"。
+      // 六张报表全部用 catch 降级：单张失败只影响自己（显示"暂无数据"），
+      // 仅当全部失败时才提示整体错误。
       const [velocityData, qualityData, flowSettled, cycleSettled, leadSettled, throughputSettled] =
         await Promise.all([
-          projectService.getVelocity(pid),
-          projectService.getQuality(pid),
+          projectService.getVelocity(pid).catch(() => null),
+          projectService.getQuality(pid).catch(() => null),
           projectService.getCumulativeFlow(pid).catch(() => null),
           projectService.getCycleTime(pid).catch(() => null),
           projectService.getLeadTime(pid).catch(() => null),
@@ -196,6 +197,16 @@ export default function ProjectDetailPage() {
       setCycleTime(cycleSettled);
       setLeadTime(leadSettled);
       setThroughput(throughputSettled);
+      if (
+        velocityData === null &&
+        qualityData === null &&
+        flowSettled === null &&
+        cycleSettled === null &&
+        leadSettled === null &&
+        throughputSettled === null
+      ) {
+        setReportError('报表数据加载失败');
+      }
     } catch (err: unknown) {
       setVelocity(null);
       setQuality(null);
