@@ -61,7 +61,18 @@ func New(c *wiring.Container) *gin.Engine {
 
 	api := r.Group("/api")
 
-	authLimiter := middleware.NewIPLimiter(3, 1)
+	// 认证接口 IP 限流可通过 AUTH_IP_RATE_LIMIT_PER_MIN / _BURST 调整，
+	// 默认 120 次/分、突发 20：登录限流只防自己人手快与共享出口 IP 的高峰，防爆破交给网关层。
+	// 手工构造 Config 的测试可能缺省为 0，这里兜底。
+	authRate := c.Cfg.AuthIPRateLimitPerMin
+	if authRate <= 0 {
+		authRate = 120
+	}
+	authBurst := c.Cfg.AuthIPRateLimitBurst
+	if authBurst <= 0 {
+		authBurst = 20
+	}
+	authLimiter := middleware.NewIPLimiter(authRate, authBurst)
 	authGroup := api.Group("/auth")
 	{
 		authGroup.POST("/register", authLimiter.Middleware(), c.Auth.Register)

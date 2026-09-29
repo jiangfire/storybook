@@ -37,6 +37,10 @@ type Config struct {
 	// AI 限流
 	AIUserRateLimitPerMin int // AI_USER_RATE_LIMIT_PER_MIN：每用户每分钟 AI 调用次数
 
+	// 认证接口 IP 限流（register/login/refresh）
+	AuthIPRateLimitPerMin int // AUTH_IP_RATE_LIMIT_PER_MIN：每 IP 每分钟认证请求数
+	AuthIPRateLimitBurst  int // AUTH_IP_RATE_LIMIT_BURST：认证限流突发容量
+
 	// Metrics
 	MetricsUser string // /metrics Basic Auth 用户名（为空则不注册 /metrics）
 	MetricsPass string // /metrics Basic Auth 密码
@@ -93,6 +97,14 @@ func load(requireJWT bool) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	authIPRate, err := getEnvInt("AUTH_IP_RATE_LIMIT_PER_MIN", 120)
+	if err != nil {
+		return nil, err
+	}
+	authIPBurst, err := getEnvInt("AUTH_IP_RATE_LIMIT_BURST", 20)
+	if err != nil {
+		return nil, err
+	}
 
 	cfg := &Config{
 		ServerAddr:               normalizeServerAddr(getEnv("SERVER_ADDR", ":8080")),
@@ -113,6 +125,8 @@ func load(requireJWT bool) (*Config, error) {
 		OllamaModel:              strings.TrimSpace(os.Getenv("OLLAMA_MODEL")),
 		OllamaDimension:          ollamaDim,
 		AIUserRateLimitPerMin:    aiUserLimit,
+		AuthIPRateLimitPerMin:    authIPRate,
+		AuthIPRateLimitBurst:     authIPBurst,
 		MetricsUser:              strings.TrimSpace(os.Getenv("METRICS_USER")),
 		MetricsPass:              strings.TrimSpace(os.Getenv("METRICS_PASS")),
 	}
