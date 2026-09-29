@@ -12,6 +12,10 @@ export function canManageTechLeads(role?: UserRole): boolean {
   return role === 'product' || role === 'admin';
 }
 
+export function canManageSprints(role?: UserRole): boolean {
+  return role === 'product' || role === 'admin';
+}
+
 export function canCreateStory(role?: UserRole): boolean {
   return role === 'product' || role === 'admin';
 }

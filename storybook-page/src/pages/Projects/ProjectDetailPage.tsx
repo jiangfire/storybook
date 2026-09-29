@@ -12,6 +12,7 @@ import { getErrorMessage } from '../../utils/error';
 import {
   canCreateStory as canCreateStoryPermission,
   canManageProjectMembers,
+  canManageSprints as canManageSprintsPermission,
   canManageTechLeads as canManageTechLeadsPermission,
 } from '../../utils/permissions';
 import type {
@@ -537,6 +538,7 @@ export default function ProjectDetailPage() {
         sprintError={sprintError}
         sprints={sprints}
         statusUpdatingSprintID={statusUpdatingSprintID}
+        canManage={canManageSprintsPermission(user?.role)}
         onCreateSprint={() => setIsCreateSprintOpen(true)}
         onSelectSprint={setSelectedSprintID}
         onUpdateSprintStatus={handleUpdateSprintStatus}

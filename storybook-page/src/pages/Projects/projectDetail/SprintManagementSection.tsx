@@ -7,6 +7,8 @@ interface SprintManagementSectionProps {
   sprintError: string;
   sprints: SprintSummary[];
   statusUpdatingSprintID: number | null;
+  /** 冲刺增删/状态变更后端仅 PM/admin，非管理角色不渲染操作入口 */
+  canManage: boolean;
   onCreateSprint: () => void;
   onSelectSprint: (sprintID: number) => void;
   onUpdateSprintStatus: (sprint: SprintSummary) => Promise<void>;
@@ -19,6 +21,7 @@ export function SprintManagementSection({
   sprintError,
   sprints,
   statusUpdatingSprintID,
+  canManage,
   onCreateSprint,
   onSelectSprint,
   onUpdateSprintStatus,
@@ -32,9 +35,11 @@ export function SprintManagementSection({
           <h2 className="text-lg font-semibold text-text">冲刺管理</h2>
           <p className="mt-1 text-sm text-text-light">统一查看每个冲刺的周期、完成量和下一步动作。</p>
         </div>
-        <Button size="sm" onClick={onCreateSprint}>
-          + 新建冲刺
-        </Button>
+        {canManage && (
+          <Button size="sm" onClick={onCreateSprint}>
+            + 新建冲刺
+          </Button>
+        )}
       </div>
 
       {sprintError && <div className="mb-3 state-panel state-panel-error">{sprintError}</div>}
@@ -69,7 +74,7 @@ export function SprintManagementSection({
                   <Button size="sm" variant="secondary" onClick={() => onSelectSprint(sprint.id)}>
                     查看燃尽图
                   </Button>
-                  {canCancelSprint(sprint.status) && (
+                  {canManage && canCancelSprint(sprint.status) && (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -79,7 +84,7 @@ export function SprintManagementSection({
                       取消冲刺
                     </Button>
                   )}
-                  {sprint.status === 'planned' && (
+                  {canManage && sprint.status === 'planned' && (
                     <Button
                       size="sm"
                       variant="danger"
@@ -89,7 +94,7 @@ export function SprintManagementSection({
                       删除冲刺
                     </Button>
                   )}
-                  {action && (
+                  {canManage && action && (
                     <Button
                       size="sm"
                       onClick={() => void onUpdateSprintStatus(sprint)}
